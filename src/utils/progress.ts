@@ -1,0 +1,65 @@
+import type { AnswerRecord, Difficulty, Profile } from '@/types';
+import { roundRewards, type RoundRewards } from '@/utils/rewards';
+
+export interface RoundResult {
+  highScoreKey: string;
+  score: number;
+  bestStreak: number;
+  history: AnswerRecord[];
+  /** Difficulty the round started at. */
+  difficulty: Difficulty;
+  /** Set when the round was the daily challenge. */
+  dailyDate?: string;
+}
+
+export interface RoundOutcome extends RoundRewards {
+  newHighScore: boolean;
+}
+
+/**
+ * Applies a finished round to a profile: stats, best streak, high score, coins,
+ * stars, the day's play date and the daily challenge. Pure, so it can be tested.
+ */
+export function applyRound(
+  profile: Profile,
+  round: RoundResult,
+  today: string,
+): { profile: Profile; outcome: RoundOutcome } {
+  const stats = { ...profile.stats };
+  for (const r of round.history) {
+    const op = r.problem.operation;
+    stats[op] = {
+      attempted: stats[op].attempted + 1,
+      correct: stats[op].correct + (r.correct ? 1 : 0),
+    };
+  }
+
+  const previous = profile.highScores[round.highScoreKey] ?? 0;
+  const isDaily = round.dailyDate === today;
+  const rewards = roundRewards(round.history, isDaily, profile.dailyChallengeDate === today);
+  const playDates = profile.playDates.includes(today)
+    ? profile.playDates
+    : [...profile.playDates, today];
+
+  return {
+    profile: {
+      ...profile,
+      stats,
+      bestStreak: Math.max(profile.bestStreak, round.bestStreak),
+      highScores: { ...profile.highScores, [round.highScoreKey]: Math.max(previous, round.score) },
+      coins: profile.coins + rewards.coins,
+      stars: profile.stars + rewards.stars,
+      playDates,
+      dailyChallengeDate: rewards.dailyBonusCoins > 0 ? today : profile.dailyChallengeDate,
+      // The daily challenge shouldn't change what the next one is based on.
+      lastDifficulty: isDaily ? profile.lastDifficulty : round.difficulty,
+    },
+    outcome: { ...rewards, newHighScore: round.score > previous },
+  };
+}
+
+/** Accuracy as a whole percent, or null before anything has been tried. */
+export function accuracy(stats: { attempted: number; correct: number }): number | null {
+  if (stats.attempted === 0) return null;
+  return Math.round((stats.correct / stats.attempted) * 100);
+}

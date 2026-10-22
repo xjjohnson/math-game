@@ -39,8 +39,9 @@ export function problemAt(config: GameConfig, index: number, difficulty: Difficu
   return generate(mode.operation, difficulty, rng);
 }
 
-/** Key for saving a best score, e.g. "multiply:easy:10" or "tables-3-7:medium:none". */
+/** Key for saving a best score, e.g. "multiply:easy:10", "tables-3-7:medium:none" or "daily:2026-10-22". */
 export function highScoreKey(config: GameConfig): string {
+  if (config.dailyDate) return `daily:${config.dailyDate}`;
   const mode =
     config.mode.kind === 'operation'
       ? config.mode.operation

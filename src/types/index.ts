@@ -41,6 +41,12 @@ export interface Profile {
   /** Shop item ids the profile owns. */
   unlocks: string[];
   stats: Record<Operation, OperationStats>;
+  /** Local dates ("YYYY-MM-DD") the player finished at least one round, oldest first. */
+  playDates: string[];
+  /** Local date the daily challenge bonus was last earned. */
+  dailyChallengeDate: string | null;
+  /** Difficulty of the last round; the daily challenge uses it. */
+  lastDifficulty: Difficulty;
 }
 
 /** What the round asks: one operation, or chosen times tables. */
@@ -56,6 +62,8 @@ export interface GameConfig {
   adaptive: boolean;
   questionCount: number;
   seed: number;
+  /** Set when this round is the daily challenge for that local date. */
+  dailyDate?: string;
 }
 
 export interface AnswerRecord {

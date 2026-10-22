@@ -45,7 +45,7 @@ export function SettingsScreen() {
         options={MOTION_OPTIONS}
       />
       <Text style={styles.note}>
-        These are saved now; sounds, speech, fonts and colors switch on as later phases land.
+        Sound effects work now (placeholder tones in the browser). Speech, fonts, colors and vibration switch on in a later phase.
       </Text>
       <BigButton label="Reset settings" outline color={colors.wrong} onPress={settings.reset} />
     </Screen>

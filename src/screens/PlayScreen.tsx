@@ -21,7 +21,10 @@ import {
   QUESTIONS_PER_ROUND,
   type SessionState,
 } from '@/utils/gameSession';
+import type { RoundOutcome } from '@/utils/progress';
+import { DAILY_PASS, STREAK_MILESTONE } from '@/utils/rewards';
 import { randomSeed } from '@/utils/seededRandom';
+import { playSound } from '@/utils/soundEffects';
 
 /** How long a right answer stays on screen before the next card. */
 const CORRECT_PAUSE_MS = 900;
@@ -69,13 +72,19 @@ function Round({ config, onPlayAgain }: { config: GameConfig; onPlayAgain: () =>
   const profile = useActiveProfile();
   const recordRound = useProfiles((s) => s.recordRound);
   const [state, dispatch] = useGameSession(config);
-  const [newHighScore, setNewHighScore] = useState(false);
+  const [outcome, setOutcome] = useState<RoundOutcome | null>(null);
   const saved = useRef(false);
 
   const asking = state.phase === 'question';
   const secondsLeft = useTimer(config.timer, asking, state.index, () => dispatch({ type: 'timeout' }));
   const last = lastAnswer(state);
   const inputStyle = resolveInputStyle(profile?.inputStyle, state.difficulty);
+
+  useEffect(() => {
+    if (state.phase !== 'feedback' || !last) return;
+    if (!last.correct) playSound('wrong');
+    else playSound(state.streak % STREAK_MILESTONE === 0 ? 'streak' : 'correct');
+  }, [state.phase, state.streak, last]);
 
   // Right answers move on by themselves; wrong ones wait so the player can read the fix.
   useEffect(() => {
@@ -87,18 +96,24 @@ function Round({ config, onPlayAgain }: { config: GameConfig; onPlayAgain: () =>
   useEffect(() => {
     if (state.phase !== 'finished' || saved.current || !profile) return;
     saved.current = true;
-    setNewHighScore(
-      recordRound(profile.id, {
-        highScoreKey: highScoreKey(config),
-        score: state.score,
-        bestStreak: state.bestStreak,
-        history: state.history,
-      }),
-    );
+    const result = recordRound(profile.id, {
+      highScoreKey: highScoreKey(config),
+      score: state.score,
+      bestStreak: state.bestStreak,
+      history: state.history,
+      difficulty: config.difficulty,
+      dailyDate: config.dailyDate,
+    });
+    setOutcome(result);
+    if (result && (result.dailyBonusCoins > 0 || result.newHighScore || result.stars === 3)) {
+      playSound('reward');
+    }
   }, [state, profile, config, recordRound]);
 
   if (state.phase === 'finished') {
-    return <Results state={state} newHighScore={newHighScore} onPlayAgain={onPlayAgain} />;
+    return (
+      <Results state={state} outcome={outcome} daily={!!config.dailyDate} onPlayAgain={onPlayAgain} />
+    );
   }
 
   const answer = (given: number) =>
@@ -154,11 +169,13 @@ function Round({ config, onPlayAgain }: { config: GameConfig; onPlayAgain: () =>
 
 function Results({
   state,
-  newHighScore,
+  outcome,
+  daily,
   onPlayAgain,
 }: {
   state: SessionState;
-  newHighScore: boolean;
+  outcome: RoundOutcome | null;
+  daily: boolean;
   onPlayAgain: () => void;
 }) {
   const right = correctCount(state);
@@ -168,7 +185,26 @@ function Results({
 
   return (
     <Screen title={cheer}>
-      {newHighScore ? <Text style={styles.highScore}>🏆 New high score!</Text> : null}
+      {outcome ? (
+        <View style={styles.rewards}>
+          <Text
+            style={styles.stars}
+            accessibilityLabel={`${outcome.stars} out of 3 stars`}
+          >
+            {[0, 1, 2].map((i) => (i < outcome.stars ? '★' : '☆')).join(' ')}
+          </Text>
+          <Text style={styles.coins}>+{outcome.coins} 🪙</Text>
+          {outcome.streakBonusCoins > 0 ? (
+            <Text style={styles.bonus}>Includes +{outcome.streakBonusCoins} for streaks of {STREAK_MILESTONE}</Text>
+          ) : null}
+          {outcome.dailyBonusCoins > 0 ? (
+            <Text style={styles.bonus}>🎉 Daily challenge complete! +{outcome.dailyBonusCoins} bonus</Text>
+          ) : daily ? (
+            <Text style={styles.bonus}>Get {DAILY_PASS} right to win the daily bonus.</Text>
+          ) : null}
+          {outcome.newHighScore ? <Text style={styles.highScore}>🏆 New high score!</Text> : null}
+        </View>
+      ) : null}
       <View style={styles.summary}>
         <Stat label="Score" value={String(state.score)} />
         <Stat label="Right" value={`${right} / ${total}`} />
@@ -185,7 +221,7 @@ function Results({
         </View>
       ) : null}
       <BigButton label="Play again" color={colors.correct} onPress={onPlayAgain} />
-      <BigButton label="Change game" outline onPress={() => router.back()} />
+      <BigButton label={daily ? 'Home' : 'Change game'} outline onPress={() => router.back()} />
     </Screen>
   );
 }
@@ -205,6 +241,10 @@ const styles = StyleSheet.create({
   level: { fontSize: 16, fontWeight: '700', color: colors.textMuted, textAlign: 'center' },
   feedback: { fontSize: fontSizes.button, fontWeight: '800', textAlign: 'center' },
   highScore: { fontSize: fontSizes.button, fontWeight: '900', color: colors.accent, textAlign: 'center' },
+  rewards: { alignItems: 'center', gap: spacing.xs },
+  stars: { fontSize: 56, color: colors.accent, letterSpacing: 4 },
+  coins: { fontSize: fontSizes.title, fontWeight: '900', color: colors.text },
+  bonus: { fontSize: 18, fontWeight: '700', color: colors.textMuted, textAlign: 'center' },
   summary: { flexDirection: 'row', gap: spacing.sm },
   stat: {
     flex: 1,

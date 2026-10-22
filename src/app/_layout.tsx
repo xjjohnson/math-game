@@ -20,6 +20,7 @@ export default function RootLayout() {
         <Stack.Screen name="profiles" options={{ title: 'Players' }} />
         <Stack.Screen name="mode" options={{ title: 'New game' }} />
         <Stack.Screen name="play" options={{ title: 'Play' }} />
+        <Stack.Screen name="progress" options={{ title: 'My progress' }} />
         <Stack.Screen name="settings" options={{ title: 'Settings' }} />
       </Stack>
     </>
