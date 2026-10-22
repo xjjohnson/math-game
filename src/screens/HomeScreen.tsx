@@ -73,6 +73,13 @@ export function HomeScreen() {
         />
       ) : null}
       {profile ? (
+        <BigButton
+          label="👥 Play with a friend"
+          color={colors.operations.add}
+          onPress={() => router.push('/multiplayer')}
+        />
+      ) : null}
+      {profile ? (
         <View style={styles.pair}>
           <BigButton
             label="🛍️ Shop"
