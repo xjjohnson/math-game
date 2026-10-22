@@ -1,0 +1,69 @@
+# Builds the Android app and posts it as a download on the "Latest Android app"
+# release, so phones can install it straight from GitHub. Runs on every merge
+# to main, or by hand from the Actions tab ("Run workflow").
+name: Android APK
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: android-apk-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - uses: gradle/actions/setup-gradle@v4
+
+      - run: npm ci
+
+      - name: Typecheck and tests
+        run: |
+          npm run typecheck
+          npm test -- --ci
+
+      - name: Generate the Android project
+        run: npx expo prebuild --platform android --no-install
+        env:
+          EXPO_NO_TELEMETRY: 1
+
+      - name: Build the APK
+        working-directory: android
+        run: ./gradlew assembleRelease --no-daemon
+
+      - name: Name the APK
+        run: cp android/app/build/outputs/apk/release/app-release.apk math-game.apk
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: math-game-apk
+          path: math-game.apk
+
+      - name: Post it on the "Latest Android app" release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release delete latest-apk --yes --cleanup-tag || true
+          gh release create latest-apk math-game.apk \
+            --target "$GITHUB_SHA" \
+            --title "Latest Android app" \
+            --notes "Built from ${GITHUB_REF_NAME} at ${GITHUB_SHA::7}. On each phone, open this page, tap math-game.apk, and allow installing from your browser when asked."
