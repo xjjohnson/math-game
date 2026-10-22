@@ -9,10 +9,10 @@ The full plan lives in [docs/build-plan.md](docs/build-plan.md).
 
 - [x] Phase 1: scaffold (Expo Router navigation, theme, multi-profile store, settings store)
 - [x] Phase 2: math engine and unit tests
-- [ ] Phase 3: single-player core (scoring, timers, number pad, streaks, times tables, adaptive difficulty)
+- [x] Phase 3: single-player core (10-question rounds, scoring, per-question timers, number pad, streaks, times tables, adaptive difficulty, results and high scores)
 - [ ] Phases 4-10: see the build plan
 
-The Play screen is currently a preview that shows problems from the math engine with multiple choice.
+Coins, stars and the daily challenge arrive in Phase 4.
 
 ## Running it
 
@@ -31,12 +31,12 @@ Later phases add native modules (Nearby multiplayer), which need a development b
 
 ```
 src/app         routes (Expo Router); each file just renders a screen
-src/screens     Home, Profiles, ModePicker, Play, Settings
-src/components  BigButton, OptionGroup, ChoiceButtons, Screen
+src/screens     Home, Profiles, ModePicker, Play (round + results), Settings
+src/components  BigButton, OptionGroup, ChoiceButtons, NumberPad, FlashCard, TimerBar, Screen
 src/constants   theme, difficulty configs
 src/store       Zustand stores persisted to AsyncStorage
-src/utils       mathEngine, seededRandom (+ tests in __tests__)
+src/utils       mathEngine, gameSession, scoring, adaptive, seededRandom (+ tests in __tests__)
 src/types       shared types
-src/hooks       (Phase 3)
+src/hooks       useTimer, useGameSession
 src/services    multiplayer transports (Phases 7-9)
 ```
