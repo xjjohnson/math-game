@@ -36,9 +36,33 @@ export interface Profile {
   coins: number;
   stars: number;
   bestStreak: number;
-  /** Keyed by `${operation}:${difficulty}:${timer}`. */
+  /** Keyed by highScoreKey(config), e.g. "multiply:easy:10". */
   highScores: Record<string, number>;
   /** Shop item ids the profile owns. */
   unlocks: string[];
   stats: Record<Operation, OperationStats>;
+}
+
+/** What the round asks: one operation, or chosen times tables. */
+export type GameMode =
+  | { kind: 'operation'; operation: Operation }
+  | { kind: 'tables'; tables: number[]; includeDivision: boolean };
+
+export interface GameConfig {
+  mode: GameMode;
+  difficulty: Difficulty;
+  timer: TimerSetting;
+  /** Step difficulty up or down from recent accuracy (operation mode only). */
+  adaptive: boolean;
+  questionCount: number;
+  seed: number;
+}
+
+export interface AnswerRecord {
+  problem: Problem;
+  difficulty: Difficulty;
+  /** null when the timer ran out. */
+  given: number | null;
+  correct: boolean;
+  points: number;
 }
