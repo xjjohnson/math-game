@@ -1,5 +1,7 @@
 import type { AnswerRecord, Difficulty, Profile } from '@/types';
+import { newBadges } from '@/utils/badges';
 import { roundRewards, type RoundRewards } from '@/utils/rewards';
+import { recordWeek, WEEKLY_GOAL_BONUS } from '@/utils/weekly';
 
 export interface RoundResult {
   highScoreKey: string;
@@ -14,11 +16,16 @@ export interface RoundResult {
 
 export interface RoundOutcome extends RoundRewards {
   newHighScore: boolean;
+  /** Paid on the round that completes every weekly goal; included in `coins`. */
+  weeklyBonusCoins: number;
+  /** Badge ids earned by this round. */
+  newBadges: string[];
 }
 
 /**
  * Applies a finished round to a profile: stats, best streak, high score, coins,
- * stars, the day's play date and the daily challenge. Pure, so it can be tested.
+ * stars, the day's play date, the daily challenge, weekly goals and badges.
+ * Pure, so it can be tested.
  */
 export function applyRound(
   profile: Profile,
@@ -41,20 +48,42 @@ export function applyRound(
     ? profile.playDates
     : [...profile.playDates, today];
 
+  const correct = round.history.filter((r) => r.correct).length;
+  const { week, justCompleted } = recordWeek(profile.week, today, correct);
+  const weeklyBonusCoins = justCompleted ? WEEKLY_GOAL_BONUS : 0;
+
+  const updated: Profile = {
+    ...profile,
+    stats,
+    bestStreak: Math.max(profile.bestStreak, round.bestStreak),
+    highScores: { ...profile.highScores, [round.highScoreKey]: Math.max(previous, round.score) },
+    coins: profile.coins + rewards.coins + weeklyBonusCoins,
+    stars: profile.stars + rewards.stars,
+    playDates,
+    dailyChallengeDate: rewards.dailyBonusCoins > 0 ? today : profile.dailyChallengeDate,
+    // The daily challenge shouldn't change what the next one is based on.
+    lastDifficulty: isDaily ? profile.lastDifficulty : round.difficulty,
+    week,
+  };
+
+  const earned = newBadges(updated, {
+    history: round.history,
+    difficulty: round.difficulty,
+    stars: rewards.stars,
+    wonDaily: rewards.dailyBonusCoins > 0,
+    weeklyCompleted: justCompleted,
+    today,
+  });
+
   return {
-    profile: {
-      ...profile,
-      stats,
-      bestStreak: Math.max(profile.bestStreak, round.bestStreak),
-      highScores: { ...profile.highScores, [round.highScoreKey]: Math.max(previous, round.score) },
-      coins: profile.coins + rewards.coins,
-      stars: profile.stars + rewards.stars,
-      playDates,
-      dailyChallengeDate: rewards.dailyBonusCoins > 0 ? today : profile.dailyChallengeDate,
-      // The daily challenge shouldn't change what the next one is based on.
-      lastDifficulty: isDaily ? profile.lastDifficulty : round.difficulty,
+    profile: { ...updated, badges: [...updated.badges, ...earned] },
+    outcome: {
+      ...rewards,
+      coins: rewards.coins + weeklyBonusCoins,
+      weeklyBonusCoins,
+      newHighScore: round.score > previous,
+      newBadges: earned,
     },
-    outcome: { ...rewards, newHighScore: round.score > previous },
   };
 }
 

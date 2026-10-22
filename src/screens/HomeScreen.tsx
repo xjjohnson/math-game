@@ -8,6 +8,7 @@ import { colors, fontSizes, spacing } from '@/constants/theme';
 import { useActiveProfile } from '@/store/profiles';
 import { dateKey, dayStreak } from '@/utils/dates';
 import { DAILY_CHALLENGE_BONUS, DAILY_PASS, dailyChallengeConfig } from '@/utils/rewards';
+import { companionFor } from '@/utils/shop';
 
 export function HomeScreen() {
   const profile = useActiveProfile();
@@ -18,13 +19,17 @@ export function HomeScreen() {
   const dailyOperation = daily?.mode.kind === 'operation' ? daily.mode.operation : undefined;
   const dailyOp = OPERATIONS.find((o) => o.value === dailyOperation);
   const days = profile ? dayStreak(profile.playDates, today) : 0;
+  const companion = companionFor(profile);
 
   return (
     <Screen title="Math Game">
       <View style={styles.profile}>
         {profile ? (
           <>
-            <Text style={styles.avatar}>{profile.avatar}</Text>
+            <Text style={styles.avatar}>
+              {profile.avatar}
+              {companion ? <Text style={styles.buddy}> {companion.emoji}</Text> : null}
+            </Text>
             <Text style={styles.name}>Hi, {profile.name}!</Text>
             <Text style={styles.stats}>
               🪙 {profile.coins}   ⭐ {profile.stars}   📅 {days} {days === 1 ? 'day' : 'days'}
@@ -53,7 +58,20 @@ export function HomeScreen() {
         />
       ) : null}
       {profile ? (
-        <BigButton label="My progress" color={colors.accent} onPress={() => router.push('/progress')} />
+        <View style={styles.pair}>
+          <BigButton
+            label="🛍️ Shop"
+            color={colors.operations.subtract}
+            onPress={() => router.push('/shop')}
+            style={styles.half}
+          />
+          <BigButton
+            label="My progress"
+            color={colors.accent}
+            onPress={() => router.push('/progress')}
+            style={styles.half}
+          />
+        </View>
       ) : null}
       <BigButton
         label={profile ? 'Switch player' : 'Create a player'}
@@ -69,6 +87,9 @@ export function HomeScreen() {
 const styles = StyleSheet.create({
   profile: { alignItems: 'center', gap: spacing.xs, marginBottom: spacing.md },
   avatar: { fontSize: 72 },
+  buddy: { fontSize: 44 },
+  pair: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.md },
+  half: { flexGrow: 1, flexBasis: '40%' },
   name: { fontSize: fontSizes.button, fontWeight: '700', color: colors.text, textAlign: 'center' },
   stats: { fontSize: fontSizes.body, color: colors.textMuted, fontVariant: ['tabular-nums'] },
 });

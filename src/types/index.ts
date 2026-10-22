@@ -47,6 +47,28 @@ export interface Profile {
   dailyChallengeDate: string | null;
   /** Difficulty of the last round; the daily challenge uses it. */
   lastDifficulty: Difficulty;
+  /** Shop item ids in use (the avatar is stored as `avatar` itself). */
+  equipped: Equipped;
+  /** Earned badge ids, in the order they were earned. */
+  badges: string[];
+  /** This week's goal progress; null before the first round. */
+  week: WeekProgress | null;
+}
+
+export interface Equipped {
+  background: string;
+  cardStyle: string;
+  companion: string | null;
+}
+
+export interface WeekProgress {
+  /** Sunday that starts the week, "YYYY-MM-DD". */
+  week: string;
+  correct: number;
+  rounds: number;
+  days: string[];
+  /** True once every weekly goal has been met (pays out once). */
+  completed: boolean;
 }
 
 /** What the round asks: one operation, or chosen times tables. */

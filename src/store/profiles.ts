@@ -1,10 +1,12 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 
+import { DEFAULT_EQUIPPED } from '@/constants/shop';
 import { persistStorage } from '@/store/storage';
 import type { InputStyle, Profile } from '@/types';
 import { dateKey } from '@/utils/dates';
 import { applyRound, type RoundOutcome, type RoundResult } from '@/utils/progress';
+import { buyItem, equipItem, type BuyResult } from '@/utils/shop';
 
 function emptyStats(): Profile['stats'] {
   return {
@@ -35,6 +37,9 @@ export function createProfile(name: string, avatar: string, inputStyle: InputSty
     playDates: [],
     dailyChallengeDate: null,
     lastDifficulty: 'easy',
+    equipped: { ...DEFAULT_EQUIPPED },
+    badges: [],
+    week: null,
   };
 }
 
@@ -47,6 +52,8 @@ interface ProfilesState {
   updateProfile: (id: string, changes: Partial<Omit<Profile, 'id'>>) => void;
   /** Saves a finished round and returns what it earned. */
   recordRound: (id: string, round: RoundResult) => RoundOutcome | null;
+  buy: (id: string, itemId: string) => BuyResult;
+  equip: (id: string, itemId: string) => void;
 }
 
 export const useProfiles = create<ProfilesState>()(
@@ -78,10 +85,21 @@ export const useProfiles = create<ProfilesState>()(
         set((s) => ({ profiles: s.profiles.map((p) => (p.id === id ? profile : p)) }));
         return outcome;
       },
+      buy: (id, itemId) => {
+        const current = get().profiles.find((p) => p.id === id);
+        if (!current) return { ok: false, reason: 'unknown' };
+        const result = buyItem(current, itemId);
+        if (result.ok) {
+          set((s) => ({ profiles: s.profiles.map((p) => (p.id === id ? result.profile : p)) }));
+        }
+        return result;
+      },
+      equip: (id, itemId) =>
+        set((s) => ({ profiles: s.profiles.map((p) => (p.id === id ? equipItem(p, itemId) : p)) })),
     }),
     {
       name: 'math-game.profiles',
-      version: 2,
+      version: 3,
       storage: persistStorage,
       migrate: (persisted, version) => {
         const state = persisted as Pick<ProfilesState, 'profiles' | 'activeProfileId'>;
@@ -92,6 +110,15 @@ export const useProfiles = create<ProfilesState>()(
             playDates: p.playDates ?? [],
             dailyChallengeDate: p.dailyChallengeDate ?? null,
             lastDifficulty: p.lastDifficulty ?? 'easy',
+          }));
+        }
+        if (version < 3) {
+          // Version 3 added the shop (equipped items), badges and weekly goals.
+          state.profiles = state.profiles.map((p) => ({
+            ...p,
+            equipped: p.equipped ?? { ...DEFAULT_EQUIPPED },
+            badges: p.badges ?? [],
+            week: p.week ?? null,
           }));
         }
         return state as ProfilesState;

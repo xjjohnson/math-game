@@ -4,10 +4,12 @@ import { StyleSheet, Text, View } from 'react-native';
 
 import { BigButton } from '@/components/BigButton';
 import { ChoiceButtons } from '@/components/ChoiceButtons';
+import { CompanionBubble } from '@/components/CompanionBubble';
 import { FlashCard } from '@/components/FlashCard';
 import { NumberPad } from '@/components/NumberPad';
 import { Screen } from '@/components/Screen';
 import { TimerBar } from '@/components/TimerBar';
+import { findBadge } from '@/constants/badges';
 import { DIFFICULTIES } from '@/constants/difficulty';
 import { colors, fontSizes, radius, spacing } from '@/constants/theme';
 import { useGameSession } from '@/hooks/useGameSession';
@@ -24,6 +26,7 @@ import {
 import type { RoundOutcome } from '@/utils/progress';
 import { DAILY_PASS, STREAK_MILESTONE } from '@/utils/rewards';
 import { randomSeed } from '@/utils/seededRandom';
+import { cardStyleFor, companionFor } from '@/utils/shop';
 import { playSound } from '@/utils/soundEffects';
 
 /** How long a right answer stays on screen before the next card. */
@@ -79,6 +82,7 @@ function Round({ config, onPlayAgain }: { config: GameConfig; onPlayAgain: () =>
   const secondsLeft = useTimer(config.timer, asking, state.index, () => dispatch({ type: 'timeout' }));
   const last = lastAnswer(state);
   const inputStyle = resolveInputStyle(profile?.inputStyle, state.difficulty);
+  const companion = companionFor(profile);
 
   useEffect(() => {
     if (state.phase !== 'feedback' || !last) return;
@@ -105,7 +109,14 @@ function Round({ config, onPlayAgain }: { config: GameConfig; onPlayAgain: () =>
       dailyDate: config.dailyDate,
     });
     setOutcome(result);
-    if (result && (result.dailyBonusCoins > 0 || result.newHighScore || result.stars === 3)) {
+    if (
+      result &&
+      (result.dailyBonusCoins > 0 ||
+        result.weeklyBonusCoins > 0 ||
+        result.newBadges.length > 0 ||
+        result.newHighScore ||
+        result.stars === 3)
+    ) {
       playSound('reward');
     }
   }, [state, profile, config, recordRound]);
@@ -137,7 +148,19 @@ function Round({ config, onPlayAgain }: { config: GameConfig; onPlayAgain: () =>
         <TimerBar total={config.timer} left={secondsLeft} />
       ) : null}
 
-      <FlashCard problem={state.problem} reveal={!!showFeedback && !last.correct} />
+      <FlashCard
+        problem={state.problem}
+        reveal={!!showFeedback && !last.correct}
+        cardStyle={cardStyleFor(profile)}
+      />
+
+      {companion ? (
+        <CompanionBubble
+          companion={companion}
+          correct={showFeedback ? last.correct : null}
+          turn={state.index}
+        />
+      ) : null}
 
       {showFeedback ? (
         <Text style={[styles.feedback, { color: last.correct ? colors.correct : colors.wrong }]}>
@@ -202,7 +225,18 @@ function Results({
           ) : daily ? (
             <Text style={styles.bonus}>Get {DAILY_PASS} right to win the daily bonus.</Text>
           ) : null}
+          {outcome.weeklyBonusCoins > 0 ? (
+            <Text style={styles.bonus}>🏆 All weekly goals done! +{outcome.weeklyBonusCoins} bonus</Text>
+          ) : null}
           {outcome.newHighScore ? <Text style={styles.highScore}>🏆 New high score!</Text> : null}
+          {outcome.newBadges.map((id) => {
+            const badge = findBadge(id);
+            return badge ? (
+              <Text key={id} style={styles.badge}>
+                {badge.emoji} New badge: {badge.name}
+              </Text>
+            ) : null;
+          })}
         </View>
       ) : null}
       <View style={styles.summary}>
@@ -245,6 +279,7 @@ const styles = StyleSheet.create({
   stars: { fontSize: 56, color: colors.accent, letterSpacing: 4 },
   coins: { fontSize: fontSizes.title, fontWeight: '900', color: colors.text },
   bonus: { fontSize: 18, fontWeight: '700', color: colors.textMuted, textAlign: 'center' },
+  badge: { fontSize: fontSizes.body, fontWeight: '900', color: colors.primary, textAlign: 'center' },
   summary: { flexDirection: 'row', gap: spacing.sm },
   stat: {
     flex: 1,

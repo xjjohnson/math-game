@@ -11,9 +11,10 @@ The full plan lives in [docs/build-plan.md](docs/build-plan.md).
 - [x] Phase 2: math engine and unit tests
 - [x] Phase 3: single-player core (10-question rounds, scoring, per-question timers, number pad, streaks, times tables, adaptive difficulty, results and high scores)
 - [x] Phase 4: rewards (coins, stars, streak bonuses, daily challenge, day streak calendar, progress screen, sound effect hooks)
-- [ ] Phases 5-10: see the build plan
+- [x] Phase 5: shop and avatar (avatars, backgrounds, card styles, buddies), badges, weekly goals
+- [ ] Phases 6-10: see the build plan
 
-The shop where coins get spent arrives in Phase 5. Sounds are placeholder tones on web and silent on Android until real sound files are added.
+Sounds are placeholder tones on web and silent on Android until real sound files are added.
 
 ## Running it
 
@@ -32,12 +33,14 @@ Later phases add native modules (Nearby multiplayer), which need a development b
 
 ```
 src/app         routes (Expo Router); each file just renders a screen
-src/screens     Home, Profiles, ModePicker, Play (round + results), Progress, Settings
-src/components  BigButton, OptionGroup, ChoiceButtons, NumberPad, FlashCard, TimerBar, StreakCalendar, Screen
-src/constants   theme, difficulty configs
+src/screens     Home, Profiles, ModePicker, Play (round + results), Progress, Shop, Settings
+src/components  BigButton, OptionGroup, ChoiceButtons, NumberPad, FlashCard, TimerBar,
+                StreakCalendar, CompanionBubble, Screen
+src/constants   theme, difficulty configs, shop catalog, badges
 src/store       Zustand stores persisted to AsyncStorage
 src/utils       mathEngine, gameSession, scoring, adaptive, rewards, progress, dates,
-                soundEffects, seededRandom (+ tests in __tests__)
+                shop, badges, weekly, soundEffects, seededRandom (+ tests in __tests__)
+src/test        shared test fixtures
 src/types       shared types
 src/hooks       useTimer, useGameSession
 src/services    multiplayer transports (Phases 7-9)
