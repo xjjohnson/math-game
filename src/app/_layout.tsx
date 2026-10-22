@@ -37,7 +37,7 @@ export default function RootLayout() {
         <Stack.Screen name="nearby-test" options={{ title: 'Nearby test' }} />
         <Stack.Screen name="multiplayer" options={{ title: 'Play with a friend' }} />
         <Stack.Screen name="pass-play" options={{ title: 'Take turns' }} />
-        <Stack.Screen name="nearby-play" options={{ title: 'Two phones' }} />
+        <Stack.Screen name="nearby-play" options={{ title: 'Several phones' }} />
       </Stack>
     </>
   );

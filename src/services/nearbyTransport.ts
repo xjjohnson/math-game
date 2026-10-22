@@ -54,8 +54,8 @@ class NearbyTransport extends Emitter implements Transport {
     await Nearby!.connect(name, peerId).catch((e) => this.fail(e));
   }
 
-  async send(msg: GameMessage) {
-    await Nearby!.send(null, encodeMessage(msg)).catch((e) => this.fail(e));
+  async send(msg: GameMessage, to?: string) {
+    await Nearby!.send(to ?? null, encodeMessage(msg)).catch((e) => this.fail(e));
   }
 
   disconnect() {

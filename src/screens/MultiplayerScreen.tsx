@@ -11,24 +11,24 @@ export function MultiplayerScreen() {
   return (
     <Screen title="Play with a friend">
       <BigButton
-        label="📱📱 Two phones"
+        label="📱📱 Several phones"
         color={colors.primary}
         disabled={!Nearby}
-        accessibilityHint="Race or team up with a friend on another phone nearby."
+        accessibilityHint="Race or team up with up to 7 friends on their own phones nearby."
         onPress={() => router.push('/nearby-play')}
       />
       <Text style={styles.note}>
         {Nearby
-          ? 'Race to 10 or team up against the clock. Works without Wi-Fi or internet.'
-          : 'Two phones needs the Math Game app on Android.'}
+          ? 'Up to 8 phones. Race to 10 or team up against the clock. No Wi-Fi or internet needed.'
+          : 'Playing on several phones needs the Math Game app on Android.'}
       </Text>
       <BigButton
         label="📱 One phone, take turns"
         color={colors.accent}
-        accessibilityHint="Two players answer 10 questions each on this device."
+        accessibilityHint="Up to 6 players answer 10 questions each on this device."
         onPress={() => router.push('/pass-play')}
       />
-      <Text style={styles.note}>Each player answers 10, then hands the phone over.</Text>
+      <Text style={styles.note}>2 to 6 players. Each answers 10, then hands the phone on.</Text>
     </Screen>
   );
 }
