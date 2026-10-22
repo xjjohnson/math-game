@@ -3,6 +3,8 @@ import { ScrollView, StyleSheet, Text } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { colors, fontSizes, spacing } from '@/constants/theme';
+import { useActiveProfile } from '@/store/profiles';
+import { backgroundColor } from '@/utils/shop';
 
 interface Props {
   title?: string;
@@ -11,8 +13,12 @@ interface Props {
 
 /** Standard page wrapper: safe area, scrolling, centered column for tablets and PC. */
 export function Screen({ title, children }: Props) {
+  const background = backgroundColor(useActiveProfile());
   return (
-    <SafeAreaView style={styles.safe} edges={['top', 'bottom', 'left', 'right']}>
+    <SafeAreaView
+      style={[styles.safe, { backgroundColor: background }]}
+      edges={['top', 'bottom', 'left', 'right']}
+    >
       <ScrollView contentContainerStyle={styles.content}>
         {title ? <Text style={styles.title} accessibilityRole="header">{title}</Text> : null}
         {children}
@@ -22,7 +28,7 @@ export function Screen({ title, children }: Props) {
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: colors.background },
+  safe: { flex: 1 },
   content: {
     padding: spacing.lg,
     gap: spacing.md,

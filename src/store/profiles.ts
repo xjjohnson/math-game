@@ -1,8 +1,12 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 
-import type { AnswerRecord, InputStyle, Profile } from '@/types';
+import { DEFAULT_EQUIPPED } from '@/constants/shop';
 import { persistStorage } from '@/store/storage';
+import type { InputStyle, Profile } from '@/types';
+import { dateKey } from '@/utils/dates';
+import { applyRound, type RoundOutcome, type RoundResult } from '@/utils/progress';
+import { buyItem, equipItem, type BuyResult } from '@/utils/shop';
 
 function emptyStats(): Profile['stats'] {
   return {
@@ -30,6 +34,12 @@ export function createProfile(name: string, avatar: string, inputStyle: InputSty
     highScores: {},
     unlocks: [],
     stats: emptyStats(),
+    playDates: [],
+    dailyChallengeDate: null,
+    lastDifficulty: 'easy',
+    equipped: { ...DEFAULT_EQUIPPED },
+    badges: [],
+    week: null,
   };
 }
 
@@ -40,34 +50,10 @@ interface ProfilesState {
   removeProfile: (id: string) => void;
   setActiveProfile: (id: string) => void;
   updateProfile: (id: string, changes: Partial<Omit<Profile, 'id'>>) => void;
-  /** Saves a finished round. Returns true when it set a new high score. */
-  recordRound: (id: string, round: RoundResult) => boolean;
-}
-
-export interface RoundResult {
-  highScoreKey: string;
-  score: number;
-  bestStreak: number;
-  history: AnswerRecord[];
-}
-
-/** Applies a finished round to a profile's stats, best streak and high scores. */
-export function applyRound(profile: Profile, round: RoundResult): Profile {
-  const stats = { ...profile.stats };
-  for (const r of round.history) {
-    const op = r.problem.operation;
-    stats[op] = {
-      attempted: stats[op].attempted + 1,
-      correct: stats[op].correct + (r.correct ? 1 : 0),
-    };
-  }
-  const previous = profile.highScores[round.highScoreKey] ?? 0;
-  return {
-    ...profile,
-    stats,
-    bestStreak: Math.max(profile.bestStreak, round.bestStreak),
-    highScores: { ...profile.highScores, [round.highScoreKey]: Math.max(previous, round.score) },
-  };
+  /** Saves a finished round and returns what it earned. */
+  recordRound: (id: string, round: RoundResult) => RoundOutcome | null;
+  buy: (id: string, itemId: string) => BuyResult;
+  equip: (id: string, itemId: string) => void;
 }
 
 export const useProfiles = create<ProfilesState>()(
@@ -93,14 +79,51 @@ export const useProfiles = create<ProfilesState>()(
           profiles: s.profiles.map((p) => (p.id === id ? { ...p, ...changes } : p)),
         })),
       recordRound: (id, round) => {
-        const profile = get().profiles.find((p) => p.id === id);
-        if (!profile) return false;
-        const isHighScore = round.score > (profile.highScores[round.highScoreKey] ?? 0);
-        set((s) => ({ profiles: s.profiles.map((p) => (p.id === id ? applyRound(p, round) : p)) }));
-        return isHighScore;
+        const current = get().profiles.find((p) => p.id === id);
+        if (!current) return null;
+        const { profile, outcome } = applyRound(current, round, dateKey());
+        set((s) => ({ profiles: s.profiles.map((p) => (p.id === id ? profile : p)) }));
+        return outcome;
       },
+      buy: (id, itemId) => {
+        const current = get().profiles.find((p) => p.id === id);
+        if (!current) return { ok: false, reason: 'unknown' };
+        const result = buyItem(current, itemId);
+        if (result.ok) {
+          set((s) => ({ profiles: s.profiles.map((p) => (p.id === id ? result.profile : p)) }));
+        }
+        return result;
+      },
+      equip: (id, itemId) =>
+        set((s) => ({ profiles: s.profiles.map((p) => (p.id === id ? equipItem(p, itemId) : p)) })),
     }),
-    { name: 'math-game.profiles', version: 1, storage: persistStorage },
+    {
+      name: 'math-game.profiles',
+      version: 3,
+      storage: persistStorage,
+      migrate: (persisted, version) => {
+        const state = persisted as Pick<ProfilesState, 'profiles' | 'activeProfileId'>;
+        if (version < 2) {
+          // Version 2 added play dates, the daily challenge and last difficulty.
+          state.profiles = state.profiles.map((p) => ({
+            ...p,
+            playDates: p.playDates ?? [],
+            dailyChallengeDate: p.dailyChallengeDate ?? null,
+            lastDifficulty: p.lastDifficulty ?? 'easy',
+          }));
+        }
+        if (version < 3) {
+          // Version 3 added the shop (equipped items), badges and weekly goals.
+          state.profiles = state.profiles.map((p) => ({
+            ...p,
+            equipped: p.equipped ?? { ...DEFAULT_EQUIPPED },
+            badges: p.badges ?? [],
+            week: p.week ?? null,
+          }));
+        }
+        return state as ProfilesState;
+      },
+    },
   ),
 );
 
