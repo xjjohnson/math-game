@@ -1,0 +1,20 @@
+plugins {
+  id 'com.android.library'
+  id 'expo-module-gradle-plugin'
+}
+
+group = 'com.xjjohnson.mathgame'
+version = '0.1.0'
+
+android {
+  namespace "expo.modules.mathnearby"
+  defaultConfig {
+    versionCode 1
+    versionName "0.1.0"
+  }
+}
+
+dependencies {
+  // Google Nearby Connections: Bluetooth + Wi-Fi Direct, no internet needed.
+  implementation 'com.google.android.gms:play-services-nearby:19.3.0'
+}

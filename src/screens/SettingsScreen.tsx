@@ -49,6 +49,7 @@ export function SettingsScreen() {
       <Text style={styles.note}>
         Reading aloud uses the device voice. Vibration works on phones only. Sound effects are placeholder tones in the browser.
       </Text>
+      <BigButton label="📡 Play nearby (test)" outline onPress={() => router.push('/permissions')} />
       <BigButton label="🔒 Parent area" color={colors.text} onPress={() => router.push('/parent')} />
       <BigButton label="Reset settings" outline color={colors.wrong} onPress={settings.reset} />
     </Screen>
