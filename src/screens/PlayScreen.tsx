@@ -18,7 +18,7 @@ import { usePalette } from '@/hooks/useAccessibility';
 import { useGameSession } from '@/hooks/useGameSession';
 import { useTimer } from '@/hooks/useTimer';
 import { useActiveProfile, useProfiles } from '@/store/profiles';
-import type { Difficulty, GameConfig, InputStyle } from '@/types';
+import type { GameConfig } from '@/types';
 import { speakProblem, stopSpeaking, vibrate } from '@/utils/feedback';
 import {
   correctCount,
@@ -27,6 +27,7 @@ import {
   QUESTIONS_PER_ROUND,
   type SessionState,
 } from '@/utils/gameSession';
+import { resolveInputStyle } from '@/utils/inputStyle';
 import type { RoundOutcome } from '@/utils/progress';
 import { DAILY_PASS, STREAK_MILESTONE } from '@/utils/rewards';
 import { randomSeed } from '@/utils/seededRandom';
@@ -53,12 +54,6 @@ function parseConfig(raw: string | undefined): GameConfig {
   } catch {
     return fallback;
   }
-}
-
-/** "Auto" means multiple choice on Easy and the number pad above it. */
-function resolveInputStyle(style: InputStyle | undefined, difficulty: Difficulty): InputStyle {
-  if (style === 'choices' || style === 'numpad') return style;
-  return difficulty === 'easy' ? 'choices' : 'numpad';
 }
 
 export function PlayScreen() {

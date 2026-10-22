@@ -1,0 +1,103 @@
+import { useCallback, useEffect, useState } from 'react';
+import { StyleSheet } from 'react-native';
+
+import { Text } from '@/components/AppText';
+import { ChoiceButtons } from '@/components/ChoiceButtons';
+import { FlashCard, isStacked } from '@/components/FlashCard';
+import { NumberPad } from '@/components/NumberPad';
+import { DIFFICULTIES } from '@/constants/difficulty';
+import { fontSizes } from '@/constants/theme';
+import { usePalette } from '@/hooks/useAccessibility';
+import type { Difficulty, InputStyle, Problem } from '@/types';
+import { speakProblem, stopSpeaking, vibrate } from '@/utils/feedback';
+import { playSound } from '@/utils/soundEffects';
+
+const RIGHT_PAUSE_MS = 700;
+const WRONG_PAUSE_MS = 1600;
+
+interface Props {
+  problem: Problem;
+  difficulty: Difficulty;
+  inputStyle: InputStyle;
+  /** Called the moment the player answers. */
+  onAnswer: (given: number, correct: boolean) => void;
+  /** Called after the right/wrong pause, to move to the next card. */
+  onNext: () => void;
+  /** Stops taking answers, e.g. while waiting for the other phone. */
+  disabled?: boolean;
+}
+
+/**
+ * One card and its answer buttons, for the two-player games. It shows ✓ or the
+ * right answer briefly, then moves on by itself so nobody has to tap Next.
+ * Give it a new `key` for each card.
+ */
+export function QuestionPanel({ problem, difficulty, inputStyle, onAnswer, onNext, disabled }: Props) {
+  const palette = usePalette();
+  const [given, setGiven] = useState<number | null>(null);
+  const [entry, setEntry] = useState('');
+  const onEntryChange = useCallback((value: string) => setEntry(value), []);
+  const answered = given !== null;
+  const correct = given === problem.answer;
+
+  useEffect(() => {
+    speakProblem(problem);
+    return stopSpeaking;
+  }, [problem]);
+
+  useEffect(() => {
+    if (!answered) return;
+    const id = setTimeout(onNext, correct ? RIGHT_PAUSE_MS : WRONG_PAUSE_MS);
+    return () => clearTimeout(id);
+    // onNext may be a new function each render; the pause should start once.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [answered, correct]);
+
+  const answer = (value: number) => {
+    if (answered || disabled) return;
+    const right = value === problem.answer;
+    setGiven(value);
+    vibrate(right ? 'correct' : 'wrong');
+    playSound(right ? 'correct' : 'wrong');
+    onAnswer(value, right);
+  };
+
+  const allowNegative =
+    DIFFICULTIES[difficulty].allowNegatives && problem.operation === 'subtract' && !problem.story;
+
+  return (
+    <>
+      <FlashCard
+        problem={problem}
+        reveal={answered}
+        entry={entry}
+        onSpeak={() => speakProblem(problem, true)}
+      />
+      {answered ? (
+        <Text style={[styles.feedback, { color: correct ? palette.correct : palette.wrong }]}>
+          {correct ? '✓ Right!' : `✗ It's ${problem.answer}`}
+        </Text>
+      ) : null}
+      {inputStyle === 'choices' ? (
+        <ChoiceButtons
+          choices={problem.choices}
+          selected={given}
+          answer={problem.answer}
+          onSelect={answer}
+        />
+      ) : answered ? null : (
+        <NumberPad
+          onSubmit={answer}
+          allowNegative={allowNegative}
+          disabled={disabled}
+          onEntryChange={onEntryChange}
+          hideDisplay={isStacked(problem)}
+        />
+      )}
+    </>
+  );
+}
+
+const styles = StyleSheet.create({
+  feedback: { fontSize: fontSizes.button, fontWeight: '800', textAlign: 'center' },
+});
