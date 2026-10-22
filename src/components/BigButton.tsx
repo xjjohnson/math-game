@@ -1,5 +1,6 @@
-import { Pressable, StyleSheet, Text, type StyleProp, type ViewStyle } from 'react-native';
+import { Pressable, StyleSheet, type StyleProp, type ViewStyle } from 'react-native';
 
+import { Text } from '@/components/AppText';
 import { colors, fontSizes, radius, spacing, TAP_TARGET } from '@/constants/theme';
 
 interface Props {

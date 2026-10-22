@@ -37,5 +37,6 @@ export const makeProfile = (overrides: Partial<Profile> = {}): Profile => ({
   equipped: { ...DEFAULT_EQUIPPED },
   badges: [],
   week: null,
+  missed: {},
   ...overrides,
 });

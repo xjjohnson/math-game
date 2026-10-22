@@ -20,6 +20,19 @@ export interface Problem {
   prompt: string;
   /** Shuffled answer options, always including the correct answer. */
   choices: number[];
+  /** Word problem text, when the round uses word problems. */
+  story?: string;
+}
+
+/** The parts of a problem needed to ask it again later. */
+export type Fact = Pick<Problem, 'operation' | 'a' | 'b' | 'answer' | 'prompt'>;
+
+export interface MissedFact extends Fact {
+  misses: number;
+  /** Right answers in a row since the last miss; 2 clears the fact. */
+  rightInARow: number;
+  /** Local date of the latest miss. */
+  lastMissed: string;
 }
 
 export interface OperationStats {
@@ -53,6 +66,8 @@ export interface Profile {
   badges: string[];
   /** This week's goal progress; null before the first round. */
   week: WeekProgress | null;
+  /** Facts to review, keyed by factKey(). */
+  missed: Record<string, MissedFact>;
 }
 
 export interface Equipped {
@@ -74,7 +89,9 @@ export interface WeekProgress {
 /** What the round asks: one operation, or chosen times tables. */
 export type GameMode =
   | { kind: 'operation'; operation: Operation }
-  | { kind: 'tables'; tables: number[]; includeDivision: boolean };
+  | { kind: 'tables'; tables: number[]; includeDivision: boolean }
+  /** Practice facts the player got wrong before. */
+  | { kind: 'review'; facts: Fact[] };
 
 export interface GameConfig {
   mode: GameMode;
@@ -86,6 +103,8 @@ export interface GameConfig {
   seed: number;
   /** Set when this round is the daily challenge for that local date. */
   dailyDate?: string;
+  /** Ask each problem as a short story (operation mode only). */
+  wordProblems?: boolean;
 }
 
 export interface AnswerRecord {

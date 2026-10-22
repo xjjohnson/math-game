@@ -12,7 +12,8 @@ The full plan lives in [docs/build-plan.md](docs/build-plan.md).
 - [x] Phase 3: single-player core (10-question rounds, scoring, per-question timers, number pad, streaks, times tables, adaptive difficulty, results and high scores)
 - [x] Phase 4: rewards (coins, stars, streak bonuses, daily challenge, day streak calendar, progress screen, sound effect hooks)
 - [x] Phase 5: shop and avatar (avatars, backgrounds, card styles, buddies), badges, weekly goals
-- [ ] Phases 6-10: see the build plan
+- [x] Phase 6: polish (bigger problems stacked in columns, animations, read aloud, vibration, dyslexia font, colorblind colors, reduce motion, word problems, tricky-facts review, PIN-protected parent report)
+- [ ] Phases 7-10: see the build plan
 
 Sounds are placeholder tones on web and silent on Android until real sound files are added.
 

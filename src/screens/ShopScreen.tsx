@@ -1,6 +1,7 @@
 import { useState } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, View } from 'react-native';
 
+import { Text } from '@/components/AppText';
 import { OptionGroup } from '@/components/OptionGroup';
 import { Screen } from '@/components/Screen';
 import { findBadge } from '@/constants/badges';

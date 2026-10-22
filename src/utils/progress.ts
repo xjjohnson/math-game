@@ -1,6 +1,7 @@
 import type { AnswerRecord, Difficulty, Profile } from '@/types';
 import { newBadges } from '@/utils/badges';
 import { roundRewards, type RoundRewards } from '@/utils/rewards';
+import { updateMissed } from '@/utils/weakSpots';
 import { recordWeek, WEEKLY_GOAL_BONUS } from '@/utils/weekly';
 
 export interface RoundResult {
@@ -64,6 +65,7 @@ export function applyRound(
     // The daily challenge shouldn't change what the next one is based on.
     lastDifficulty: isDaily ? profile.lastDifficulty : round.difficulty,
     week,
+    missed: updateMissed(profile.missed, round.history, today),
   };
 
   const earned = newBadges(updated, {

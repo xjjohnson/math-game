@@ -1,12 +1,14 @@
-import { StyleSheet, Switch, Text, View } from 'react-native';
+import { router } from 'expo-router';
+import { StyleSheet, Switch, View } from 'react-native';
 
+import { Text } from '@/components/AppText';
 import { BigButton } from '@/components/BigButton';
 import { OptionGroup } from '@/components/OptionGroup';
 import { Screen } from '@/components/Screen';
 import { colors, fontSizes, spacing, TAP_TARGET } from '@/constants/theme';
 import { useSettings, type ReduceMotion, type Settings } from '@/store/settings';
 
-type ToggleKey = Exclude<keyof Settings, 'reduceMotion'>;
+type ToggleKey = Exclude<keyof Settings, 'reduceMotion' | 'parentPin'>;
 
 const TOGGLES: { key: ToggleKey; label: string }[] = [
   { key: 'sound', label: 'Sound effects' },
@@ -45,8 +47,9 @@ export function SettingsScreen() {
         options={MOTION_OPTIONS}
       />
       <Text style={styles.note}>
-        Sound effects work now (placeholder tones in the browser). Speech, fonts, colors and vibration switch on in a later phase.
+        Reading aloud uses the device voice. Vibration works on phones only. Sound effects are placeholder tones in the browser.
       </Text>
+      <BigButton label="🔒 Parent area" color={colors.text} onPress={() => router.push('/parent')} />
       <BigButton label="Reset settings" outline color={colors.wrong} onPress={settings.reset} />
     </Screen>
   );

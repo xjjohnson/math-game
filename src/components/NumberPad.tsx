@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
-import { Platform, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Platform, Pressable, StyleSheet, View } from 'react-native';
 
+import { Text } from '@/components/AppText';
 import { colors, fontSizes, radius, spacing, TAP_TARGET } from '@/constants/theme';
 
 interface Props {
@@ -8,14 +9,28 @@ interface Props {
   /** Show a minus key for answers that can be negative. */
   allowNegative?: boolean;
   disabled?: boolean;
+  /** Called as the player types, e.g. to show the entry inside a stacked problem. */
+  onEntryChange?: (entry: string) => void;
+  /** Hide the pad's own answer box (when the entry is shown elsewhere). */
+  hideDisplay?: boolean;
 }
 
 const MAX_DIGITS = 6;
 const KEYS = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '±', '0', '⌫'];
 
 /** Big on-screen number pad. On web, the keyboard's digits, Backspace, - and Enter work too. */
-export function NumberPad({ onSubmit, allowNegative = false, disabled = false }: Props) {
+export function NumberPad({
+  onSubmit,
+  allowNegative = false,
+  disabled = false,
+  onEntryChange,
+  hideDisplay = false,
+}: Props) {
   const [entry, setEntry] = useState('');
+
+  useEffect(() => {
+    onEntryChange?.(entry);
+  }, [entry, onEntryChange]);
 
   const press = (key: string) => {
     if (disabled) return;
@@ -54,11 +69,13 @@ export function NumberPad({ onSubmit, allowNegative = false, disabled = false }:
 
   return (
     <View style={styles.wrap}>
-      <View style={styles.display} accessibilityLiveRegion="polite">
-        <Text style={styles.displayText} accessibilityLabel={`Your answer: ${entry || 'empty'}`}>
-          {entry || ' '}
-        </Text>
-      </View>
+      {hideDisplay ? null : (
+        <View style={styles.display} accessibilityLiveRegion="polite">
+          <Text style={styles.displayText} accessibilityLabel={`Your answer: ${entry || 'empty'}`}>
+            {entry || ' '}
+          </Text>
+        </View>
+      )}
       <View style={styles.grid}>
         {KEYS.map((key) => {
           const hidden = key === '±' && !allowNegative;
