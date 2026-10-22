@@ -5,7 +5,6 @@ import { StyleSheet, View } from 'react-native';
 import { Text } from '@/components/AppText';
 import { BigButton } from '@/components/BigButton';
 import { MatchOptions } from '@/components/MatchOptions';
-import { OptionGroup } from '@/components/OptionGroup';
 import { QuestionPanel } from '@/components/QuestionPanel';
 import { Screen } from '@/components/Screen';
 import { colors, fontSizes, radius, spacing } from '@/constants/theme';
@@ -16,8 +15,9 @@ import {
   PASS_QUESTIONS,
   passProblem,
   passReducer,
+  MAX_PASS_PLAYERS,
   passScores,
-  passWinner,
+  passWinners,
   startPass,
   type PassPlayer,
   type PassState,
@@ -29,9 +29,15 @@ import { playSound } from '@/utils/soundEffects';
 const GUESTS: Record<string, PassPlayer> = {
   'guest-1': { name: 'Guest 1', avatar: '🙂' },
   'guest-2': { name: 'Guest 2', avatar: '😎' },
+  'guest-3': { name: 'Guest 3', avatar: '🤠' },
+  'guest-4': { name: 'Guest 4', avatar: '🥳' },
+  'guest-5': { name: 'Guest 5', avatar: '🤓' },
+  'guest-6': { name: 'Guest 6', avatar: '😺' },
 };
 
-/** Two players on one phone: each answers 10, then hands it over. */
+const MEDALS = ['🥇', '🥈', '🥉'];
+
+/** 2 to 6 players on one phone: each answers 10, then hands it on. */
 export function PassPlayScreen() {
   const [game, setGame] = useState<PassState | null>(null);
   if (!game) return <Setup onStart={setGame} />;
@@ -41,24 +47,45 @@ export function PassPlayScreen() {
 function Setup({ onStart }: { onStart: (state: PassState) => void }) {
   const { profiles, activeProfileId } = useProfiles();
   const others = profiles.filter((p) => p.id !== activeProfileId);
-  const [first, setFirst] = useState(activeProfileId ?? 'guest-1');
-  const [second, setSecond] = useState(others[0]?.id ?? 'guest-2');
+  // Seats in the order players were picked; that's the order they take turns.
+  const [seats, setSeats] = useState<string[]>([activeProfileId ?? 'guest-1', others[0]?.id ?? 'guest-2']);
   const [operation, setOperation] = useState<Operation>('add');
   const [difficulty, setDifficulty] = useState<Difficulty>('easy');
 
   const options = [
-    ...profiles.map((p) => ({ value: p.id, label: `${p.avatar} ${p.name}` })),
-    ...Object.entries(GUESTS).map(([value, g]) => ({ value, label: `${g.avatar} ${g.name}` })),
+    ...profiles.map((p) => ({ id: p.id, label: `${p.avatar} ${p.name}` })),
+    ...Object.entries(GUESTS).map(([id, g]) => ({ id, label: `${g.avatar} ${g.name}` })),
   ];
   const player = (id: string): PassPlayer => {
     const p = profiles.find((x) => x.id === id);
     return p ? { name: p.name, avatar: p.avatar, profileId: p.id } : GUESTS[id];
   };
+  const toggle = (id: string) =>
+    setSeats((s) => (s.includes(id) ? s.filter((x) => x !== id) : s.length < MAX_PASS_PLAYERS ? [...s, id] : s));
 
   return (
     <Screen title="Take turns">
-      <OptionGroup label="Player 1" value={first} onChange={setFirst} options={options} />
-      <OptionGroup label="Player 2" value={second} onChange={setSecond} options={options} />
+      <View style={styles.group} accessibilityLabel="Players">
+        <Text style={styles.label}>
+          Who's playing? Tap to add or remove ({seats.length} of up to {MAX_PASS_PLAYERS})
+        </Text>
+        <View style={styles.options}>
+          {options.map((o) => {
+            const seat = seats.indexOf(o.id);
+            return (
+              <BigButton
+                key={o.id}
+                label={seat >= 0 ? `${seat + 1}. ${o.label}` : o.label}
+                outline={seat < 0}
+                selected={seat >= 0}
+                disabled={seat < 0 && seats.length >= MAX_PASS_PLAYERS}
+                onPress={() => toggle(o.id)}
+                style={styles.option}
+              />
+            );
+          })}
+        </View>
+      </View>
       <MatchOptions
         operation={operation}
         difficulty={difficulty}
@@ -67,12 +94,12 @@ function Setup({ onStart }: { onStart: (state: PassState) => void }) {
           if (c.difficulty) setDifficulty(c.difficulty);
         }}
       />
-      {first === second ? <Text style={styles.note}>Pick two different players.</Text> : null}
+      {seats.length < 2 ? <Text style={styles.note}>Pick at least two players.</Text> : null}
       <BigButton
         label="Start"
         color={colors.correct}
-        disabled={first === second}
-        onPress={() => onStart(startPass([player(first), player(second)], operation, difficulty, randomSeed()))}
+        disabled={seats.length < 2}
+        onPress={() => onStart(startPass(seats.map(player), operation, difficulty, randomSeed()))}
       />
     </Screen>
   );
@@ -85,6 +112,9 @@ function Game({ start, onAgain }: { start: PassState; onAgain: () => void }) {
   const saved = useRef(false);
   const current = state.players[state.turn];
   const scores = passScores(state);
+  // Who leads among the players who have finished their turn.
+  const done = scores.slice(0, state.turn);
+  const leader = done.length ? done.indexOf(Math.max(...done)) : null;
 
   // Pay each saved profile for their own answers once the game ends.
   useEffect(() => {
@@ -99,19 +129,26 @@ function Game({ start, onAgain }: { start: PassState; onAgain: () => void }) {
   }, [state, recordRound]);
 
   if (state.phase === 'finished') {
-    const winner = passWinner(state);
+    const winners = passWinners(state);
+    const top = state.players[winners[0]];
+    const ranked = state.players.map((p, seat) => ({ ...p, seat })).sort((a, b) => scores[b.seat] - scores[a.seat]);
     return (
-      <Screen title={winner === null ? "It's a tie!" : `${state.players[winner].avatar} ${state.players[winner].name} wins!`}>
-        <View style={styles.scoreRow}>
-          {state.players.map((p, i) => (
-            <View key={i} style={[styles.scoreCard, winner === i && styles.winnerCard]}>
-              <Text style={styles.scoreAvatar}>{p.avatar}</Text>
-              <Text style={styles.scoreName}>{p.name}</Text>
-              <Text style={styles.scoreValue}>
-                {scores[i]} / {PASS_QUESTIONS}
-              </Text>
-            </View>
-          ))}
+      <Screen title={winners.length > 1 ? "It's a tie!" : `${top.avatar} ${top.name} wins!`}>
+        <View style={styles.standings}>
+          {ranked.map((p) => {
+            const place = scores.filter((x) => x > scores[p.seat]).length;
+            return (
+              <View key={p.seat} style={[styles.scoreRow, winners.includes(p.seat) && styles.winnerRow]}>
+                <Text style={styles.place}>{MEDALS[place] ?? `${place + 1}.`}</Text>
+                <Text style={styles.scoreName} numberOfLines={1}>
+                  {p.avatar} {p.name}
+                </Text>
+                <Text style={styles.scoreValue}>
+                  {scores[p.seat]} / {PASS_QUESTIONS}
+                </Text>
+              </View>
+            );
+          })}
         </View>
         <Text style={styles.note}>Players with a profile got coins for their right answers.</Text>
         <BigButton label="Play again" color={colors.correct} onPress={onAgain} />
@@ -125,9 +162,9 @@ function Game({ start, onAgain }: { start: PassState; onAgain: () => void }) {
       <Screen title={state.turn === 0 ? 'First up' : 'Pass the phone!'}>
         <Text style={styles.handoffAvatar}>{current.avatar}</Text>
         <Text style={styles.handoffName}>{current.name}, it's your turn</Text>
-        {state.turn === 1 ? (
+        {leader !== null ? (
           <Text style={styles.note}>
-            {state.players[0].name} got {scores[0]}. Can you beat it?
+            Best so far: {state.players[leader].name} with {scores[leader]}. Can you beat it?
           </Text>
         ) : null}
         <BigButton label="I'm ready" color={colors.correct} onPress={() => dispatch({ type: 'begin' })} />
@@ -165,19 +202,23 @@ const styles = StyleSheet.create({
   status: { fontSize: fontSizes.body, fontWeight: '800', color: colors.text },
   handoffAvatar: { fontSize: 96, textAlign: 'center' },
   handoffName: { fontSize: fontSizes.title, fontWeight: '900', color: colors.text, textAlign: 'center' },
-  scoreRow: { flexDirection: 'row', gap: spacing.md },
-  scoreCard: {
-    flex: 1,
+  group: { gap: spacing.sm },
+  label: { fontSize: fontSizes.body, fontWeight: '700', color: colors.textMuted },
+  options: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
+  option: { flexGrow: 1, flexBasis: '45%' },
+  standings: { gap: spacing.sm },
+  scoreRow: {
+    flexDirection: 'row',
     alignItems: 'center',
-    gap: spacing.xs,
+    gap: spacing.md,
     padding: spacing.md,
     backgroundColor: colors.surface,
     borderRadius: radius.lg,
     borderWidth: 3,
     borderColor: colors.border,
   },
-  winnerCard: { borderColor: colors.correct, borderWidth: 5 },
-  scoreAvatar: { fontSize: 56 },
-  scoreName: { fontSize: fontSizes.body, fontWeight: '800', color: colors.text },
+  winnerRow: { borderColor: colors.correct, borderWidth: 5 },
+  place: { width: 40, fontSize: fontSizes.button, fontWeight: '900', color: colors.text, textAlign: 'center' },
+  scoreName: { flex: 1, fontSize: fontSizes.body, fontWeight: '800', color: colors.text },
   scoreValue: { fontSize: fontSizes.button, fontWeight: '900', color: colors.text },
 });

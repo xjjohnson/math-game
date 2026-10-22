@@ -22,21 +22,26 @@ import {
   COOP_WAVES,
   isOver,
   matchProblem,
-  other,
+  mySeat,
   outcomeFor,
+  playerLeft,
   RACE_TARGET,
   receive,
+  standings,
   startMatch,
+  waveTarget,
   waveTimeUp,
   type MatchState,
   type Step,
 } from '@/utils/multiplayer/match';
 import {
+  HOST_ID,
+  MAX_PLAYERS,
   PROTOCOL_VERSION,
   type GameMessage,
   type MatchMode,
   type MatchSetup,
-  type Role,
+  type PlayerInfo,
 } from '@/utils/multiplayer/protocol';
 import { multiplayerRound } from '@/utils/multiplayer/rounds';
 import { allGranted, checkPermissions, devicePermissions } from '@/utils/nearbyPermissions';
@@ -44,95 +49,144 @@ import { randomSeed } from '@/utils/seededRandom';
 import { playSound } from '@/utils/soundEffects';
 import { Nearby } from '../../modules/math-nearby';
 
-type Phase = 'choose' | 'hosting' | 'finding' | 'lobby' | 'playing' | 'gone';
-
-interface Friend extends Peer {
-  avatar: string;
-  code: string;
-}
+/** choose → (host) lobby, or (guest) finding → lobby; then playing; gone when the game ends early. */
+type Phase = 'choose' | 'finding' | 'lobby' | 'playing' | 'gone';
 
 const MODES: { value: MatchMode; label: string }[] = [
   { value: 'race', label: `🏁 Race\nFirst to ${RACE_TARGET} right wins` },
   { value: 'coop', label: `🛡️ Co-op Defense\nBeat ${COOP_WAVES.length} waves together` },
 ];
 
+const MEDALS = ['🥇', '🥈', '🥉'];
+const VERSION_MISMATCH = 'Some phones have a different version of Math Game. Update them all, then try again.';
+
 const errorText = (e: unknown) => (e instanceof Error ? e.message : String(e));
 
-/** Two phones over Nearby: find each other, then Race or Co-op Defense. */
+/** Keeps a value in state for rendering and in a ref for transport callbacks. */
+function useStateRef<T>(initial: T) {
+  const ref = useRef(initial);
+  const [value, setValue] = useState(initial);
+  const set = useCallback((next: T) => {
+    ref.current = next;
+    setValue(next);
+  }, []);
+  return [value, set, ref] as const;
+}
+
+/** Up to 8 phones over Nearby: one hosts, the rest join, then Race or Co-op Defense. */
 export function NearbyPlayScreen() {
   const profile = useActiveProfile();
-  const me = { name: profile?.name ?? 'Player', avatar: profile?.avatar ?? '🙂' };
+  const me: PlayerInfo = { id: HOST_ID, name: profile?.name ?? 'Player', avatar: profile?.avatar ?? '🙂' };
 
   const transport = useRef<Transport | null>(null);
-  const [phase, setPhase] = useState<Phase>('choose');
-  const [role, setRole] = useState<Role>('host');
+  const [phase, setPhase, phaseRef] = useStateRef<Phase>('choose');
+  const [isHost, setIsHost, isHostRef] = useStateRef(false);
+  /** Everyone in the game, host first. The host keeps it; guests get copies. */
+  const [roster, setRoster, rosterRef] = useStateRef<PlayerInfo[]>([]);
+  /** This phone's player id; a guest learns it from the host's welcome. */
+  const [myId, setMyId, myIdRef] = useStateRef<string>(HOST_ID);
   const [found, setFound] = useState<Peer[]>([]);
-  const [friend, setFriend] = useState<Friend | null>(null);
+  const [code, setCode] = useState('');
   const [notice, setNotice] = useState<string | null>(null);
+  const [goneText, setGoneText] = useState('');
 
   // Host's picks, kept between rematches.
   const [mode, setMode] = useState<MatchMode>('race');
   const [operation, setOperation] = useState<Operation>('add');
   const [difficulty, setDifficulty] = useState<Difficulty>('easy');
 
-  // The match lives in a ref too, so transport callbacks always see the latest state.
-  const matchRef = useRef<MatchState | null>(null);
-  const [match, setMatchState] = useState<MatchState | null>(null);
-  const setMatch = (state: MatchState | null) => {
-    matchRef.current = state;
-    setMatchState(state);
-  };
+  const [match, setMatch, matchRef] = useStateRef<MatchState | null>(null);
 
-  const send = useCallback((message: GameMessage) => {
-    transport.current?.send(message).catch(() => undefined);
+  const send = useCallback((message: GameMessage, to?: string) => {
+    transport.current?.send(message, to).catch(() => undefined);
   }, []);
 
   const apply = useCallback(
     ([state, out]: Step) => {
-      matchRef.current = state;
-      setMatchState(state);
-      out.forEach(send);
+      setMatch(state);
+      out.forEach((m) => send(m));
     },
-    [send],
+    [send, setMatch],
   );
 
-  const begin = useCallback((setup: MatchSetup, as: Role) => {
-    setMatch(startMatch(setup, as));
-    setPhase('playing');
-  }, []);
+  const end = useCallback(
+    (text: string) => {
+      setGoneText(text);
+      setPhase('gone');
+      setMatch(null);
+    },
+    [setMatch, setPhase],
+  );
 
   useEffect(() => {
     const t = createNearbyTransport();
     transport.current = t;
     if (!t) return;
+
+    const updateRoster = (players: PlayerInfo[]) => {
+      setRoster(players);
+      if (isHostRef.current) t.send({ type: 'lobby', players }).catch(() => undefined);
+    };
+
     const offs = [
       t.on('peerFound', (peer) => setFound((f) => [...f.filter((p) => p.id !== peer.id), peer])),
       t.on('peerLost', ({ id }) => setFound((f) => f.filter((p) => p.id !== id))),
-      t.on('connected', ({ id, name, code }) => {
-        setFriend({ id, name, code, avatar: '🙂' });
+      t.on('connected', ({ id, code: digits }) => {
+        if (isHostRef.current) {
+          // Late or extra phones are turned away; the rest wait for their hello.
+          if (phaseRef.current === 'playing' || rosterRef.current.length >= MAX_PLAYERS) {
+            t.send({ type: 'bye' }, id).catch(() => undefined);
+          }
+          return;
+        }
+        setCode(digits);
         setPhase('lobby');
         playSound('reward');
         t.send({ type: 'hello', version: PROTOCOL_VERSION, name: me.name, avatar: me.avatar }).catch(() => undefined);
       }),
-      t.on('disconnected', () => {
-        setPhase('gone');
-        setMatch(null);
+      t.on('disconnected', ({ id }) => {
+        if (!isHostRef.current) {
+          end('The host phone left the game.');
+          return;
+        }
+        if (!rosterRef.current.some((p) => p.id === id)) return;
+        updateRoster(rosterRef.current.filter((p) => p.id !== id));
+        if (matchRef.current) {
+          apply(playerLeft(matchRef.current, id));
+          if (rosterRef.current.length < 2) end('Everyone else left the game.');
+        }
       }),
       t.on('error', (text) => setNotice(text)),
-      t.on('message', ({ message }) => {
+      t.on('message', ({ id, message }) => {
         switch (message.type) {
           case 'hello':
+            if (!isHostRef.current || phaseRef.current !== 'lobby') return;
+            t.send({ type: 'welcome', version: PROTOCOL_VERSION, you: id }, id).catch(() => undefined);
             if (message.version !== PROTOCOL_VERSION) {
-              setNotice('The two phones have different versions of Math Game. Update both, then try again.');
+              setNotice(VERSION_MISMATCH);
+              return;
             }
-            setFriend((f) => (f ? { ...f, name: message.name, avatar: message.avatar } : f));
+            playSound('reward');
+            updateRoster([
+              ...rosterRef.current.filter((p) => p.id !== id),
+              { id, name: message.name, avatar: message.avatar },
+            ]);
+            break;
+          case 'welcome':
+            if (message.version !== PROTOCOL_VERSION) setNotice(VERSION_MISMATCH);
+            setMyId(message.you);
+            break;
+          case 'lobby':
+            if (!isHostRef.current) setRoster(message.players);
             break;
           case 'start':
-            begin(message.setup, 'guest');
+            if (isHostRef.current) return;
+            setRoster(message.players);
+            setMatch(startMatch(message.setup, message.players, myIdRef.current));
+            setPhase('playing');
             break;
           case 'bye':
-            setPhase('gone');
-            setMatch(null);
+            if (!isHostRef.current) end('The host ended the game, or it was already full.');
             break;
           default:
             if (matchRef.current) apply(receive(matchRef.current, message));
@@ -144,19 +198,19 @@ export function NearbyPlayScreen() {
       t.send({ type: 'bye' }).catch(() => undefined);
       t.disconnect();
     };
-    // Set up once for the life of the screen.
+    // Set up once for the life of the screen; callbacks read the refs.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   if (!Nearby) {
     return (
-      <Screen title="Two phones">
-        <Text style={styles.body}>Playing on two phones needs the Math Game app on Android.</Text>
+      <Screen title="Several phones">
+        <Text style={styles.body}>Playing on several phones needs the Math Game app on Android.</Text>
       </Screen>
     );
   }
 
-  const go = async (next: 'hosting' | 'finding') => {
+  const go = async (asHost: boolean) => {
     const list = devicePermissions();
     if (!allGranted(await checkPermissions(list), list)) {
       router.push('/permissions');
@@ -165,10 +219,12 @@ export function NearbyPlayScreen() {
     setNotice(null);
     setFound([]);
     try {
-      if (next === 'hosting') await transport.current?.host(`${me.avatar} ${me.name}`);
+      if (asHost) await transport.current?.host(`${me.avatar} ${me.name}`);
       else await transport.current?.discover();
-      setRole(next === 'hosting' ? 'host' : 'guest');
-      setPhase(next);
+      setIsHost(asHost);
+      setMyId(HOST_ID);
+      setRoster(asHost ? [me] : []);
+      setPhase(asHost ? 'lobby' : 'finding');
     } catch (e) {
       setNotice(errorText(e));
     }
@@ -176,8 +232,9 @@ export function NearbyPlayScreen() {
 
   const startGame = () => {
     const setup: MatchSetup = { mode, operation, difficulty, seed: randomSeed() };
-    send({ type: 'start', setup });
-    begin(setup, 'host');
+    send({ type: 'start', setup, players: roster });
+    setMatch(startMatch(setup, roster, HOST_ID));
+    setPhase('playing');
   };
 
   const leave = () => {
@@ -190,7 +247,6 @@ export function NearbyPlayScreen() {
       <Match
         key={match.setup.seed}
         match={match}
-        friend={friend}
         onAnswer={(correct) => matchRef.current && apply(answerMine(matchRef.current, correct))}
         onTimeUp={() => matchRef.current && apply(waveTimeUp(matchRef.current))}
         onRematch={() => {
@@ -202,8 +258,10 @@ export function NearbyPlayScreen() {
     );
   }
 
+  const friends = roster.length - 1;
+
   return (
-    <Screen title="Two phones">
+    <Screen title="Several phones">
       {notice ? (
         <Text style={styles.notice} accessibilityLiveRegion="polite">
           {notice}
@@ -212,17 +270,12 @@ export function NearbyPlayScreen() {
 
       {phase === 'choose' ? (
         <>
-          <Text style={styles.body}>One phone hosts the game. The other one joins it.</Text>
-          <BigButton label="📣 Host a game" color={colors.primary} onPress={() => go('hosting')} />
-          <BigButton label="🔍 Join a game" color={colors.accent} onPress={() => go('finding')} />
+          <Text style={styles.body}>
+            One phone hosts the game. Everyone else joins it, up to {MAX_PLAYERS} phones in all.
+          </Text>
+          <BigButton label="📣 Host a game" color={colors.primary} onPress={() => go(true)} />
+          <BigButton label="🔍 Join a game" color={colors.accent} onPress={() => go(false)} />
         </>
-      ) : null}
-
-      {phase === 'hosting' ? (
-        <View style={styles.center}>
-          <Text style={styles.big}>📣</Text>
-          <Text style={styles.body}>Waiting for a friend to join… On their phone, tap Join a game.</Text>
-        </View>
       ) : null}
 
       {phase === 'finding' ? (
@@ -244,13 +297,26 @@ export function NearbyPlayScreen() {
         </View>
       ) : null}
 
-      {phase === 'lobby' && friend ? (
+      {phase === 'lobby' ? (
         <>
-          <Text style={styles.heading}>
-            Playing with {friend.avatar} {friend.name}
-            {friend.code ? ` · code ${friend.code}` : ''}
-          </Text>
-          {role === 'host' ? (
+          <View style={styles.section} accessibilityLiveRegion="polite">
+            <Text style={styles.heading}>
+              {isHost
+                ? friends
+                  ? `${roster.length} players ready`
+                  : 'Waiting for friends… On their phones, tap Join a game.'
+                : `Joined${code ? ` · code ${code}` : ''}. Waiting for the host to start.`}
+            </Text>
+            {roster.map((p) => (
+              <View key={p.id} style={styles.playerRow}>
+                <Text style={styles.playerName} numberOfLines={1}>
+                  {p.avatar} {p.name}
+                </Text>
+                <Text style={styles.playerTag}>{p.id === HOST_ID ? 'host' : p.id === myId ? 'you' : ''}</Text>
+              </View>
+            ))}
+          </View>
+          {isHost ? (
             <>
               <OptionGroup label="Game" value={mode} onChange={setMode} options={MODES} />
               <MatchOptions
@@ -261,22 +327,18 @@ export function NearbyPlayScreen() {
                   if (c.difficulty) setDifficulty(c.difficulty);
                 }}
               />
-              <BigButton label="Start" color={colors.correct} onPress={startGame} />
+              <BigButton
+                label={friends ? `Start with ${roster.length} players` : 'Start'}
+                color={colors.correct}
+                disabled={!friends}
+                onPress={startGame}
+              />
             </>
-          ) : (
-            <Text style={styles.body}>
-              {friend.name} is picking the game. It starts on both phones at once.
-            </Text>
-          )}
+          ) : null}
         </>
       ) : null}
 
-      {phase === 'gone' ? (
-        <Text style={styles.body}>
-          {friend ? `${friend.name} left the game.` : 'The other phone disconnected.'} Go back to start a new
-          one.
-        </Text>
-      ) : null}
+      {phase === 'gone' ? <Text style={styles.body}>{goneText} Go back to start a new one.</Text> : null}
 
       {phase !== 'choose' ? <BigButton label="Leave" outline color={colors.wrong} onPress={leave} /> : null}
     </Screen>
@@ -285,14 +347,12 @@ export function NearbyPlayScreen() {
 
 function Match({
   match,
-  friend,
   onAnswer,
   onTimeUp,
   onRematch,
   onLeave,
 }: {
   match: MatchState;
-  friend: Friend | null;
   onAnswer: (correct: boolean) => void;
   onTimeUp: () => void;
   onRematch: () => void;
@@ -301,17 +361,17 @@ function Match({
   const profile = useActiveProfile();
   const recordRound = useProfiles((s) => s.recordRound);
   const palette = usePalette();
-  const { setup, me } = match;
+  const { setup, me, players } = match;
   const [shown, setShown] = useState(0);
   const [history, setHistory] = useState<AnswerRecord[]>([]);
   const saved = useRef(false);
   const over = isOver(match);
-  const them = other(me);
-  const friendName = friend?.name ?? 'Friend';
+  const host = me === HOST_ID;
+  const nameOf = (id: string | null) => players.find((p) => p.id === id)?.name ?? 'Someone';
 
   const wave = COOP_WAVES[match.wave];
   const secondsLeft = useTimer(setup.mode === 'coop' ? wave.seconds : null, !over, match.wave, () => {
-    if (me === 'host') onTimeUp();
+    if (host) onTimeUp();
   });
 
   useEffect(() => {
@@ -323,52 +383,74 @@ function Match({
 
   if (over) {
     const won = outcomeFor(match) === 'won';
+    const ranked = standings(match);
     const title =
       setup.mode === 'race'
         ? won
           ? '🏆 You win!'
-          : `${friendName} wins!`
+          : `${nameOf(match.winner)} wins!`
         : won
           ? '🛡️ You beat every wave!'
           : 'The clock won this time';
     return (
       <Screen title={title}>
-        {setup.mode === 'race' ? (
+        {setup.mode === 'coop' ? (
           <Text style={styles.body}>
-            You got {match.correct[me]} right. {friendName} got {match.correct[them]}.
+            Team total: {ranked.reduce((sum, p) => sum + p.correct, 0)} right.
           </Text>
-        ) : (
-          <Text style={styles.body}>
-            Team total: {match.correct.host + match.correct.guest} right. You got {match.correct[me]}, {friendName}{' '}
-            got {match.correct[them]}.
-          </Text>
-        )}
-        {me === 'host' ? (
+        ) : null}
+        <View style={styles.section}>
+          {ranked.map((p) => {
+            const place = ranked.filter((x) => x.correct > p.correct).length;
+            const left = match.left.includes(p.id);
+            return (
+              <View key={p.id} style={[styles.playerRow, p.id === match.winner && styles.winnerRow]}>
+                <Text style={styles.place}>
+                  {setup.mode === 'race' ? (MEDALS[place] ?? `${place + 1}.`) : '⭐'}
+                </Text>
+                <Text style={styles.playerName} numberOfLines={1}>
+                  {p.avatar} {p.id === me ? 'You' : p.name}
+                  {left ? ' (left)' : ''}
+                </Text>
+                <Text style={styles.playerScore}>{p.correct}</Text>
+              </View>
+            );
+          })}
+        </View>
+        {host ? (
           <BigButton label="Play again" color={colors.correct} onPress={onRematch} />
         ) : (
-          <Text style={styles.body}>Waiting for {friendName} to start another game…</Text>
+          <Text style={styles.body}>Waiting for {nameOf(HOST_ID)} to start another game…</Text>
         )}
         <BigButton label="Leave" outline color={colors.wrong} onPress={onLeave} />
       </Screen>
     );
   }
 
-  const problem = matchProblem(setup, me, shown);
+  const problem = matchProblem(setup, mySeat(match), shown);
   const waitingForCall = setup.mode === 'race' && match.correct[me] >= RACE_TARGET;
 
   return (
     <Screen>
       {setup.mode === 'race' ? (
-        <View style={styles.section}>
-          <ProgressBar label="You" value={match.correct[me]} total={RACE_TARGET} color={palette.correct} />
-          <ProgressBar label={friendName} value={match.correct[them]} total={RACE_TARGET} color={colors.accent} />
+        <View style={styles.bars}>
+          {players.map((p) => (
+            <ProgressBar
+              key={p.id}
+              label={p.id === me ? 'You' : `${p.avatar} ${p.name}`}
+              value={match.correct[p.id] ?? 0}
+              total={RACE_TARGET}
+              color={p.id === me ? palette.correct : colors.accent}
+              faded={match.left.includes(p.id)}
+            />
+          ))}
         </View>
       ) : (
         <View style={styles.section}>
           <Text style={styles.heading}>
-            Wave {match.wave + 1} of {COOP_WAVES.length}
+            Wave {match.wave + 1} of {COOP_WAVES.length} · team of {players.length - match.left.length}
           </Text>
-          <ProgressBar label="Team" value={match.waveCorrect} total={wave.target} color={palette.correct} />
+          <ProgressBar label="Team" value={match.waveCorrect} total={waveTarget(match)} color={palette.correct} />
           {secondsLeft !== null ? <TimerBar total={wave.seconds} left={secondsLeft} /> : null}
         </View>
       )}
@@ -388,10 +470,26 @@ function Match({
   );
 }
 
-function ProgressBar({ label, value, total, color }: { label: string; value: number; total: number; color: string }) {
+function ProgressBar({
+  label,
+  value,
+  total,
+  color,
+  faded,
+}: {
+  label: string;
+  value: number;
+  total: number;
+  color: string;
+  faded?: boolean;
+}) {
   const pct = Math.min(1, value / total);
   return (
-    <View style={styles.barRow} accessible accessibilityLabel={`${label}: ${value} of ${total}`}>
+    <View
+      style={[styles.barRow, faded && styles.faded]}
+      accessible
+      accessibilityLabel={`${label}: ${value} of ${total}${faded ? ', left the game' : ''}`}
+    >
       <Text style={styles.barLabel} numberOfLines={1}>
         {label}
       </Text>
@@ -408,9 +506,8 @@ function ProgressBar({ label, value, total, color }: { label: string; value: num
 const styles = StyleSheet.create({
   body: { fontSize: fontSizes.body, color: colors.text, textAlign: 'center' },
   notice: { fontSize: fontSizes.body, fontWeight: '700', color: colors.wrong, textAlign: 'center' },
-  center: { alignItems: 'center', gap: spacing.md },
-  big: { fontSize: 72 },
   section: { gap: spacing.sm },
+  bars: { gap: spacing.xs },
   heading: { fontSize: fontSizes.body, fontWeight: '800', color: colors.text, textAlign: 'center' },
   peer: {
     minHeight: TAP_TARGET,
@@ -423,9 +520,26 @@ const styles = StyleSheet.create({
   },
   pressed: { transform: [{ scale: 0.97 }] },
   peerName: { fontSize: fontSizes.button, fontWeight: '800', color: colors.text },
+  playerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
+    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.md,
+    backgroundColor: colors.surface,
+    borderRadius: radius.md,
+    borderWidth: 3,
+    borderColor: colors.border,
+  },
+  winnerRow: { borderColor: colors.correct, borderWidth: 5 },
+  place: { width: 40, fontSize: fontSizes.button, fontWeight: '900', textAlign: 'center', color: colors.text },
+  playerName: { flex: 1, fontSize: fontSizes.body, fontWeight: '800', color: colors.text },
+  playerTag: { fontSize: 16, fontWeight: '700', color: colors.textMuted },
+  playerScore: { fontSize: fontSizes.button, fontWeight: '900', color: colors.text },
   barRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
-  barLabel: { width: 90, fontSize: 18, fontWeight: '800', color: colors.text },
-  track: { flex: 1, height: 20, borderRadius: radius.md, backgroundColor: colors.disabled, overflow: 'hidden' },
+  faded: { opacity: 0.4 },
+  barLabel: { width: 110, fontSize: 18, fontWeight: '800', color: colors.text },
+  track: { flex: 1, height: 18, borderRadius: radius.md, backgroundColor: colors.disabled, overflow: 'hidden' },
   fill: { height: '100%', borderRadius: radius.md },
   barValue: { width: 52, textAlign: 'right', fontSize: 18, fontWeight: '800', color: colors.text },
 });

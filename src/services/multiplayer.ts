@@ -9,7 +9,7 @@ export interface TransportEvents {
   /** Another phone is hosting nearby (while finding). */
   peerFound: Peer;
   peerLost: { id: string };
-  /** Connected; both phones show the same 4-digit code. */
+  /** Connected; both phones show the same 4-digit code. A host gets one per guest. */
   connected: Peer & { code: string };
   disconnected: { id: string };
   message: { id: string; message: GameMessage };
@@ -18,15 +18,16 @@ export interface TransportEvents {
 }
 
 /**
- * How two devices talk. Game screens only use this interface, never a
- * transport directly, so Nearby (Android), a mock (tests) and later WebRTC (PC)
- * are interchangeable.
+ * How phones talk: one host, any number of guests. Game screens only use this
+ * interface, never a transport directly, so Nearby (Android), a mock (tests)
+ * and later WebRTC (PC) are interchangeable.
  */
 export interface Transport {
   host(name: string): Promise<void>;
   discover(): Promise<void>;
   connect(name: string, peerId: string): Promise<void>;
-  send(message: GameMessage): Promise<void>;
+  /** To one peer, or to every connected peer when `to` is left out. */
+  send(message: GameMessage, to?: string): Promise<void>;
   disconnect(): void;
   on<E extends keyof TransportEvents>(event: E, listener: (event: TransportEvents[E]) => void): () => void;
 }

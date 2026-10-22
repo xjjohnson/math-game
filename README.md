@@ -14,7 +14,7 @@ The full plan lives in [docs/build-plan.md](docs/build-plan.md).
 - [x] Phase 5: shop and avatar (avatars, backgrounds, card styles, buddies), badges, weekly goals
 - [x] Phase 6: polish (bigger problems stacked in columns, animations, read aloud, vibration, dyslexia font, colorblind colors, reduce motion, word problems, tricky-facts review, PIN-protected parent report)
 - [x] Phase 7: Nearby permission screen and two-phone prototype (confirmed on two Android phones)
-- [x] Phase 8: play with a friend: Head-to-Head Race and Co-op Defense on two phones over Nearby, and take-turns on one phone
+- [x] Phase 8: play with friends: Race and Co-op Defense on up to 8 phones over Nearby (one host, the rest join), and take-turns for 2-6 players on one phone
 - [ ] Phases 9-10: see the build plan
 
 Sounds are placeholder tones on web and silent on Android until real sound files are added.
