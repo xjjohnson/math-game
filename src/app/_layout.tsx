@@ -33,6 +33,8 @@ export default function RootLayout() {
         <Stack.Screen name="shop" options={{ title: 'Shop' }} />
         <Stack.Screen name="settings" options={{ title: 'Settings' }} />
         <Stack.Screen name="parent" options={{ title: 'Parent area' }} />
+        <Stack.Screen name="permissions" options={{ title: 'Play nearby' }} />
+        <Stack.Screen name="nearby-test" options={{ title: 'Nearby test' }} />
       </Stack>
     </>
   );
