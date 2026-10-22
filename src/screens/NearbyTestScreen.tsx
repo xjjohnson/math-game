@@ -125,22 +125,19 @@ export function NearbyTestScreen() {
       <Text style={styles.body}>
         On one phone tap Host. On the other tap Find, then tap the first phone's name.
       </Text>
-      <View style={styles.pair}>
-        <BigButton
-          label="📣 Host"
-          color={colors.primary}
-          outline={role !== 'hosting'}
-          onPress={() => run('hosting', () => nearby.startHosting(myName))}
-          style={styles.half}
-        />
-        <BigButton
-          label="🔍 Find"
-          color={colors.accent}
-          outline={role !== 'finding'}
-          onPress={() => run('finding', () => nearby.startFinding())}
-          style={styles.half}
-        />
-      </View>
+      {/* Full width: side by side, "Host" wrapped and Android clipped the second line. */}
+      <BigButton
+        label="📣 Host"
+        color={colors.primary}
+        outline={role !== 'hosting'}
+        onPress={() => run('hosting', () => nearby.startHosting(myName))}
+      />
+      <BigButton
+        label="🔍 Find"
+        color={colors.accent}
+        outline={role !== 'finding'}
+        onPress={() => run('finding', () => nearby.startFinding())}
+      />
 
       {role === 'finding' && connected.length === 0 ? (
         <View style={styles.section}>
@@ -201,8 +198,6 @@ export function NearbyTestScreen() {
 
 const styles = StyleSheet.create({
   body: { fontSize: fontSizes.body, color: colors.text },
-  pair: { flexDirection: 'row', gap: spacing.md },
-  half: { flex: 1 },
   section: { gap: spacing.sm },
   heading: { fontSize: fontSizes.body, fontWeight: '800', color: colors.text },
   peer: {
