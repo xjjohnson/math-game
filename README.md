@@ -32,7 +32,12 @@ Playing nearby uses our own native module (`modules/math-nearby`), so it needs a
 
 ## Building the Android app (APK)
 
-Either way gives an `.apk` to install on each phone (allow "install unknown apps" when asked).
+**Easiest: let GitHub build it.** Every merge to `main` runs the "Android APK" workflow, which posts
+the app on the [Latest Android app](../../releases/tag/latest-apk) release. On each phone, open that page
+(signed in to GitHub, since the repo is private), tap `math-game.apk`, and allow installing from the
+browser when asked. To build without merging, open the Actions tab → Android APK → Run workflow.
+
+The other two ways also give an `.apk` to install on each phone.
 
 **In the cloud with EAS (no Android Studio needed):**
 
