@@ -46,7 +46,11 @@ export function BigButton({
         style,
       ]}
     >
-      <Text style={[styles.label, { color: foreground }]}>{label}</Text>
+      {/* Keyed by style: Android sometimes keeps the old text color when a button
+          switches between filled and outline, leaving white text on white. */}
+      <Text key={outline ? 'outline' : 'filled'} style={[styles.label, { color: foreground }]}>
+        {label}
+      </Text>
     </Pressable>
   );
 }

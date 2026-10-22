@@ -14,19 +14,19 @@ const BLUETOOTH: NearbyPermission[] = [
 
 /**
  * The runtime permissions Nearby Connections needs on a given Android API level.
- * Android 12 (31) split Bluetooth into its own permissions, Android 13 (33) added
- * nearby Wi-Fi, and before 13 Android files Bluetooth scanning under location.
+ * Android 12 (31) split Bluetooth into its own permissions and Android 13 (33)
+ * added nearby Wi-Fi. Nearby still checks for location on every version.
  */
 export function nearbyPermissions(apiLevel: number): NearbyPermission[] {
   const list: NearbyPermission[] = [];
   if (apiLevel >= 31) list.push(...BLUETOOTH);
   if (apiLevel >= 33) {
     list.push({ permission: 'android.permission.NEARBY_WIFI_DEVICES', label: 'Connect over nearby Wi-Fi' });
-  } else if (apiLevel >= 29) {
-    list.push({ permission: 'android.permission.ACCESS_FINE_LOCATION', label: 'Location (Android needs it to scan for phones)' });
-  } else {
-    list.push({ permission: 'android.permission.ACCESS_COARSE_LOCATION', label: 'Location (Android needs it to scan for phones)' });
   }
+  list.push({
+    permission: apiLevel >= 29 ? 'android.permission.ACCESS_FINE_LOCATION' : 'android.permission.ACCESS_COARSE_LOCATION',
+    label: 'Location (Android needs it to find nearby phones)',
+  });
   return list;
 }
 

@@ -17,8 +17,15 @@ describe('nearbyPermissions', () => {
     expect(names(32)).toEqual(names(31));
   });
 
-  it('swaps location for nearby Wi-Fi from Android 13', () => {
-    expect(names(33)).toEqual(['BLUETOOTH_SCAN', 'BLUETOOTH_ADVERTISE', 'BLUETOOTH_CONNECT', 'NEARBY_WIFI_DEVICES']);
+  // Nearby still fails with MISSING_PERMISSION_ACCESS_COARSE_LOCATION without it.
+  it('adds nearby Wi-Fi from Android 13 and keeps location', () => {
+    expect(names(33)).toEqual([
+      'BLUETOOTH_SCAN',
+      'BLUETOOTH_ADVERTISE',
+      'BLUETOOTH_CONNECT',
+      'NEARBY_WIFI_DEVICES',
+      'ACCESS_FINE_LOCATION',
+    ]);
     expect(names(36)).toEqual(names(33));
   });
 });
