@@ -1,8 +1,9 @@
 import type { AnswerRecord, Difficulty, GameConfig, Problem } from '@/types';
 import { adjustDifficulty } from '@/utils/adaptive';
-import { generate, generateTimesTable } from '@/utils/mathEngine';
+import { buildProblem, generate, generateTimesTable } from '@/utils/mathEngine';
 import { pointsFor } from '@/utils/scoring';
 import { createRng } from '@/utils/seededRandom';
+import { toWordProblem } from '@/utils/wordProblems';
 
 export const QUESTIONS_PER_ROUND = 10;
 
@@ -36,17 +37,24 @@ export function problemAt(config: GameConfig, index: number, difficulty: Difficu
   if (mode.kind === 'tables') {
     return generateTimesTable({ tables: mode.tables, includeDivision: mode.includeDivision }, rng);
   }
-  return generate(mode.operation, difficulty, rng);
+  if (mode.kind === 'review') {
+    const fact = mode.facts[index % mode.facts.length];
+    return buildProblem(fact.operation, fact.a, fact.b, fact.answer, rng);
+  }
+  const problem = generate(mode.operation, difficulty, rng);
+  return config.wordProblems ? toWordProblem(problem, rng) : problem;
 }
 
 /** Key for saving a best score, e.g. "multiply:easy:10", "tables-3-7:medium:none" or "daily:2026-10-22". */
 export function highScoreKey(config: GameConfig): string {
   if (config.dailyDate) return `daily:${config.dailyDate}`;
-  const mode =
-    config.mode.kind === 'operation'
-      ? config.mode.operation
-      : `tables-${[...config.mode.tables].sort((a, b) => a - b).join('-')}${config.mode.includeDivision ? '-div' : ''}`;
-  return `${mode}:${config.difficulty}:${config.timer ?? 'none'}${config.adaptive ? ':adaptive' : ''}`;
+  const { mode } = config;
+  if (mode.kind === 'review') return 'review';
+  const name =
+    mode.kind === 'operation'
+      ? `${mode.operation}${config.wordProblems ? '-words' : ''}`
+      : `tables-${[...mode.tables].sort((a, b) => a - b).join('-')}${mode.includeDivision ? '-div' : ''}`;
+  return `${name}:${config.difficulty}:${config.timer ?? 'none'}${config.adaptive ? ':adaptive' : ''}`;
 }
 
 export function startSession(config: GameConfig): SessionState {

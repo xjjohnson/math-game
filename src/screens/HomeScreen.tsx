@@ -1,6 +1,7 @@
 import { router } from 'expo-router';
-import { StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 
+import { Text } from '@/components/AppText';
 import { BigButton } from '@/components/BigButton';
 import { Screen } from '@/components/Screen';
 import { DIFFICULTIES, OPERATIONS } from '@/constants/difficulty';
@@ -8,7 +9,9 @@ import { colors, fontSizes, spacing } from '@/constants/theme';
 import { useActiveProfile } from '@/store/profiles';
 import { dateKey, dayStreak } from '@/utils/dates';
 import { DAILY_CHALLENGE_BONUS, DAILY_PASS, dailyChallengeConfig } from '@/utils/rewards';
+import { randomSeed } from '@/utils/seededRandom';
 import { companionFor } from '@/utils/shop';
+import { reviewConfig } from '@/utils/weakSpots';
 
 export function HomeScreen() {
   const profile = useActiveProfile();
@@ -20,6 +23,7 @@ export function HomeScreen() {
   const dailyOp = OPERATIONS.find((o) => o.value === dailyOperation);
   const days = profile ? dayStreak(profile.playDates, today) : 0;
   const companion = companionFor(profile);
+  const tricky = profile ? Object.keys(profile.missed).length : 0;
 
   return (
     <Screen title="Math Game">
@@ -55,6 +59,17 @@ export function HomeScreen() {
           onPress={() =>
             router.push({ pathname: '/play', params: { config: JSON.stringify(daily) } })
           }
+        />
+      ) : null}
+      {profile && tricky > 0 ? (
+        <BigButton
+          label={`🎯 Practice tricky ones (${tricky})`}
+          color={colors.operations.multiply}
+          accessibilityHint="Ten easy-going questions on facts you missed lately. Get one right twice to clear it."
+          onPress={() => {
+            const config = reviewConfig(profile.missed, randomSeed());
+            if (config) router.push({ pathname: '/play', params: { config: JSON.stringify(config) } });
+          }}
         />
       ) : null}
       {profile ? (

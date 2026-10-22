@@ -40,6 +40,7 @@ export function createProfile(name: string, avatar: string, inputStyle: InputSty
     equipped: { ...DEFAULT_EQUIPPED },
     badges: [],
     week: null,
+    missed: {},
   };
 }
 
@@ -99,7 +100,7 @@ export const useProfiles = create<ProfilesState>()(
     }),
     {
       name: 'math-game.profiles',
-      version: 3,
+      version: 4,
       storage: persistStorage,
       migrate: (persisted, version) => {
         const state = persisted as Pick<ProfilesState, 'profiles' | 'activeProfileId'>;
@@ -120,6 +121,10 @@ export const useProfiles = create<ProfilesState>()(
             badges: p.badges ?? [],
             week: p.week ?? null,
           }));
+        }
+        if (version < 4) {
+          // Version 4 added the weak-spots review list.
+          state.profiles = state.profiles.map((p) => ({ ...p, missed: p.missed ?? {} }));
         }
         return state as ProfilesState;
       },

@@ -1,21 +1,25 @@
 import { router, useLocalSearchParams } from 'expo-router';
-import { useEffect, useRef, useState } from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { StyleSheet, View } from 'react-native';
 
+import { Text } from '@/components/AppText';
 import { BigButton } from '@/components/BigButton';
 import { ChoiceButtons } from '@/components/ChoiceButtons';
 import { CompanionBubble } from '@/components/CompanionBubble';
-import { FlashCard } from '@/components/FlashCard';
+import { FlashCard, isStacked } from '@/components/FlashCard';
 import { NumberPad } from '@/components/NumberPad';
+import { PopIn } from '@/components/PopIn';
 import { Screen } from '@/components/Screen';
 import { TimerBar } from '@/components/TimerBar';
 import { findBadge } from '@/constants/badges';
 import { DIFFICULTIES } from '@/constants/difficulty';
 import { colors, fontSizes, radius, spacing } from '@/constants/theme';
+import { usePalette } from '@/hooks/useAccessibility';
 import { useGameSession } from '@/hooks/useGameSession';
 import { useTimer } from '@/hooks/useTimer';
 import { useActiveProfile, useProfiles } from '@/store/profiles';
 import type { Difficulty, GameConfig, InputStyle } from '@/types';
+import { speakProblem, stopSpeaking, vibrate } from '@/utils/feedback';
 import {
   correctCount,
   highScoreKey,
@@ -83,9 +87,19 @@ function Round({ config, onPlayAgain }: { config: GameConfig; onPlayAgain: () =>
   const last = lastAnswer(state);
   const inputStyle = resolveInputStyle(profile?.inputStyle, state.difficulty);
   const companion = companionFor(profile);
+  const palette = usePalette();
+  const [entry, setEntry] = useState('');
+  const onEntryChange = useCallback((value: string) => setEntry(value), []);
+
+  // Read each new problem aloud when that setting is on; stop when leaving the round.
+  useEffect(() => {
+    if (state.phase === 'question') speakProblem(state.problem);
+  }, [state.problem, state.phase]);
+  useEffect(() => stopSpeaking, []);
 
   useEffect(() => {
     if (state.phase !== 'feedback' || !last) return;
+    vibrate(last.correct ? 'correct' : 'wrong');
     if (!last.correct) playSound('wrong');
     else playSound(state.streak % STREAK_MILESTONE === 0 ? 'streak' : 'correct');
   }, [state.phase, state.streak, last]);
@@ -130,7 +144,11 @@ function Round({ config, onPlayAgain }: { config: GameConfig; onPlayAgain: () =>
   const answer = (given: number) =>
     dispatch({ type: 'answer', given, secondsLeft: config.timer === null ? null : secondsLeft });
   const showFeedback = state.phase === 'feedback' && last;
-  const allowNegative = DIFFICULTIES[state.difficulty].allowNegatives && state.problem.operation === 'subtract';
+  const allowNegative =
+    DIFFICULTIES[state.difficulty].allowNegatives &&
+    state.problem.operation === 'subtract' &&
+    !state.problem.story;
+  const stacked = isStacked(state.problem);
 
   return (
     <Screen>
@@ -149,9 +167,12 @@ function Round({ config, onPlayAgain }: { config: GameConfig; onPlayAgain: () =>
       ) : null}
 
       <FlashCard
+        key={`card-${state.index}`}
         problem={state.problem}
-        reveal={!!showFeedback && !last.correct}
+        reveal={!!showFeedback}
+        entry={entry}
         cardStyle={cardStyleFor(profile)}
+        onSpeak={() => speakProblem(state.problem, true)}
       />
 
       {companion ? (
@@ -163,12 +184,12 @@ function Round({ config, onPlayAgain }: { config: GameConfig; onPlayAgain: () =>
       ) : null}
 
       {showFeedback ? (
-        <Text style={[styles.feedback, { color: last.correct ? colors.correct : colors.wrong }]}>
+        <Text style={[styles.feedback, { color: last.correct ? palette.correct : palette.wrong }]}>
           {last.correct
-            ? `Great job! +${last.points}`
+            ? `✓ Great job! +${last.points}`
             : last.given === null
-              ? "Time's up!"
-              : 'Not quite. Remember this one!'}
+              ? "✗ Time's up!"
+              : '✗ Not quite. Remember this one!'}
         </Text>
       ) : null}
 
@@ -180,7 +201,13 @@ function Round({ config, onPlayAgain }: { config: GameConfig; onPlayAgain: () =>
           onSelect={answer}
         />
       ) : showFeedback ? null : (
-        <NumberPad key={state.index} onSubmit={answer} allowNegative={allowNegative} />
+        <NumberPad
+          key={`pad-${state.index}`}
+          onSubmit={answer}
+          allowNegative={allowNegative}
+          onEntryChange={onEntryChange}
+          hideDisplay={stacked}
+        />
       )}
 
       {showFeedback && !last.correct ? (
@@ -210,12 +237,15 @@ function Results({
     <Screen title={cheer}>
       {outcome ? (
         <View style={styles.rewards}>
-          <Text
-            style={styles.stars}
-            accessibilityLabel={`${outcome.stars} out of 3 stars`}
-          >
-            {[0, 1, 2].map((i) => (i < outcome.stars ? '★' : '☆')).join(' ')}
-          </Text>
+          <View style={styles.starRow} accessible accessibilityLabel={`${outcome.stars} out of 3 stars`}>
+            {[0, 1, 2].map((i) => (
+              <PopIn key={i} delay={250 * i} damping={9}>
+                <Text style={[styles.stars, i >= outcome.stars && styles.starEmpty]}>
+                  {i < outcome.stars ? '★' : '☆'}
+                </Text>
+              </PopIn>
+            ))}
+          </View>
           <Text style={styles.coins}>+{outcome.coins} 🪙</Text>
           {outcome.streakBonusCoins > 0 ? (
             <Text style={styles.bonus}>Includes +{outcome.streakBonusCoins} for streaks of {STREAK_MILESTONE}</Text>
@@ -276,7 +306,9 @@ const styles = StyleSheet.create({
   feedback: { fontSize: fontSizes.button, fontWeight: '800', textAlign: 'center' },
   highScore: { fontSize: fontSizes.button, fontWeight: '900', color: colors.accent, textAlign: 'center' },
   rewards: { alignItems: 'center', gap: spacing.xs },
-  stars: { fontSize: 56, color: colors.accent, letterSpacing: 4 },
+  starRow: { flexDirection: 'row', gap: spacing.md },
+  stars: { fontSize: 56, color: colors.accent },
+  starEmpty: { opacity: 0.5 },
   coins: { fontSize: fontSizes.title, fontWeight: '900', color: colors.text },
   bonus: { fontSize: 18, fontWeight: '700', color: colors.textMuted, textAlign: 'center' },
   badge: { fontSize: fontSizes.body, fontWeight: '900', color: colors.primary, textAlign: 'center' },

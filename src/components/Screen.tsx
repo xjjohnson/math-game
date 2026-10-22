@@ -1,7 +1,8 @@
 import type { ReactNode } from 'react';
-import { ScrollView, StyleSheet, Text } from 'react-native';
+import { ScrollView, StyleSheet } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { Text } from '@/components/AppText';
 import { colors, fontSizes, spacing } from '@/constants/theme';
 import { useActiveProfile } from '@/store/profiles';
 import { backgroundColor } from '@/utils/shop';

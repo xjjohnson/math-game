@@ -1,3 +1,7 @@
+import { Lexend_400Regular } from '@expo-google-fonts/lexend/400Regular';
+import { Lexend_700Bold } from '@expo-google-fonts/lexend/700Bold';
+import { Lexend_900Black } from '@expo-google-fonts/lexend/900Black';
+import { useFonts } from 'expo-font';
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 
@@ -6,6 +10,8 @@ import { useActiveProfile } from '@/store/profiles';
 import { backgroundColor } from '@/utils/shop';
 
 export default function RootLayout() {
+  // Loads in the background; text falls back to the system font until it's ready.
+  useFonts({ Lexend_400Regular, Lexend_700Bold, Lexend_900Black });
   const background = backgroundColor(useActiveProfile());
   return (
     <>
@@ -26,6 +32,7 @@ export default function RootLayout() {
         <Stack.Screen name="progress" options={{ title: 'My progress' }} />
         <Stack.Screen name="shop" options={{ title: 'Shop' }} />
         <Stack.Screen name="settings" options={{ title: 'Settings' }} />
+        <Stack.Screen name="parent" options={{ title: 'Parent area' }} />
       </Stack>
     </>
   );

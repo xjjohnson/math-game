@@ -1,5 +1,6 @@
-import { StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 
+import { Text } from '@/components/AppText';
 import type { Companion } from '@/constants/shop';
 import { colors, fontSizes, radius, spacing } from '@/constants/theme';
 

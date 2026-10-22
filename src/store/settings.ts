@@ -12,6 +12,8 @@ export interface Settings {
   reduceMotion: ReduceMotion;
   dyslexiaFont: boolean;
   colorblindPalette: boolean;
+  /** 4-digit code guarding the parent area; null until a parent sets one. */
+  parentPin: string | null;
 }
 
 export const DEFAULT_SETTINGS: Settings = {
@@ -21,6 +23,7 @@ export const DEFAULT_SETTINGS: Settings = {
   reduceMotion: 'system',
   dyslexiaFont: false,
   colorblindPalette: false,
+  parentPin: null,
 };
 
 interface SettingsState extends Settings {
@@ -34,8 +37,14 @@ export const useSettings = create<SettingsState>()(
     (set) => ({
       ...DEFAULT_SETTINGS,
       update: (changes) => set(changes),
-      reset: () => set(DEFAULT_SETTINGS),
+      // Resetting settings keeps the parent PIN so a child can't clear it.
+      reset: () => set((s) => ({ ...DEFAULT_SETTINGS, parentPin: s.parentPin })),
     }),
-    { name: 'math-game.settings', version: 1, storage: persistStorage },
+    {
+      name: 'math-game.settings',
+      version: 2,
+      storage: persistStorage,
+      migrate: (persisted) => ({ ...DEFAULT_SETTINGS, ...(persisted as Partial<Settings>) }),
+    },
   ),
 );

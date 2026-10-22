@@ -9,7 +9,14 @@ const SYMBOLS = Object.fromEntries(OPERATIONS.map((o) => [o.value, o.symbol])) a
   string
 >;
 
-function buildProblem(operation: Operation, a: number, b: number, answer: number, rng: Rng): Problem {
+/** Builds a problem from known numbers, with fresh answer choices. */
+export function buildProblem(
+  operation: Operation,
+  a: number,
+  b: number,
+  answer: number,
+  rng: Rng,
+): Problem {
   return {
     operation,
     a,

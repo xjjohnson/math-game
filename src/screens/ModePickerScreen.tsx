@@ -1,7 +1,8 @@
 import { router } from 'expo-router';
 import { useState } from 'react';
-import { Pressable, StyleSheet, Switch, Text, View } from 'react-native';
+import { Pressable, StyleSheet, Switch, View } from 'react-native';
 
+import { Text } from '@/components/AppText';
 import { BigButton } from '@/components/BigButton';
 import { OptionGroup } from '@/components/OptionGroup';
 import { Screen } from '@/components/Screen';
@@ -32,6 +33,7 @@ export function ModePickerScreen() {
   const [adaptive, setAdaptive] = useState(false);
   const [tables, setTables] = useState<number[]>([2]);
   const [includeDivision, setIncludeDivision] = useState(false);
+  const [wordProblems, setWordProblems] = useState(false);
 
   const isTables = choice === 'tables';
 
@@ -49,6 +51,7 @@ export function ModePickerScreen() {
       difficulty: isTables ? 'medium' : difficulty,
       timer,
       adaptive: !isTables && adaptive,
+      wordProblems: !isTables && wordProblems,
       questionCount: QUESTIONS_PER_ROUND,
       seed: randomSeed(),
     };
@@ -105,6 +108,7 @@ export function ModePickerScreen() {
             }))}
           />
           <ToggleRow label="Change difficulty as I play" value={adaptive} onChange={setAdaptive} />
+          <ToggleRow label="Word problems (little stories)" value={wordProblems} onChange={setWordProblems} />
         </>
       )}
 

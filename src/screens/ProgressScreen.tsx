@@ -1,5 +1,6 @@
-import { StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 
+import { Text } from '@/components/AppText';
 import { Screen } from '@/components/Screen';
 import { StreakCalendar } from '@/components/StreakCalendar';
 import { BADGES } from '@/constants/badges';
