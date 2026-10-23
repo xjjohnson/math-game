@@ -5,7 +5,7 @@ import {
   type Companion,
   type ShopItem,
 } from '@/constants/shop';
-import { colors } from '@/constants/theme';
+import { AVATARS, colors } from '@/constants/theme';
 import type { Profile } from '@/types';
 
 export type BuyResult =
@@ -27,6 +27,11 @@ export function isEquipped(profile: Profile, item: ShopItem): boolean {
     case 'companion':
       return profile.equipped.companion === item.id;
   }
+}
+
+/** Avatars a player can always switch to for free: their first pick, then the defaults. */
+export function freeAvatars(profile: Profile): string[] {
+  return [...new Set([profile.startAvatar, ...AVATARS])];
 }
 
 /** Spends coins on an item, then equips it right away. */

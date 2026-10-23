@@ -2,7 +2,7 @@ import { SHOP_ITEMS } from '@/constants/shop';
 import { makeProfile, results } from '@/test/fixtures';
 import { newBadges } from '@/utils/badges';
 import { applyRound } from '@/utils/progress';
-import { backgroundColor, buyItem, equipItem, isEquipped, owns } from '@/utils/shop';
+import { backgroundColor, buyItem, equipItem, freeAvatars, isEquipped, owns } from '@/utils/shop';
 import { allGoalsMet, recordWeek, WEEKLY_GOAL_BONUS, weekKey } from '@/utils/weekly';
 
 const today = '2026-10-22'; // a Thursday
@@ -126,5 +126,18 @@ describe('badges', () => {
     expect(
       newBadges(makeProfile(), { ...ctx, history: results('1100'), difficulty: 'easy', stars: 1, wonDaily: false }),
     ).toEqual(['first-round']);
+  });
+});
+
+describe('free avatars', () => {
+  it('lists the first pick, then the defaults, without repeats', () => {
+    const list = freeAvatars(makeProfile({ startAvatar: '🦊' }));
+    expect(list[0]).toBe('🦊');
+    expect(new Set(list).size).toBe(list.length);
+    expect(list).toContain('🚀');
+  });
+
+  it('keeps a shop avatar as the first pick if that was it', () => {
+    expect(freeAvatars(makeProfile({ startAvatar: '🐱' }))[0]).toBe('🐱');
   });
 });
