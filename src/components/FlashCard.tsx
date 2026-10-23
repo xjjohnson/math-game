@@ -1,20 +1,22 @@
-import { Pressable, StyleSheet, View } from 'react-native';
+import { Pressable, StyleSheet } from 'react-native';
 
 import { Text } from '@/components/AppText';
+import { ColumnWork } from '@/components/ColumnWork';
 import { PopIn } from '@/components/PopIn';
 import { OPERATIONS } from '@/constants/difficulty';
 import type { CardStyle } from '@/constants/shop';
 import { colors, fontSizes, radius, spacing } from '@/constants/theme';
 import { usePalette } from '@/hooks/useAccessibility';
 import type { Problem } from '@/types';
+import { columnLayout, type ColumnEntry, type ColumnLayout, type ColumnRow } from '@/utils/columnEntry';
 import { spokenProblem } from '@/utils/feedback';
 
 interface Props {
   problem: Problem;
   /** Shows the answer under the problem (after a miss). */
   reveal?: boolean;
-  /** What the player has typed so far; shown under the line on stacked problems. */
-  entry?: string;
+  /** Answer boxes for a stacked problem the player types into. */
+  column?: ColumnProps;
   /** Look bought in the shop; defaults to the classic white card. */
   cardStyle?: CardStyle;
   /** Shows a speaker button that reads the problem aloud. */
@@ -38,7 +40,19 @@ export function isStacked(problem: Problem): boolean {
   );
 }
 
-export function FlashCard({ problem, reveal = false, entry, cardStyle, onSpeak }: Props) {
+export interface ColumnProps {
+  layout: ColumnLayout;
+  entry: ColumnEntry;
+  selectable: boolean;
+  pending?: string;
+  flyCarries?: boolean;
+  finished?: boolean;
+  allowNegative?: boolean;
+  onSelect: (row: ColumnRow, col: number) => void;
+  onToggleSign?: () => void;
+}
+
+export function FlashCard({ problem, reveal = false, column, cardStyle, onSpeak }: Props) {
   const palette = usePalette();
   const look = cardStyle ?? {
     background: colors.surface,
@@ -69,24 +83,22 @@ export function FlashCard({ problem, reveal = false, entry, cardStyle, onSpeak }
           </Text>
         </>
       ) : isStacked(problem) ? (
-        <View style={styles.stack}>
-          <Text style={[styles.stackNumber, ink]}>{problem.a}</Text>
-          <View style={styles.stackRow}>
-            <Text style={[styles.stackNumber, styles.stackSymbol, ink]}>
-              {SYMBOLS[problem.operation]}
-            </Text>
-            <Text style={[styles.stackNumber, ink]}>{problem.b}</Text>
-          </View>
-          <View style={[styles.line, { backgroundColor: look.text }]} />
-          <Text
-            style={[
-              styles.stackNumber,
-              reveal ? { color: palette.correct } : [ink, styles.entry],
-            ]}
-          >
-            {reveal ? problem.answer : entry || '?'}
-          </Text>
-        </View>
+        <ColumnWork
+          problem={problem}
+          layout={column?.layout ?? columnLayout(problem)}
+          symbol={SYMBOLS[problem.operation]}
+          ink={look.text}
+          correctColor={palette.correct}
+          entry={column?.entry ?? null}
+          reveal={reveal}
+          selectable={column?.selectable}
+          pending={column?.pending}
+          flyCarries={column?.flyCarries}
+          finished={column?.finished}
+          allowNegative={column?.allowNegative}
+          onSelect={column?.onSelect}
+          onToggleSign={column?.onToggleSign}
+        />
       ) : (
         <>
           <Text style={[styles.prompt, ink]} adjustsFontSizeToFit numberOfLines={1}>
@@ -132,18 +144,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 36,
   },
   storyAnswer: { fontSize: fontSizes.button, fontWeight: '800', marginTop: spacing.sm },
-  stack: { alignItems: 'flex-end' },
-  stackRow: { flexDirection: 'row', alignItems: 'center' },
-  stackNumber: {
-    fontSize: 56,
-    lineHeight: 64,
-    fontWeight: '900',
-    fontVariant: ['tabular-nums'],
-    letterSpacing: 4,
-  },
-  stackSymbol: { marginRight: spacing.md },
-  line: { alignSelf: 'stretch', height: 5, borderRadius: 3, marginVertical: spacing.xs },
-  entry: { opacity: 0.85 },
   speaker: { position: 'absolute', top: spacing.sm, right: spacing.sm, padding: spacing.xs },
   speakerIcon: { fontSize: 28 },
 });

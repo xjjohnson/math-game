@@ -1,6 +1,7 @@
 import { Lexend_400Regular } from '@expo-google-fonts/lexend/400Regular';
 import { Lexend_700Bold } from '@expo-google-fonts/lexend/700Bold';
 import { Lexend_900Black } from '@expo-google-fonts/lexend/900Black';
+import { PatrickHand_400Regular } from '@expo-google-fonts/patrick-hand/400Regular';
 import { useFonts } from 'expo-font';
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
@@ -11,7 +12,7 @@ import { backgroundColor } from '@/utils/shop';
 
 export default function RootLayout() {
   // Loads in the background; text falls back to the system font until it's ready.
-  useFonts({ Lexend_400Regular, Lexend_700Bold, Lexend_900Black });
+  useFonts({ Lexend_400Regular, Lexend_700Bold, Lexend_900Black, PatrickHand_400Regular });
   const background = backgroundColor(useActiveProfile());
   return (
     <>

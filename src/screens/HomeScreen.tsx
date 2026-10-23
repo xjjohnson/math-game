@@ -27,7 +27,7 @@ export function HomeScreen() {
   const tricky = profile ? Object.keys(profile.missed).length : 0;
 
   return (
-    <Screen title="Math Game">
+    <Screen title="Math Game" noHeader>
       <UpdateBanner />
       <View style={styles.profile}>
         {profile ? (
