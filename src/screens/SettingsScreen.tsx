@@ -5,7 +5,9 @@ import { Text } from '@/components/AppText';
 import { BigButton } from '@/components/BigButton';
 import { OptionGroup } from '@/components/OptionGroup';
 import { Screen } from '@/components/Screen';
+import { BUILD_NUMBER } from '@/constants/build';
 import { colors, fontSizes, spacing, TAP_TARGET } from '@/constants/theme';
+import { useAppUpdate, type UpdateStatus } from '@/hooks/useAppUpdate';
 import { useSettings, type ReduceMotion, type Settings } from '@/store/settings';
 
 type ToggleKey = Exclude<keyof Settings, 'reduceMotion' | 'parentPin'>;
@@ -52,11 +54,52 @@ export function SettingsScreen() {
       <BigButton label="📡 Play nearby (test)" outline onPress={() => router.push('/permissions')} />
       <BigButton label="🔒 Parent area" color={colors.text} onPress={() => router.push('/parent')} />
       <BigButton label="Reset settings" outline color={colors.wrong} onPress={settings.reset} />
+      <AppVersion />
     </Screen>
   );
 }
 
+const UPDATE_TEXT: Record<UpdateStatus, string> = {
+  idle: '',
+  checking: 'Checking for a new version…',
+  none: "You have the newest version.",
+  available: 'A new version is ready.',
+  downloading: 'Downloading the new version…',
+  error: "The download didn't finish. Check the internet and try again.",
+};
+
+function AppVersion() {
+  const { canUpdate, status, latest, checkAgain, install } = useAppUpdate();
+  if (!canUpdate) {
+    return <Text style={styles.note}>App updates are only for the Android app from GitHub.</Text>;
+  }
+  return (
+    <View style={styles.section}>
+      <Text style={styles.note}>
+        Version: build {BUILD_NUMBER}
+        {latest ? ` · newest is build ${latest}` : ''}. {UPDATE_TEXT[status]}
+      </Text>
+      {status === 'available' || status === 'downloading' || status === 'error' ? (
+        <BigButton
+          label={status === 'downloading' ? 'Downloading…' : 'Update now'}
+          color={colors.correct}
+          disabled={status === 'downloading'}
+          onPress={install}
+        />
+      ) : (
+        <BigButton
+          label="Check for updates"
+          outline
+          disabled={status === 'checking'}
+          onPress={checkAgain}
+        />
+      )}
+    </View>
+  );
+}
+
 const styles = StyleSheet.create({
+  section: { gap: spacing.sm },
   row: {
     minHeight: TAP_TARGET,
     flexDirection: 'row',

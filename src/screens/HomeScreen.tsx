@@ -4,6 +4,7 @@ import { StyleSheet, View } from 'react-native';
 import { Text } from '@/components/AppText';
 import { BigButton } from '@/components/BigButton';
 import { Screen } from '@/components/Screen';
+import { UpdateBanner } from '@/components/UpdateBanner';
 import { DIFFICULTIES, OPERATIONS } from '@/constants/difficulty';
 import { colors, fontSizes, spacing } from '@/constants/theme';
 import { useActiveProfile } from '@/store/profiles';
@@ -27,6 +28,7 @@ export function HomeScreen() {
 
   return (
     <Screen title="Math Game">
+      <UpdateBanner />
       <View style={styles.profile}>
         {profile ? (
           <>
