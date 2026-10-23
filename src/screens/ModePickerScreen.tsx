@@ -34,6 +34,7 @@ export function ModePickerScreen() {
   const [tables, setTables] = useState<number[]>([2]);
   const [includeDivision, setIncludeDivision] = useState(false);
   const [wordProblems, setWordProblems] = useState(false);
+  const [showWork, setShowWork] = useState(false);
 
   const isTables = choice === 'tables';
 
@@ -52,6 +53,7 @@ export function ModePickerScreen() {
       timer,
       adaptive: !isTables && adaptive,
       wordProblems: !isTables && wordProblems,
+      showWork: !isTables && showWork,
       questionCount: QUESTIONS_PER_ROUND,
       seed: randomSeed(),
     };
@@ -109,6 +111,25 @@ export function ModePickerScreen() {
           />
           <ToggleRow label="Change difficulty as I play" value={adaptive} onChange={setAdaptive} />
           <ToggleRow label="Word problems (little stories)" value={wordProblems} onChange={setWordProblems} />
+          {choice !== 'divide' ? (
+            <>
+              <ToggleRow
+                label="✏️ Show my work (learn to carry and borrow)"
+                value={showWork}
+                onChange={(on) => {
+                  setShowWork(on);
+                  // Working column by column takes time, so turn the timer off.
+                  if (on) setTimer(null);
+                }}
+              />
+              {showWork ? (
+                <Text style={styles.note}>
+                  Bigger problems go one column at a time, starting with the ones.
+                  {difficulty === 'easy' ? ' Easy problems are one digit, so pick Medium or Hard to see it.' : ''}
+                </Text>
+              ) : null}
+            </>
+          ) : null}
         </>
       )}
 
@@ -172,6 +193,7 @@ const styles = StyleSheet.create({
   tableOn: { backgroundColor: colors.text },
   tableText: { fontSize: fontSizes.button, fontWeight: '800', color: colors.text },
   tableTextOn: { color: colors.primaryText },
+  note: { fontSize: 16, color: colors.textMuted },
   toggleRow: {
     minHeight: TAP_TARGET,
     flexDirection: 'row',

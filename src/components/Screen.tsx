@@ -10,17 +10,22 @@ import { backgroundColor } from '@/utils/shop';
 interface Props {
   title?: string;
   children: ReactNode;
+  /** Tighter spacing, so a whole game screen fits a phone. */
+  compact?: boolean;
+  /** For screens without a header bar, which then need the top safe area too. */
+  noHeader?: boolean;
 }
 
 /** Standard page wrapper: safe area, scrolling, centered column for tablets and PC. */
-export function Screen({ title, children }: Props) {
+export function Screen({ title, children, compact = false, noHeader = false }: Props) {
   const background = backgroundColor(useActiveProfile());
   return (
     <SafeAreaView
       style={[styles.safe, { backgroundColor: background }]}
-      edges={['top', 'bottom', 'left', 'right']}
+      // The header bar already sits below the status bar, so only header-less screens pad the top.
+      edges={noHeader ? ['top', 'bottom', 'left', 'right'] : ['bottom', 'left', 'right']}
     >
-      <ScrollView contentContainerStyle={styles.content}>
+      <ScrollView contentContainerStyle={[styles.content, compact && styles.compact]}>
         {title ? <Text style={styles.title} accessibilityRole="header">{title}</Text> : null}
         {children}
       </ScrollView>
@@ -37,6 +42,7 @@ const styles = StyleSheet.create({
     maxWidth: 640,
     alignSelf: 'center',
   },
+  compact: { paddingVertical: spacing.md, gap: spacing.sm },
   title: {
     fontSize: fontSizes.title,
     fontWeight: '800',

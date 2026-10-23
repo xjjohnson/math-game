@@ -1,13 +1,14 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { StyleSheet } from 'react-native';
 
 import { Text } from '@/components/AppText';
 import { ChoiceButtons } from '@/components/ChoiceButtons';
 import { FlashCard, isStacked } from '@/components/FlashCard';
-import { NumberPad } from '@/components/NumberPad';
+import { ColumnPad, NumberPad } from '@/components/NumberPad';
 import { DIFFICULTIES } from '@/constants/difficulty';
 import { fontSizes } from '@/constants/theme';
 import { usePalette } from '@/hooks/useAccessibility';
+import { useColumnAnswer } from '@/hooks/useColumnAnswer';
 import type { Difficulty, InputStyle, Problem } from '@/types';
 import { speakProblem, stopSpeaking, vibrate } from '@/utils/feedback';
 import { playSound } from '@/utils/soundEffects';
@@ -35,10 +36,13 @@ interface Props {
 export function QuestionPanel({ problem, difficulty, inputStyle, onAnswer, onNext, disabled }: Props) {
   const palette = usePalette();
   const [given, setGiven] = useState<number | null>(null);
-  const [entry, setEntry] = useState('');
-  const onEntryChange = useCallback((value: string) => setEntry(value), []);
   const answered = given !== null;
   const correct = given === problem.answer;
+
+  const allowNegative =
+    DIFFICULTIES[difficulty].allowNegatives && problem.operation === 'subtract' && !problem.story;
+  const typingColumns = isStacked(problem) && inputStyle !== 'choices';
+  const column = useColumnAnswer(problem, { allowNegative });
 
   useEffect(() => {
     speakProblem(problem);
@@ -62,15 +66,24 @@ export function QuestionPanel({ problem, difficulty, inputStyle, onAnswer, onNex
     onAnswer(value, right);
   };
 
-  const allowNegative =
-    DIFFICULTIES[difficulty].allowNegatives && problem.operation === 'subtract' && !problem.story;
 
   return (
     <>
       <FlashCard
         problem={problem}
         reveal={answered}
-        entry={entry}
+        column={
+          typingColumns && !answered
+            ? {
+                layout: column.layout,
+                entry: column.entry,
+                selectable: true,
+                allowNegative,
+                onSelect: column.select,
+                onToggleSign: () => column.press('±'),
+              }
+            : undefined
+        }
         onSpeak={() => speakProblem(problem, true)}
       />
       {answered ? (
@@ -85,14 +98,15 @@ export function QuestionPanel({ problem, difficulty, inputStyle, onAnswer, onNex
           answer={problem.answer}
           onSelect={answer}
         />
-      ) : answered ? null : (
-        <NumberPad
-          onSubmit={answer}
-          allowNegative={allowNegative}
+      ) : answered ? null : typingColumns ? (
+        <ColumnPad
+          onKey={column.press}
+          canCheck={column.value !== null}
+          onCheck={() => column.value !== null && answer(column.value)}
           disabled={disabled}
-          onEntryChange={onEntryChange}
-          hideDisplay={isStacked(problem)}
         />
+      ) : (
+        <NumberPad onSubmit={answer} allowNegative={allowNegative} disabled={disabled} />
       )}
     </>
   );

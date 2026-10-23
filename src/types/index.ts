@@ -105,6 +105,8 @@ export interface GameConfig {
   dailyDate?: string;
   /** Ask each problem as a short story (operation mode only). */
   wordProblems?: boolean;
+  /** Coach column problems one column at a time, carrying and borrowing like on paper. */
+  showWork?: boolean;
 }
 
 export interface AnswerRecord {

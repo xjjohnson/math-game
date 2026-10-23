@@ -1,5 +1,5 @@
 import { router, useLocalSearchParams } from 'expo-router';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 
 import { Text } from '@/components/AppText';
@@ -7,7 +7,8 @@ import { BigButton } from '@/components/BigButton';
 import { ChoiceButtons } from '@/components/ChoiceButtons';
 import { CompanionBubble } from '@/components/CompanionBubble';
 import { FlashCard, isStacked } from '@/components/FlashCard';
-import { NumberPad } from '@/components/NumberPad';
+import { ColumnHint } from '@/components/ColumnHint';
+import { ColumnPad, NumberPad } from '@/components/NumberPad';
 import { PopIn } from '@/components/PopIn';
 import { Screen } from '@/components/Screen';
 import { TimerBar } from '@/components/TimerBar';
@@ -15,6 +16,7 @@ import { findBadge } from '@/constants/badges';
 import { DIFFICULTIES } from '@/constants/difficulty';
 import { colors, fontSizes, radius, spacing } from '@/constants/theme';
 import { usePalette } from '@/hooks/useAccessibility';
+import { useColumnAnswer } from '@/hooks/useColumnAnswer';
 import { useGameSession } from '@/hooks/useGameSession';
 import { useTimer } from '@/hooks/useTimer';
 import { useActiveProfile, useProfiles } from '@/store/profiles';
@@ -83,8 +85,6 @@ function Round({ config, onPlayAgain }: { config: GameConfig; onPlayAgain: () =>
   const inputStyle = resolveInputStyle(profile?.inputStyle, state.difficulty);
   const companion = companionFor(profile);
   const palette = usePalette();
-  const [entry, setEntry] = useState('');
-  const onEntryChange = useCallback((value: string) => setEntry(value), []);
 
   // Read each new problem aloud when that setting is on; stop when leaving the round.
   useEffect(() => {
@@ -130,6 +130,12 @@ function Round({ config, onPlayAgain }: { config: GameConfig; onPlayAgain: () =>
     }
   }, [state, profile, config, recordRound]);
 
+  const allowNegative =
+    DIFFICULTIES[state.difficulty].allowNegatives &&
+    state.problem.operation === 'subtract' &&
+    !state.problem.story;
+  const column = useColumnAnswer(state.problem, { allowNegative, teach: !!config.showWork });
+
   if (state.phase === 'finished') {
     return (
       <Results state={state} outcome={outcome} daily={!!config.dailyDate} onPlayAgain={onPlayAgain} />
@@ -139,14 +145,11 @@ function Round({ config, onPlayAgain }: { config: GameConfig; onPlayAgain: () =>
   const answer = (given: number) =>
     dispatch({ type: 'answer', given, secondsLeft: config.timer === null ? null : secondsLeft });
   const showFeedback = state.phase === 'feedback' && last;
-  const allowNegative =
-    DIFFICULTIES[state.difficulty].allowNegatives &&
-    state.problem.operation === 'subtract' &&
-    !state.problem.story;
-  const stacked = isStacked(state.problem);
+  // Show-my-work needs the boxes, so it types even when the player usually taps choices.
+  const typingColumns = isStacked(state.problem) && (inputStyle !== 'choices' || !!config.showWork);
 
   return (
-    <Screen>
+    <Screen compact>
       <View style={styles.statusRow}>
         <Text style={styles.status}>
           {state.index + 1} / {config.questionCount}
@@ -165,7 +168,21 @@ function Round({ config, onPlayAgain }: { config: GameConfig; onPlayAgain: () =>
         key={`card-${state.index}`}
         problem={state.problem}
         reveal={!!showFeedback}
-        entry={entry}
+        column={
+          typingColumns && !showFeedback
+            ? {
+                layout: column.layout,
+                entry: column.entry,
+                selectable: !column.teaching,
+                pending: column.hint?.typed,
+                flyCarries: column.teaching,
+                finished: column.hint?.done,
+                allowNegative,
+                onSelect: column.select,
+                onToggleSign: () => column.press('±'),
+              }
+            : undefined
+        }
         cardStyle={cardStyleFor(profile)}
         onSpeak={() => speakProblem(state.problem, true)}
       />
@@ -188,21 +205,24 @@ function Round({ config, onPlayAgain }: { config: GameConfig; onPlayAgain: () =>
         </Text>
       ) : null}
 
-      {inputStyle === 'choices' ? (
+      {inputStyle === 'choices' && !typingColumns ? (
         <ChoiceButtons
           choices={state.problem.choices}
           selected={showFeedback ? (last.given ?? Number.NaN) : null}
           answer={state.problem.answer}
           onSelect={answer}
         />
-      ) : showFeedback ? null : (
-        <NumberPad
-          key={`pad-${state.index}`}
-          onSubmit={answer}
-          allowNegative={allowNegative}
-          onEntryChange={onEntryChange}
-          hideDisplay={stacked}
-        />
+      ) : showFeedback ? null : typingColumns ? (
+        <>
+          {column.hint ? <ColumnHint hint={column.hint} /> : null}
+          <ColumnPad
+            onKey={column.press}
+            canCheck={column.value !== null}
+            onCheck={() => column.value !== null && answer(column.value)}
+          />
+        </>
+      ) : (
+        <NumberPad key={`pad-${state.index}`} onSubmit={answer} allowNegative={allowNegative} />
       )}
 
       {showFeedback && !last.correct ? (

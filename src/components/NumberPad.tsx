@@ -9,10 +9,6 @@ interface Props {
   /** Show a minus key for answers that can be negative. */
   allowNegative?: boolean;
   disabled?: boolean;
-  /** Called as the player types, e.g. to show the entry inside a stacked problem. */
-  onEntryChange?: (entry: string) => void;
-  /** Hide the pad's own answer box (when the entry is shown elsewhere). */
-  hideDisplay?: boolean;
 }
 
 const MAX_DIGITS = 6;
@@ -23,14 +19,8 @@ export function NumberPad({
   onSubmit,
   allowNegative = false,
   disabled = false,
-  onEntryChange,
-  hideDisplay = false,
 }: Props) {
   const [entry, setEntry] = useState('');
-
-  useEffect(() => {
-    onEntryChange?.(entry);
-  }, [entry, onEntryChange]);
 
   const press = (key: string) => {
     if (disabled) return;
@@ -69,13 +59,11 @@ export function NumberPad({
 
   return (
     <View style={styles.wrap}>
-      {hideDisplay ? null : (
-        <View style={styles.display} accessibilityLiveRegion="polite">
-          <Text style={styles.displayText} accessibilityLabel={`Your answer: ${entry || 'empty'}`}>
-            {entry || ' '}
-          </Text>
-        </View>
-      )}
+      <View style={styles.display} accessibilityLiveRegion="polite">
+        <Text style={styles.displayText} accessibilityLabel={`Your answer: ${entry || 'empty'}`}>
+          {entry || ' '}
+        </Text>
+      </View>
       <View style={styles.grid}>
         {KEYS.map((key) => {
           const hidden = key === '±' && !allowNegative;
@@ -145,4 +133,64 @@ const styles = StyleSheet.create({
   check: { backgroundColor: colors.correct, flexBasis: 'auto', flexGrow: 0 },
   checkDisabled: { backgroundColor: colors.disabled },
   checkText: { color: colors.primaryText },
+  compactKey: { minHeight: 56 },
+  compactCheck: { flexBasis: '30%', flexGrow: 1 },
 });
+
+interface ColumnPadProps {
+  onKey: (key: string) => void;
+  onCheck: () => void;
+  canCheck: boolean;
+  disabled?: boolean;
+}
+
+const COLUMN_KEYS = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '⌫', '0', 'check'];
+
+/**
+ * A shorter pad for answers written in boxes, with Check in the bottom row so
+ * the whole problem fits on a phone without scrolling.
+ */
+export function ColumnPad({ onKey, onCheck, canCheck, disabled = false }: ColumnPadProps) {
+  useEffect(() => {
+    if (Platform.OS !== 'web' || disabled) return;
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (/^[0-9]$/.test(e.key)) onKey(e.key);
+      else if (e.key === 'Backspace') onKey('⌫');
+      else if (e.key === '-') onKey('±');
+      else if (e.key === 'Enter') {
+        if (canCheck) onCheck();
+      } else return;
+      e.preventDefault();
+    };
+    document.addEventListener('keydown', onKeyDown);
+    return () => document.removeEventListener('keydown', onKeyDown);
+  });
+
+  return (
+    <View style={styles.grid}>
+      {COLUMN_KEYS.map((key) => {
+        const check = key === 'check';
+        const off = disabled || (check && !canCheck);
+        return (
+          <Pressable
+            key={key}
+            onPress={() => (check ? onCheck() : onKey(key))}
+            disabled={off}
+            accessibilityRole="button"
+            accessibilityLabel={check ? 'Check answer' : key === '⌫' ? 'Delete' : key}
+            style={({ pressed }) => [
+              styles.key,
+              styles.compactKey,
+              check && styles.check,
+              check && styles.compactCheck,
+              check && !canCheck && styles.checkDisabled,
+              pressed && styles.pressed,
+            ]}
+          >
+            <Text style={[styles.keyText, check && styles.checkText]}>{check ? '✓' : key}</Text>
+          </Pressable>
+        );
+      })}
+    </View>
+  );
+}
