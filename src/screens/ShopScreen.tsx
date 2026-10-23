@@ -8,12 +8,12 @@ import { findBadge } from '@/constants/badges';
 import { itemsIn, SHOP_CATEGORIES, type ShopCategory, type ShopItem } from '@/constants/shop';
 import { colors, fontSizes, radius, spacing, TAP_TARGET } from '@/constants/theme';
 import { useActiveProfile, useProfiles } from '@/store/profiles';
-import { isEquipped, owns } from '@/utils/shop';
+import { freeAvatars, isEquipped, owns } from '@/utils/shop';
 import { playSound } from '@/utils/soundEffects';
 
 export function ShopScreen() {
   const profile = useActiveProfile();
-  const { buy, equip } = useProfiles();
+  const { buy, equip, setAvatar } = useProfiles();
   const [category, setCategory] = useState<ShopCategory>('avatar');
   const [message, setMessage] = useState<string | null>(null);
 
@@ -55,6 +55,38 @@ export function ShopScreen() {
         <Text style={styles.message} accessibilityLiveRegion="polite">
           {message}
         </Text>
+      ) : null}
+      {category === 'avatar' ? (
+        <>
+          <Text style={styles.heading}>Free avatars</Text>
+          <View style={styles.freeRow}>
+            {freeAvatars(profile).map((emoji) => {
+              const using = profile.avatar === emoji;
+              const first = emoji === profile.startAvatar;
+              return (
+                <Pressable
+                  key={emoji}
+                  onPress={() => {
+                    setAvatar(profile.id, emoji);
+                    setMessage(first ? 'Back to your first avatar!' : `Now using ${emoji}.`);
+                  }}
+                  accessibilityRole="button"
+                  accessibilityLabel={`Avatar ${emoji}${first ? ', your first pick' : ''}${using ? ', using' : ''}`}
+                  accessibilityState={{ selected: using }}
+                  style={({ pressed }) => [
+                    styles.freeChoice,
+                    using && styles.using,
+                    pressed && styles.pressed,
+                  ]}
+                >
+                  <Text style={styles.freeEmoji}>{emoji}</Text>
+                  {first ? <Text style={styles.firstTag}>First</Text> : null}
+                </Pressable>
+              );
+            })}
+          </View>
+          <Text style={styles.heading}>Shop avatars</Text>
+        </>
       ) : null}
       <View style={styles.grid}>
         {itemsIn(category).map((item) => {
@@ -123,6 +155,20 @@ function Preview({ item }: { item: ShopItem }) {
 const styles = StyleSheet.create({
   balance: { fontSize: fontSizes.button, fontWeight: '900', color: colors.text, textAlign: 'center' },
   message: { fontSize: fontSizes.body, fontWeight: '700', color: colors.primary, textAlign: 'center' },
+  heading: { fontSize: fontSizes.body, fontWeight: '900', color: colors.text },
+  freeRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm, justifyContent: 'center' },
+  freeChoice: {
+    width: TAP_TARGET + 24,
+    height: TAP_TARGET + 24,
+    backgroundColor: colors.surface,
+    borderRadius: radius.lg,
+    borderWidth: 3,
+    borderColor: colors.border,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  freeEmoji: { fontSize: 36 },
+  firstTag: { fontSize: 12, fontWeight: '800', color: colors.primary },
   grid: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
   item: {
     flexBasis: '45%',

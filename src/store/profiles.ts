@@ -6,7 +6,7 @@ import { persistStorage } from '@/store/storage';
 import type { InputStyle, Profile } from '@/types';
 import { dateKey } from '@/utils/dates';
 import { applyRound, type RoundOutcome, type RoundResult } from '@/utils/progress';
-import { buyItem, equipItem, type BuyResult } from '@/utils/shop';
+import { buyItem, equipItem, freeAvatars, type BuyResult } from '@/utils/shop';
 
 function emptyStats(): Profile['stats'] {
   return {
@@ -26,6 +26,7 @@ export function createProfile(name: string, avatar: string, inputStyle: InputSty
     id: newId(),
     name: name.trim(),
     avatar,
+    startAvatar: avatar,
     inputStyle,
     createdAt: Date.now(),
     coins: 0,
@@ -55,6 +56,8 @@ interface ProfilesState {
   recordRound: (id: string, round: RoundResult) => RoundOutcome | null;
   buy: (id: string, itemId: string) => BuyResult;
   equip: (id: string, itemId: string) => void;
+  /** Switches to a free avatar: the first pick or one of the defaults. */
+  setAvatar: (id: string, avatar: string) => void;
 }
 
 export const useProfiles = create<ProfilesState>()(
@@ -97,10 +100,16 @@ export const useProfiles = create<ProfilesState>()(
       },
       equip: (id, itemId) =>
         set((s) => ({ profiles: s.profiles.map((p) => (p.id === id ? equipItem(p, itemId) : p)) })),
+      setAvatar: (id, avatar) =>
+        set((s) => ({
+          profiles: s.profiles.map((p) =>
+            p.id === id && freeAvatars(p).includes(avatar) ? { ...p, avatar } : p,
+          ),
+        })),
     }),
     {
       name: 'math-game.profiles',
-      version: 4,
+      version: 5,
       storage: persistStorage,
       migrate: (persisted, version) => {
         const state = persisted as Pick<ProfilesState, 'profiles' | 'activeProfileId'>;
@@ -125,6 +134,10 @@ export const useProfiles = create<ProfilesState>()(
         if (version < 4) {
           // Version 4 added the weak-spots review list.
           state.profiles = state.profiles.map((p) => ({ ...p, missed: p.missed ?? {} }));
+        }
+        if (version < 5) {
+          // Version 5 remembers the first avatar so it can be picked again.
+          state.profiles = state.profiles.map((p) => ({ ...p, startAvatar: p.startAvatar ?? p.avatar }));
         }
         return state as ProfilesState;
       },

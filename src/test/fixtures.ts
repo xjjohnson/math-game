@@ -18,6 +18,7 @@ export const makeProfile = (overrides: Partial<Profile> = {}): Profile => ({
   id: 'p1',
   name: 'Ava',
   avatar: '🐼',
+  startAvatar: '🐼',
   inputStyle: 'auto',
   createdAt: 0,
   coins: 0,

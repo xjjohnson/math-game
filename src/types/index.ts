@@ -44,6 +44,8 @@ export interface Profile {
   id: string;
   name: string;
   avatar: string;
+  /** The avatar picked when the player was made, so it can always be picked again for free. */
+  startAvatar: string;
   inputStyle: InputStyle;
   createdAt: number;
   coins: number;
