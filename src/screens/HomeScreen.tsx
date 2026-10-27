@@ -1,14 +1,16 @@
 import { router } from 'expo-router';
-import { StyleSheet, View } from 'react-native';
+import { Pressable, StyleSheet, View } from 'react-native';
 
 import { Text } from '@/components/AppText';
 import { BigButton } from '@/components/BigButton';
+import { BuddyFace } from '@/components/BuddyFace';
 import { Screen } from '@/components/Screen';
 import { Sticker } from '@/components/Sticker';
 import { UpdateBanner } from '@/components/UpdateBanner';
 import { DIFFICULTIES, OPERATIONS } from '@/constants/difficulty';
 import { colors, fontSizes, spacing } from '@/constants/theme';
 import { useActiveProfile } from '@/store/profiles';
+import { buddyGift } from '@/utils/buddy';
 import { dateKey, dayStreak } from '@/utils/dates';
 import { DAILY_CHALLENGE_BONUS, DAILY_PASS, dailyChallengeConfig } from '@/utils/rewards';
 import { randomSeed } from '@/utils/seededRandom';
@@ -35,7 +37,15 @@ export function HomeScreen() {
           <>
             <View style={styles.faces}>
               <Sticker value={profile.avatar} size={72} />
-              {companion ? <Sticker value={companion.emoji} size={44} /> : null}
+              {companion ? (
+                <Pressable
+                  onPress={() => router.push('/buddy')}
+                  accessibilityRole="button"
+                  accessibilityLabel="Visit my buddy"
+                >
+                  <BuddyFace value={companion.emoji} size={44} gift={buddyGift(profile)} />
+                </Pressable>
+              ) : null}
             </View>
             <Text style={styles.name}>Hi, {profile.name}!</Text>
             <Text style={styles.stats}>
@@ -88,6 +98,12 @@ export function HomeScreen() {
             label="🛍️ Shop"
             color={colors.operations.subtract}
             onPress={() => router.push('/shop')}
+            style={styles.half}
+          />
+          <BigButton
+            label="🐾 My buddy"
+            color={colors.operations.divide}
+            onPress={() => router.push('/buddy')}
             style={styles.half}
           />
           <BigButton

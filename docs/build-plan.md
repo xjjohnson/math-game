@@ -66,7 +66,7 @@ Cross-platform interactive math learning game for kids (ages 5-15), React Native
 - Timers: 10s, 30s, untimed practice
 - Answer input: multiple choice for younger kids, number pad for older, set per profile or automatically by difficulty
 - Coins and stars for correct answers, streak bonuses, progress tracker, sound triggers on correct answers
-- Shop: avatar items, badges, backgrounds, card-flip styles, companions
+- Shop: avatar items, badges, backgrounds, card-flip styles, companions (each buddy has a home to pet, feed and play with)
 - Multiple profiles, PIN-protected parent area
 
 ---
@@ -195,6 +195,9 @@ Phases 1-6 deliver a complete single-player game before any native Bluetooth wor
 - [ ] Avatar items (Phase 5)
 - [ ] Themed backgrounds and card-flip styles (Phase 5)
 - [ ] Pets or companions that react to answers (Phase 5 or later)
+- [x] Bluey and Stitch avatars and buddies (fan-style drawings for family use only; kid request 2026-10-23)
+- [x] Themed backgrounds with faint pictures: space, ocean, jungle, candy, dinos, rainbow, snow, backyard, beach
+- [x] More buddies (bunny, panda, fox, penguin, octopus, unicorn) and a "My buddy" home: pet, treats, a fetch math game, hearts, levels 1-5 with a gift worn at each level
 
 ---
 

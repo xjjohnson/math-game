@@ -13,6 +13,8 @@ export interface Companion {
   emoji: string;
   cheers: string[];
   comforts: string[];
+  /** The buddy's favorite snack, given as a treat in the buddy's home. */
+  treat: string;
 }
 
 interface BaseItem {
@@ -171,6 +173,7 @@ export const SHOP_ITEMS: ShopItem[] = [
     price: 100,
     companion: {
       emoji: '🐶',
+      treat: '🦴',
       cheers: ['Woof! Nice!', 'Good job!', 'You rock!'],
       comforts: ["It's okay!", 'Try the next one!', 'Paws and think!'],
     },
@@ -182,8 +185,81 @@ export const SHOP_ITEMS: ShopItem[] = [
     price: 100,
     companion: {
       emoji: '🐱',
+      treat: '🐟',
       cheers: ['Purrfect!', 'Meow-velous!', 'So smart!'],
       comforts: ['No worries!', 'Keep going!', "You'll get it!"],
+    },
+  },
+  {
+    id: 'buddy-bunny',
+    category: 'companion',
+    name: 'Bunny',
+    price: 100,
+    companion: {
+      emoji: '🐰',
+      treat: '🥕',
+      cheers: ['Hop hop hooray!', 'Bunny-tastic!', 'Quick thinking!'],
+      comforts: ['Hop back up!', 'Nibble on it!', 'Next one!'],
+    },
+  },
+  {
+    id: 'buddy-panda',
+    category: 'companion',
+    name: 'Panda',
+    price: 120,
+    companion: {
+      emoji: '🐼',
+      treat: '🎋',
+      cheers: ['Bam-boo-tiful!', 'Panda power!', 'So good!'],
+      comforts: ['Take it slow!', "It's okay!", 'Try again!'],
+    },
+  },
+  {
+    id: 'buddy-fox',
+    category: 'companion',
+    name: 'Fox',
+    price: 120,
+    companion: {
+      emoji: '🦊',
+      treat: '🫐',
+      cheers: ['Clever fox!', 'Sly and smart!', 'Nailed it!'],
+      comforts: ['Sniff it out!', 'Almost!', 'Keep trying!'],
+    },
+  },
+  {
+    id: 'buddy-penguin',
+    category: 'companion',
+    name: 'Penguin',
+    price: 120,
+    companion: {
+      emoji: '🐧',
+      treat: '🐟',
+      cheers: ['Ice cool!', 'Waddle-ful!', 'Chill skills!'],
+      comforts: ['Slide to the next!', 'Brr, try again!', 'You got this!'],
+    },
+  },
+  {
+    id: 'buddy-octopus',
+    category: 'companion',
+    name: 'Octopus',
+    price: 150,
+    companion: {
+      emoji: '🐙',
+      treat: '🦐',
+      cheers: ['Eight thumbs up!', 'Tentacle-tastic!', 'Ink-credible!'],
+      comforts: ['Swim on!', 'Next wave!', "Don't worry!"],
+    },
+  },
+  {
+    id: 'buddy-unicorn',
+    category: 'companion',
+    name: 'Unicorn',
+    price: 250,
+    companion: {
+      emoji: '🦄',
+      treat: '🧁',
+      cheers: ['Magical!', 'Sparkly smart!', 'Rainbow power!'],
+      comforts: ['Make a wish and retry!', 'Magic takes practice!', 'Keep shining!'],
     },
   },
   {
@@ -193,6 +269,7 @@ export const SHOP_ITEMS: ShopItem[] = [
     price: 150,
     companion: {
       emoji: '🦖',
+      treat: '🍖',
       cheers: ['RAWR! Yes!', 'Dino-mite!', 'Stomping it!'],
       comforts: ['Shake it off!', 'Next one!', 'Big dinos try again!'],
     },
@@ -204,6 +281,7 @@ export const SHOP_ITEMS: ShopItem[] = [
     price: 250,
     companion: {
       emoji: '🐉',
+      treat: '🌶️',
       cheers: ['On fire!', 'Legendary!', 'Blazing fast!'],
       comforts: ['Even dragons miss!', 'Breathe and retry!', 'You got this!'],
     },
@@ -215,6 +293,7 @@ export const SHOP_ITEMS: ShopItem[] = [
     price: 200,
     companion: {
       emoji: '@bluey',
+      treat: '🍦',
       cheers: ['Hooray!', 'Wackadoo!', 'Best game ever!'],
       comforts: ["That's okay!", "Let's play again!", 'Have another go!'],
     },
@@ -226,6 +305,7 @@ export const SHOP_ITEMS: ShopItem[] = [
     price: 200,
     companion: {
       emoji: '@stitch',
+      treat: '🍰',
       cheers: ['Ohana!', 'Aloha, smarty!', 'Super good!'],
       comforts: ['No one gets left behind!', 'Try again!', 'Still good!'],
     },

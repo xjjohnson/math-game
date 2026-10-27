@@ -70,6 +70,19 @@ export interface Profile {
   week: WeekProgress | null;
   /** Facts to review, keyed by factKey(). */
   missed: Record<string, MissedFact>;
+  /** Hearts each buddy has earned, keyed by shop item id. */
+  buddyHearts: Record<string, number>;
+  /** Today's buddy care, for the daily limits; null before the first. */
+  buddyCare: BuddyCare | null;
+}
+
+export interface BuddyCare {
+  /** Local date, "YYYY-MM-DD". */
+  date: string;
+  pets: number;
+  treats: number;
+  /** Hearts earned from the buddy's game today. */
+  playHearts: number;
 }
 
 export interface Equipped {

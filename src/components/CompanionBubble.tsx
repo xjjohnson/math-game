@@ -1,7 +1,7 @@
 import { StyleSheet, View } from 'react-native';
 
 import { Text } from '@/components/AppText';
-import { Sticker } from '@/components/Sticker';
+import { BuddyFace } from '@/components/BuddyFace';
 import type { Companion } from '@/constants/shop';
 import { colors, fontSizes, radius, spacing } from '@/constants/theme';
 
@@ -11,15 +11,19 @@ interface Props {
   correct: boolean | null;
   /** Picks which line to say, so it changes from question to question. */
   turn: number;
+  /** What the buddy wears for its level. */
+  gift?: string | null;
 }
 
 /** The player's buddy, cheering right answers and encouraging after misses. */
-export function CompanionBubble({ companion, correct, turn }: Props) {
+export function CompanionBubble({ companion, correct, turn, gift }: Props) {
   const lines = correct === null ? null : correct ? companion.cheers : companion.comforts;
   const line = lines ? lines[turn % lines.length] : null;
   return (
     <View style={styles.row} accessibilityLiveRegion="polite">
-      <Sticker value={companion.emoji} size={44} style={correct === true && styles.bounce} />
+      <View style={correct === true && styles.bounce}>
+        <BuddyFace value={companion.emoji} size={44} gift={gift} />
+      </View>
       {line ? (
         <View style={styles.bubble}>
           <Text style={styles.text}>{line}</Text>

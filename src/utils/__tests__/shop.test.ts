@@ -42,7 +42,8 @@ describe('buying and equipping', () => {
     expect(backgroundColor(first.profile)).toBe('#E3F2FD');
     expect(first.newBadges).toEqual(['shopper']);
     expect(backgroundDecor(first.profile)).toEqual([]);
-    expect(backgroundDecor(makeProfile({ equipped: { ...first.profile.equipped, background: 'bg-space' } }))).toContain('🚀');
+    const space = makeProfile({ equipped: { ...first.profile.equipped, background: 'bg-space' } });
+    expect(backgroundDecor(space)).toContain('🚀');
 
     const second = buyItem(first.profile, 'avatar-cat');
     expect(second.ok && second.newBadges).toEqual([]);

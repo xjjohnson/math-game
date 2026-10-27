@@ -6,6 +6,7 @@ import { persistStorage } from '@/store/storage';
 import type { InputStyle, Profile } from '@/types';
 import { dateKey } from '@/utils/dates';
 import { applyRound, type RoundOutcome, type RoundResult } from '@/utils/progress';
+import { careForBuddy as applyCare, heartForRound, type CareAction, type CareResult } from '@/utils/buddy';
 import { buyItem, equipItem, freeAvatars, type BuyResult } from '@/utils/shop';
 
 function emptyStats(): Profile['stats'] {
@@ -42,6 +43,8 @@ export function createProfile(name: string, avatar: string, inputStyle: InputSty
     badges: [],
     week: null,
     missed: {},
+    buddyHearts: {},
+    buddyCare: null,
   };
 }
 
@@ -58,6 +61,8 @@ interface ProfilesState {
   equip: (id: string, itemId: string) => void;
   /** Switches to a free avatar: the first pick or one of the defaults. */
   setAvatar: (id: string, avatar: string) => void;
+  /** Pets, feeds or plays with the buddy in use. */
+  careForBuddy: (id: string, action: CareAction) => CareResult;
 }
 
 export const useProfiles = create<ProfilesState>()(
@@ -86,7 +91,8 @@ export const useProfiles = create<ProfilesState>()(
         const current = get().profiles.find((p) => p.id === id);
         if (!current) return null;
         const { profile, outcome } = applyRound(current, round, dateKey());
-        set((s) => ({ profiles: s.profiles.map((p) => (p.id === id ? profile : p)) }));
+        const withHeart = heartForRound(profile);
+        set((s) => ({ profiles: s.profiles.map((p) => (p.id === id ? withHeart : p)) }));
         return outcome;
       },
       buy: (id, itemId) => {
@@ -106,10 +112,19 @@ export const useProfiles = create<ProfilesState>()(
             p.id === id && freeAvatars(p).includes(avatar) ? { ...p, avatar } : p,
           ),
         })),
+      careForBuddy: (id, action) => {
+        const current = get().profiles.find((p) => p.id === id);
+        if (!current) return { ok: false, reason: 'noBuddy' };
+        const result = applyCare(current, action, dateKey());
+        if (result.ok) {
+          set((s) => ({ profiles: s.profiles.map((p) => (p.id === id ? result.profile : p)) }));
+        }
+        return result;
+      },
     }),
     {
       name: 'math-game.profiles',
-      version: 5,
+      version: 6,
       storage: persistStorage,
       migrate: (persisted, version) => {
         const state = persisted as Pick<ProfilesState, 'profiles' | 'activeProfileId'>;
@@ -138,6 +153,14 @@ export const useProfiles = create<ProfilesState>()(
         if (version < 5) {
           // Version 5 remembers the first avatar so it can be picked again.
           state.profiles = state.profiles.map((p) => ({ ...p, startAvatar: p.startAvatar ?? p.avatar }));
+        }
+        if (version < 6) {
+          // Version 6 added buddy hearts and daily buddy care.
+          state.profiles = state.profiles.map((p) => ({
+            ...p,
+            buddyHearts: p.buddyHearts ?? {},
+            buddyCare: p.buddyCare ?? null,
+          }));
         }
         return state as ProfilesState;
       },
