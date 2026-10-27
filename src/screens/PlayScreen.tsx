@@ -1,11 +1,12 @@
 import { router, useLocalSearchParams } from 'expo-router';
-import { useEffect, useRef, useState } from 'react';
-import { StyleSheet, View } from 'react-native';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { Pressable, StyleSheet, View } from 'react-native';
 
 import { Text } from '@/components/AppText';
 import { BigButton } from '@/components/BigButton';
 import { ChoiceButtons } from '@/components/ChoiceButtons';
 import { CompanionBubble } from '@/components/CompanionBubble';
+import { CountingAid } from '@/components/CountingAid';
 import { FlashCard, isStacked } from '@/components/FlashCard';
 import { ColumnHint } from '@/components/ColumnHint';
 import { ColumnPad, NumberPad } from '@/components/NumberPad';
@@ -21,6 +22,7 @@ import { useGameSession } from '@/hooks/useGameSession';
 import { useTimer } from '@/hooks/useTimer';
 import { useActiveProfile, useProfiles } from '@/store/profiles';
 import type { GameConfig } from '@/types';
+import { countingModel } from '@/utils/countingAid';
 import { speakProblem, stopSpeaking, vibrate } from '@/utils/feedback';
 import {
   correctCount,
@@ -77,6 +79,7 @@ function Round({ config, onPlayAgain }: { config: GameConfig; onPlayAgain: () =>
   const recordRound = useProfiles((s) => s.recordRound);
   const [state, dispatch] = useGameSession(config);
   const [outcome, setOutcome] = useState<RoundOutcome | null>(null);
+  const [counting, setCounting] = useState(false);
   const saved = useRef(false);
 
   const asking = state.phase === 'question';
@@ -91,6 +94,8 @@ function Round({ config, onPlayAgain }: { config: GameConfig; onPlayAgain: () =>
     if (state.phase === 'question') speakProblem(state.problem);
   }, [state.problem, state.phase]);
   useEffect(() => stopSpeaking, []);
+  // Each new question starts with the counting picture put away.
+  useEffect(() => setCounting(false), [state.index]);
 
   useEffect(() => {
     if (state.phase !== 'feedback' || !last) return;
@@ -135,6 +140,7 @@ function Round({ config, onPlayAgain }: { config: GameConfig; onPlayAgain: () =>
     state.problem.operation === 'subtract' &&
     !state.problem.story;
   const column = useColumnAnswer(state.problem, { allowNegative, teach: !!config.showWork });
+  const countModel = useMemo(() => countingModel(state.problem), [state.problem]);
 
   if (state.phase === 'finished') {
     return (
@@ -186,6 +192,21 @@ function Round({ config, onPlayAgain }: { config: GameConfig; onPlayAgain: () =>
         cardStyle={cardStyleFor(profile)}
         onSpeak={() => speakProblem(state.problem, true)}
       />
+
+      {countModel && !showFeedback ? (
+        <Pressable
+          onPress={() => setCounting((on) => !on)}
+          accessibilityRole="button"
+          accessibilityState={{ expanded: counting }}
+          style={styles.countToggle}
+          hitSlop={6}
+        >
+          <Text style={styles.countToggleText}>{counting ? 'Hide counting' : '🧮 Count it out'}</Text>
+        </Pressable>
+      ) : null}
+      {countModel && counting && !showFeedback ? (
+        <CountingAid key={`count-${state.index}`} problem={state.problem} model={countModel} />
+      ) : null}
 
       {companion ? (
         <CompanionBubble
@@ -318,6 +339,16 @@ const styles = StyleSheet.create({
   statusRow: { flexDirection: 'row', justifyContent: 'space-between' },
   status: { fontSize: fontSizes.body, fontWeight: '800', color: colors.text, fontVariant: ['tabular-nums'] },
   level: { fontSize: 16, fontWeight: '700', color: colors.textMuted, textAlign: 'center' },
+  countToggle: {
+    alignSelf: 'center',
+    paddingVertical: spacing.xs,
+    paddingHorizontal: spacing.md,
+    borderRadius: radius.md,
+    borderWidth: 2,
+    borderColor: colors.primary,
+    backgroundColor: colors.surface,
+  },
+  countToggleText: { fontSize: 18, fontWeight: '800', color: colors.primary },
   feedback: { fontSize: fontSizes.button, fontWeight: '800', textAlign: 'center' },
   highScore: { fontSize: fontSizes.button, fontWeight: '900', color: colors.accent, textAlign: 'center' },
   rewards: { alignItems: 'center', gap: spacing.xs },
