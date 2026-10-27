@@ -134,7 +134,15 @@ function Preview({ item }: { item: ShopItem }) {
     case 'companion':
       return <Sticker value={item.companion.emoji} size={48} />;
     case 'background':
-      return <View style={[styles.swatch, { backgroundColor: item.color }]} />;
+      return (
+        <View style={[styles.swatch, styles.scene, { backgroundColor: item.color }]}>
+          {item.decor?.slice(0, 3).map((d) => (
+            <Text key={d} style={styles.sceneEmoji}>
+              {d}
+            </Text>
+          ))}
+        </View>
+      );
     case 'cardStyle':
       return (
         <View
@@ -194,6 +202,8 @@ const styles = StyleSheet.create({
     borderWidth: 2,
     borderColor: colors.border,
   },
+  scene: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 2 },
+  sceneEmoji: { fontSize: 18 },
   miniCard: { borderWidth: 4, alignItems: 'center', justifyContent: 'center' },
   miniText: { fontWeight: '900', fontSize: 18 },
   name: { fontSize: fontSizes.body, fontWeight: '800', color: colors.text },

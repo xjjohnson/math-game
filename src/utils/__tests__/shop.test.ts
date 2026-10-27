@@ -3,7 +3,7 @@ import { SHOP_ITEMS } from '@/constants/shop';
 import { makeProfile, results } from '@/test/fixtures';
 import { newBadges } from '@/utils/badges';
 import { applyRound } from '@/utils/progress';
-import { backgroundColor, buyItem, equipItem, freeAvatars, isEquipped, owns } from '@/utils/shop';
+import { backgroundColor, backgroundDecor, buyItem, equipItem, freeAvatars, isEquipped, owns } from '@/utils/shop';
 import { allGoalsMet, recordWeek, WEEKLY_GOAL_BONUS, weekKey } from '@/utils/weekly';
 
 const today = '2026-10-22'; // a Thursday
@@ -41,6 +41,8 @@ describe('buying and equipping', () => {
     expect(first.profile.equipped.background).toBe('bg-sky');
     expect(backgroundColor(first.profile)).toBe('#E3F2FD');
     expect(first.newBadges).toEqual(['shopper']);
+    expect(backgroundDecor(first.profile)).toEqual([]);
+    expect(backgroundDecor(makeProfile({ equipped: { ...first.profile.equipped, background: 'bg-space' } }))).toContain('🚀');
 
     const second = buyItem(first.profile, 'avatar-cat');
     expect(second.ok && second.newBadges).toEqual([]);

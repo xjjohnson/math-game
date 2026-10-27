@@ -25,7 +25,8 @@ interface BaseItem {
 export type ShopItem =
   /** `emoji` may also be an "@key" drawing from constants/art. */
   | (BaseItem & { category: 'avatar'; emoji: string })
-  | (BaseItem & { category: 'background'; color: string })
+  /** `decor` scatters faint pictures over the color for a themed look. */
+  | (BaseItem & { category: 'background'; color: string; decor?: string[] })
   | (BaseItem & { category: 'cardStyle'; style: CardStyle })
   | (BaseItem & { category: 'companion'; companion: Companion });
 
@@ -54,6 +55,78 @@ export const SHOP_ITEMS: ShopItem[] = [
   { id: 'bg-lavender', category: 'background', name: 'Lavender', color: '#EEE6FF', price: 60 },
   { id: 'bg-peach', category: 'background', name: 'Peach', color: '#FFE4D6', price: 60 },
   { id: 'bg-lemon', category: 'background', name: 'Lemonade', color: '#FFF6B8', price: 80 },
+  {
+    id: 'bg-space',
+    category: 'background',
+    name: 'Outer Space',
+    color: '#E6E9FB',
+    decor: ['⭐', '🪐', '🚀', '🌙', '✨'],
+    price: 100,
+  },
+  {
+    id: 'bg-ocean',
+    category: 'background',
+    name: 'Under the Sea',
+    color: '#DDF4FB',
+    decor: ['🐠', '🫧', '🐳', '🐚', '🐙'],
+    price: 100,
+  },
+  {
+    id: 'bg-jungle',
+    category: 'background',
+    name: 'Jungle',
+    color: '#E3F4DF',
+    decor: ['🌴', '🦜', '🍃', '🐒', '🌺'],
+    price: 100,
+  },
+  {
+    id: 'bg-candy',
+    category: 'background',
+    name: 'Candy Land',
+    color: '#FDE7F1',
+    decor: ['🍭', '🍬', '🧁', '🍩', '🍓'],
+    price: 100,
+  },
+  {
+    id: 'bg-dino',
+    category: 'background',
+    name: 'Dino Land',
+    color: '#F0F5DC',
+    decor: ['🦕', '🦖', '🌋', '🦴', '🌿'],
+    price: 120,
+  },
+  {
+    id: 'bg-rainbow',
+    category: 'background',
+    name: 'Rainbow Sky',
+    color: '#F1E9FB',
+    decor: ['🌈', '☁️', '✨', '🦄', '💖'],
+    price: 120,
+  },
+  {
+    id: 'bg-snow',
+    category: 'background',
+    name: 'Snow Day',
+    color: '#EEF6FC',
+    decor: ['❄️', '⛄', '🧣', '🌨️'],
+    price: 120,
+  },
+  {
+    id: 'bg-backyard',
+    category: 'background',
+    name: 'Backyard Fun',
+    color: '#E8F6E4',
+    decor: ['🌳', '🏡', '🌼', '⚽', '🦴'],
+    price: 150,
+  },
+  {
+    id: 'bg-beach',
+    category: 'background',
+    name: 'Aloha Beach',
+    color: '#FFF1DC',
+    decor: ['🌺', '🌴', '🏄', '🌊', '🐢'],
+    price: 150,
+  },
 
   {
     id: 'card-classic',
