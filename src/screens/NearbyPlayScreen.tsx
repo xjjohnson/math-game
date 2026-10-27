@@ -5,6 +5,7 @@ import { Pressable, StyleSheet, View } from 'react-native';
 import { Text } from '@/components/AppText';
 import { BigButton } from '@/components/BigButton';
 import { MatchOptions } from '@/components/MatchOptions';
+import { MonsterBar } from '@/components/MonsterBar';
 import { OptionGroup } from '@/components/OptionGroup';
 import { QuestionPanel } from '@/components/QuestionPanel';
 import { Screen } from '@/components/Screen';
@@ -21,12 +22,16 @@ import {
   answerMine,
   COOP_WAVES,
   isOver,
+  isTeamMode,
   matchProblem,
+  MONSTER,
+  monsterFor,
   mySeat,
   outcomeFor,
   playerLeft,
   RACE_TARGET,
   receive,
+  stagesFor,
   standings,
   startMatch,
   waveTarget,
@@ -55,6 +60,7 @@ type Phase = 'choose' | 'finding' | 'lobby' | 'playing' | 'gone';
 const MODES: { value: MatchMode; label: string }[] = [
   { value: 'race', label: `🏁 Race\nFirst to ${RACE_TARGET} right wins` },
   { value: 'coop', label: `🛡️ Co-op Defense\nBeat ${COOP_WAVES.length} waves together` },
+  { value: 'monster', label: `🐉 Monster Battle\nTeam up to beat it in ${MONSTER.seconds / 60} minutes` },
 ];
 
 const MEDALS = ['🥇', '🥈', '🥉'];
@@ -73,7 +79,7 @@ function useStateRef<T>(initial: T) {
   return [value, set, ref] as const;
 }
 
-/** Up to 8 phones over Nearby: one hosts, the rest join, then Race or Co-op Defense. */
+/** Up to 8 phones over Nearby: one hosts, the rest join, then Race, Co-op Defense or Monster Battle. */
 export function NearbyPlayScreen() {
   const profile = useActiveProfile();
   const me: PlayerInfo = { id: HOST_ID, name: profile?.name ?? 'Player', avatar: profile?.avatar ?? '🙂' };
@@ -369,8 +375,9 @@ function Match({
   const host = me === HOST_ID;
   const nameOf = (id: string | null) => players.find((p) => p.id === id)?.name ?? 'Someone';
 
-  const wave = COOP_WAVES[match.wave];
-  const secondsLeft = useTimer(setup.mode === 'coop' ? wave.seconds : null, !over, match.wave, () => {
+  const team = isTeamMode(setup.mode);
+  const wave = stagesFor(setup.mode)[match.wave];
+  const secondsLeft = useTimer(team ? wave.seconds : null, !over, match.wave, () => {
     if (host) onTimeUp();
   });
 
@@ -389,12 +396,16 @@ function Match({
         ? won
           ? '🏆 You win!'
           : `${nameOf(match.winner)} wins!`
-        : won
-          ? '🛡️ You beat every wave!'
-          : 'The clock won this time';
+        : setup.mode === 'monster'
+          ? won
+            ? '🎉 You beat the monster!'
+            : `The ${monsterFor(setup.seed)} got away this time`
+          : won
+            ? '🛡️ You beat every wave!'
+            : 'The clock won this time';
     return (
       <Screen title={title}>
-        {setup.mode === 'coop' ? (
+        {team ? (
           <Text style={styles.body}>
             Team total: {ranked.reduce((sum, p) => sum + p.correct, 0)} right.
           </Text>
@@ -444,6 +455,12 @@ function Match({
               faded={match.left.includes(p.id)}
             />
           ))}
+        </View>
+      ) : setup.mode === 'monster' ? (
+        <View style={styles.section}>
+          <Text style={styles.heading}>Team of {players.length - match.left.length} · every right answer is a hit!</Text>
+          <MonsterBar monster={monsterFor(setup.seed)} hits={match.waveCorrect} health={waveTarget(match)} compact />
+          {secondsLeft !== null ? <TimerBar total={wave.seconds} left={secondsLeft} /> : null}
         </View>
       ) : (
         <View style={styles.section}>

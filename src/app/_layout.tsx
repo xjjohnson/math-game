@@ -37,7 +37,12 @@ export default function RootLayout() {
         <Stack.Screen name="permissions" options={{ title: 'Play nearby' }} />
         <Stack.Screen name="nearby-test" options={{ title: 'Nearby test' }} />
         <Stack.Screen name="multiplayer" options={{ title: 'Play with a friend' }} />
-        <Stack.Screen name="pass-play" options={{ title: 'Take turns' }} />
+        <Stack.Screen
+          name="pass-play"
+          options={({ route }) => ({
+            title: (route.params as { team?: string } | undefined)?.team === '1' ? 'Team up' : 'Take turns',
+          })}
+        />
         <Stack.Screen name="nearby-play" options={{ title: 'Several phones' }} />
       </Stack>
     </>

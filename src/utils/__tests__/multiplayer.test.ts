@@ -5,6 +5,8 @@ import {
   COOP_WAVES,
   isOver,
   matchProblem,
+  MONSTER,
+  monsterFor,
   outcomeFor,
   playerLeft,
   RACE_TARGET,
@@ -23,6 +25,10 @@ import {
   passScores,
   passWinners,
   startPass,
+  TEAM_UP_PER_PLAYER,
+  teamHits,
+  teamTarget,
+  teamWon,
   type PassPlayer,
   type PassState,
 } from '@/utils/multiplayer/passAndPlay';
@@ -36,6 +42,7 @@ import {
 
 const race: MatchSetup = { mode: 'race', operation: 'add', difficulty: 'easy', seed: 42 };
 const coop: MatchSetup = { ...race, mode: 'coop' };
+const monster: MatchSetup = { ...race, mode: 'monster' };
 
 /**
  * A host and `count - 1` guests over the mock network, each phone keeping its
@@ -74,6 +81,7 @@ describe('protocol', () => {
       { type: 'welcome', version: 2, you: 'x1' },
       { type: 'lobby', players },
       { type: 'start', setup: race, players },
+      { type: 'start', setup: monster, players },
       { type: 'answer', correct: true, playerId: 'x1' },
       { type: 'wave', wave: 1 },
       { type: 'left', playerId: 'x1' },
@@ -156,6 +164,38 @@ describe('matches', () => {
     expect(game.state(1).wave).toBe(1);
   });
 
+  it('monster battle with 3 players: everyone hits one monster and wins together', async () => {
+    const game = await phones(monster, 3);
+    expect(waveTarget(game.state(1))).toBe(MONSTER.perPlayer * 3);
+    // Teammates get their own cards, like co-op.
+    expect(matchProblem(monster, 1, 0)).toEqual(matchProblem(coop, 1, 0));
+    for (let i = 0; i < MONSTER.perPlayer * 3 - 1; i++) game.answer(i % 3, true);
+    game.answer(2, false);
+    expect(isOver(game.state(0))).toBe(false);
+    expect(game.state(2).waveCorrect).toBe(MONSTER.perPlayer * 3 - 1);
+    game.answer(1, true);
+    for (const p of [0, 1, 2]) expect(outcomeFor(game.state(p))).toBe('won');
+  });
+
+  it('monster battle: the monster gets away if the clock runs out, and shrinks when someone leaves', async () => {
+    const lost = await phones(monster, 2);
+    lost.answer(1, true);
+    lost.timeUp();
+    expect(outcomeFor(lost.state(1))).toBe('lost');
+
+    const game = await phones(monster, 3);
+    for (let i = 0; i < MONSTER.perPlayer * 2 - 1; i++) game.answer(i % 2, true);
+    game.leave(2);
+    expect(waveTarget(game.state(0))).toBe(MONSTER.perPlayer * 2);
+    game.answer(0, true);
+    expect(outcomeFor(game.state(1))).toBe('won');
+  });
+
+  it('every phone shows the same monster', () => {
+    expect(monsterFor(monster.seed)).toBe(monsterFor(42));
+    expect(new Set([0, 1, 2, 3, 4, 5, 6].map(monsterFor)).size).toBe(7);
+  });
+
   it('only the host referees', () => {
     const players = [{ id: HOST_ID, name: 'A', avatar: '🙂' }, { id: 'g', name: 'B', avatar: '🙂' }];
     const [state, out] = waveTimeUp(startMatch(coop, players, 'g'));
@@ -197,5 +237,33 @@ describe('pass-and-play', () => {
     const s = passReducer(startPass(players, 'add', 'easy', 7), { type: 'begin' });
     const cards = (turn: number) => [0, 1, 2, 3].map((index) => passProblem({ ...s, turn, index }).prompt).join();
     expect(new Set([0, 1, 2, 3].map(cards)).size).toBe(4);
+  });
+});
+
+describe('team up on one phone', () => {
+  const players: PassPlayer[] = ['Ava', 'Leo', 'Mia'].map((name) => ({ name, avatar: '🙂' }));
+  const play = (state: PassState, right: number[]) => {
+    let s = state;
+    while (s.phase !== 'finished') {
+      if (s.phase === 'handoff') s = passReducer(s, { type: 'begin' });
+      const p = passProblem(s);
+      s = passReducer(s, { type: 'answer', given: s.index < right[s.turn] ? p.answer : p.answer + 1 });
+      s = passReducer(s, { type: 'next' });
+    }
+    return s;
+  };
+
+  it("adds everyone's right answers against one monster", () => {
+    const start = startPass(players, 'add', 'easy', 7, true);
+    expect(teamTarget(start)).toBe(TEAM_UP_PER_PLAYER * 3);
+    // A strong player can carry a teammate who is still learning.
+    const carried = play(start, [10, 9, 2]);
+    expect(teamHits(carried)).toBe(21);
+    expect(teamWon(carried)).toBe(true);
+    expect(teamWon(play(start, [10, 8, 2]))).toBe(false);
+  });
+
+  it('take turns stays a competition', () => {
+    expect(startPass(players, 'add', 'easy', 7).team).toBe(false);
   });
 });

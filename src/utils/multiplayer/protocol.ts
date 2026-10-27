@@ -1,7 +1,7 @@
 import type { Difficulty, Operation } from '@/types';
 
 /** Bump when messages change shape, so phones on different builds say so instead of misbehaving. */
-export const PROTOCOL_VERSION = 2;
+export const PROTOCOL_VERSION = 3;
 
 /** The host phone plus up to 7 friends. */
 export const MAX_PLAYERS = 8;
@@ -9,7 +9,7 @@ export const MAX_PLAYERS = 8;
 /** The host's player id. Guests are known by the id the host's phone gives them. */
 export const HOST_ID = 'host';
 
-export type MatchMode = 'race' | 'coop';
+export type MatchMode = 'race' | 'coop' | 'monster';
 
 /** Everything every phone needs to generate the same match. */
 export interface MatchSetup {
@@ -38,11 +38,11 @@ export type GameMessage =
   | { type: 'lobby'; players: PlayerInfo[] }
   | { type: 'start'; setup: MatchSetup; players: PlayerInfo[] }
   | { type: 'answer'; correct: boolean; playerId: string }
-  /** Co-op: the host moved everyone on to this wave (0-based). */
+  /** Co-op Defense: the host moved everyone on to this wave (0-based). */
   | { type: 'wave'; wave: number }
   /** A player's phone dropped out of the match. */
   | { type: 'left'; playerId: string }
-  /** The host's final call: a race winner, or a co-op result. */
+  /** The host's final call: a race winner, or a team result. */
   | { type: 'end'; winner?: string; result?: 'won' | 'lost' }
   | { type: 'bye' };
 
@@ -50,7 +50,7 @@ export function encodeMessage(message: GameMessage): string {
   return JSON.stringify(message);
 }
 
-const MODES: readonly string[] = ['race', 'coop'];
+const MODES: readonly string[] = ['race', 'coop', 'monster'];
 const OPERATIONS: readonly string[] = ['add', 'subtract', 'multiply', 'divide'];
 const DIFFICULTIES: readonly string[] = ['easy', 'medium', 'hard'];
 

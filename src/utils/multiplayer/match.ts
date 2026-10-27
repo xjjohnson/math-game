@@ -1,6 +1,12 @@
 import type { GameConfig, Problem } from '@/types';
 import { problemAt } from '@/utils/gameSession';
-import { HOST_ID, type GameMessage, type MatchSetup, type PlayerInfo } from '@/utils/multiplayer/protocol';
+import {
+  HOST_ID,
+  type GameMessage,
+  type MatchMode,
+  type MatchSetup,
+  type PlayerInfo,
+} from '@/utils/multiplayer/protocol';
 
 /** Head-to-Head Race: first to this many right answers wins. */
 export const RACE_TARGET = 10;
@@ -16,8 +22,28 @@ export const COOP_WAVES = [
 ] as const;
 
 /**
+ * Monster Battle: one big monster for the whole team. Every right answer is a
+ * hit; it has this much health per player still in the game, and the team has
+ * this long to beat it. Wrong answers cost nothing.
+ */
+export const MONSTER = { perPlayer: 6, seconds: 120 } as const;
+
+/** The monster you face is picked from the match seed, so every phone sees the same one. */
+export const MONSTERS = ['🐉', '👾', '🦖', '🐙', '👹', '🦑', '🧌'] as const;
+
+export const monsterFor = (seed: number) => MONSTERS[seed % MONSTERS.length];
+
+/** Team modes: everyone shares one goal and the host's clock decides. */
+export const isTeamMode = (mode: MatchMode) => mode !== 'race';
+
+/** The timed stages of a team mode. Monster Battle is a single long one. */
+export function stagesFor(mode: MatchMode): readonly { perPlayer: number; seconds: number }[] {
+  return mode === 'monster' ? [MONSTER] : COOP_WAVES;
+}
+
+/**
  * Every phone builds the same problems from the shared seed. In a race
- * everyone gets the same cards; in co-op each player gets their own so
+ * everyone gets the same cards; in team modes each player gets their own so
  * nobody repeats a teammate's card.
  */
 export function matchConfig(setup: MatchSetup, seat: number): GameConfig {
@@ -27,7 +53,7 @@ export function matchConfig(setup: MatchSetup, seat: number): GameConfig {
     timer: null,
     adaptive: false,
     questionCount: Number.MAX_SAFE_INTEGER,
-    seed: setup.mode === 'coop' && seat > 0 ? (setup.seed ^ Math.imul(seat, 0x5bd1e995)) >>> 0 : setup.seed,
+    seed: isTeamMode(setup.mode) && seat > 0 ? (setup.seed ^ Math.imul(seat, 0x5bd1e995)) >>> 0 : setup.seed,
   };
 }
 
@@ -47,12 +73,12 @@ export interface MatchState {
   correct: Record<string, number>;
   /** Players whose phones dropped out. */
   left: string[];
-  /** Co-op: current wave (0-based) and the team's right answers in it. */
+  /** Team modes: current wave (0-based) and the team's right answers in it. */
   wave: number;
   waveCorrect: number;
   /** Race: the host's call on who won. */
   winner: string | null;
-  /** Co-op: the host's call on how it went. */
+  /** Team modes: the host's call on how it went. */
   result: 'won' | 'lost' | null;
 }
 
@@ -73,17 +99,17 @@ export function startMatch(setup: MatchSetup, players: PlayerInfo[], me: string)
 
 export const isHost = (state: MatchState) => state.me === HOST_ID;
 
-/** Where this phone's player sits; picks their co-op cards. */
+/** Where this phone's player sits; picks their team-mode cards. */
 export const mySeat = (state: MatchState) => Math.max(0, state.players.findIndex((p) => p.id === state.me));
 
 export function isOver(state: MatchState): boolean {
   return state.winner !== null || state.result !== null;
 }
 
-/** Co-op: right answers the team needs to clear the current wave. */
+/** Team modes: right answers the team needs to clear the current wave (or beat the monster). */
 export function waveTarget(state: MatchState): number {
   const playing = Math.max(1, state.players.length - state.left.length);
-  return COOP_WAVES[state.wave].perPlayer * playing;
+  return stagesFor(state.setup.mode)[state.wave].perPlayer * playing;
 }
 
 /** Players from most right answers to fewest; ties keep seating order. */
@@ -116,7 +142,7 @@ function referee(state: MatchState, timeUp = false): Step {
     return winner ? [{ ...state, winner }, [{ type: 'end', winner }]] : [state, []];
   }
   if (state.waveCorrect >= waveTarget(state)) {
-    if (state.wave === COOP_WAVES.length - 1) {
+    if (state.wave === stagesFor(state.setup.mode).length - 1) {
       return [{ ...state, result: 'won' }, [{ type: 'end', result: 'won' }]];
     }
     const wave = state.wave + 1;
@@ -170,7 +196,7 @@ export function playerLeft(state: MatchState, playerId: string): Step {
   return [after, [{ type: 'left', playerId }, ...calls]];
 }
 
-/** Co-op: the host's wave timer ran out. */
+/** Team modes: the host's clock ran out. */
 export function waveTimeUp(state: MatchState): Step {
   return referee(state, true);
 }
