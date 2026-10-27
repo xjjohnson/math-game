@@ -11,6 +11,10 @@ import {
   playerLeft,
   RACE_TARGET,
   receive,
+  RELAY,
+  relayLap,
+  runner,
+  stageSeconds,
   standings,
   startMatch,
   waveTarget,
@@ -43,6 +47,7 @@ import {
 const race: MatchSetup = { mode: 'race', operation: 'add', difficulty: 'easy', seed: 42 };
 const coop: MatchSetup = { ...race, mode: 'coop' };
 const monster: MatchSetup = { ...race, mode: 'monster' };
+const relay: MatchSetup = { ...race, mode: 'relay' };
 
 /**
  * A host and `count - 1` guests over the mock network, each phone keeping its
@@ -82,6 +87,7 @@ describe('protocol', () => {
       { type: 'lobby', players },
       { type: 'start', setup: race, players },
       { type: 'start', setup: monster, players },
+      { type: 'start', setup: relay, players },
       { type: 'answer', correct: true, playerId: 'x1' },
       { type: 'wave', wave: 1 },
       { type: 'left', playerId: 'x1' },
@@ -194,6 +200,53 @@ describe('matches', () => {
   it('every phone shows the same monster', () => {
     expect(monsterFor(monster.seed)).toBe(monsterFor(42));
     expect(new Set([0, 1, 2, 3, 4, 5, 6].map(monsterFor)).size).toBe(7);
+  });
+
+  it('relay with 3 players: the baton goes round, every phone on the same card', async () => {
+    const game = await phones(relay, 3);
+    expect(waveTarget(game.state(0))).toBe(RELAY.laps * 3);
+    expect(stageSeconds(game.state(2))).toBe(RELAY.secondsPerLeg * RELAY.laps * 3);
+    expect(runner(game.state(1))).toBe(game.ids[0]);
+
+    // Only the runner can answer; anyone else is ignored everywhere.
+    game.answer(2, true);
+    for (const p of [0, 1, 2]) expect(game.state(p).cards).toBe(0);
+
+    // A wrong answer keeps the baton but moves everyone to a fresh card.
+    game.answer(0, false);
+    for (const p of [0, 1, 2]) {
+      expect(game.state(p).cards).toBe(1);
+      expect(runner(game.state(p))).toBe(game.ids[0]);
+    }
+    game.answer(0, true);
+    for (const p of [0, 1, 2]) expect(runner(game.state(p))).toBe(game.ids[1]);
+    game.answer(1, true);
+    expect(game.state(0).last).toEqual({ playerId: game.ids[1], correct: true });
+    game.answer(2, true);
+    expect(relayLap(game.state(1))).toBe(2);
+
+    for (let leg = 3; leg < RELAY.laps * 3 - 1; leg++) game.answer(leg % 3, true);
+    expect(isOver(game.state(0))).toBe(false);
+    game.answer(2, true);
+    for (const p of [0, 1, 2]) expect(outcomeFor(game.state(p))).toBe('won');
+  });
+
+  it('relay: a player leaving drops out of the baton order', async () => {
+    const game = await phones(relay, 3);
+    game.answer(0, true);
+    expect(runner(game.state(0))).toBe(game.ids[1]);
+    game.leave(1);
+    // 2 players now need 6; the host's 1 counts, and the baton skips the empty seat.
+    expect(waveTarget(game.state(2))).toBe(RELAY.laps * 2);
+    expect(runner(game.state(2))).toBe(game.ids[2]);
+    expect(runner(game.state(0))).toBe(game.ids[2]);
+  });
+
+  it('relay: the clock can still win', async () => {
+    const game = await phones(relay, 2);
+    game.answer(0, true);
+    game.timeUp();
+    expect(outcomeFor(game.state(1))).toBe('lost');
   });
 
   it('only the host referees', () => {

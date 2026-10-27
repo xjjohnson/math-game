@@ -33,12 +33,28 @@ export const MONSTERS = ['🐉', '👾', '🦖', '🐙', '👹', '🦑', '🧌']
 
 export const monsterFor = (seed: number) => MONSTERS[seed % MONSTERS.length];
 
+/**
+ * Relay: one player answers at a time, and everyone's phone shows that card so
+ * the team can help. A right answer passes the baton to the next player; a
+ * wrong one gets them another card. Each player runs this many laps, and the
+ * clock gives the team this long per right answer it needs.
+ */
+export const RELAY = { laps: 3, secondsPerLeg: 20 } as const;
+
 /** Team modes: everyone shares one goal and the host's clock decides. */
 export const isTeamMode = (mode: MatchMode) => mode !== 'race';
 
-/** The timed stages of a team mode. Monster Battle is a single long one. */
+/** The timed stages of a team mode. Monster Battle and Relay are a single long one. */
 export function stagesFor(mode: MatchMode): readonly { perPlayer: number; seconds: number }[] {
-  return mode === 'monster' ? [MONSTER] : COOP_WAVES;
+  if (mode === 'monster') return [MONSTER];
+  if (mode === 'relay') return [{ perPlayer: RELAY.laps, seconds: 0 }];
+  return COOP_WAVES;
+}
+
+/** How long the team has for the current stage. A relay's clock depends on the team it started with. */
+export function stageSeconds(state: MatchState): number {
+  if (state.setup.mode === 'relay') return RELAY.secondsPerLeg * RELAY.laps * state.players.length;
+  return stagesFor(state.setup.mode)[state.wave].seconds;
 }
 
 /**
@@ -57,6 +73,7 @@ export function matchConfig(setup: MatchSetup, seat: number): GameConfig {
   };
 }
 
+/** A player's card. A relay shows seat 0's cards on every phone, one at a time. */
 export function matchProblem(setup: MatchSetup, seat: number, index: number): Problem {
   return problemAt(matchConfig(setup, seat), index, setup.difficulty);
 }
@@ -69,6 +86,10 @@ export interface MatchState {
   me: string;
   /** Cards answered on this phone; the next card's index. */
   myIndex: number;
+  /** Relay: cards the team has answered; the card on every screen now. */
+  cards: number;
+  /** Relay: the last answer, so watching phones can cheer or sigh. */
+  last: { playerId: string; correct: boolean } | null;
   /** Right answers per player id. */
   correct: Record<string, number>;
   /** Players whose phones dropped out. */
@@ -88,6 +109,8 @@ export function startMatch(setup: MatchSetup, players: PlayerInfo[], me: string)
     players,
     me,
     myIndex: 0,
+    cards: 0,
+    last: null,
     correct: Object.fromEntries(players.map((p) => [p.id, 0])),
     left: [],
     wave: 0,
@@ -122,10 +145,25 @@ export function standings(state: MatchState): (PlayerInfo & { correct: number })
 /** What happens next, from this phone's side, and what it sends. */
 export type Step = [MatchState, GameMessage[]];
 
+/** Relay: who holds the baton. It goes round the players still in the game, in seating order. */
+export function runner(state: MatchState): string {
+  const playing = state.players.filter((p) => !state.left.includes(p.id));
+  return (playing[state.waveCorrect % Math.max(1, playing.length)] ?? state.players[0]).id;
+}
+
+/** Relay: the lap the team is on (1-based), capped at the last. */
+export const relayLap = (state: MatchState) =>
+  Math.min(RELAY.laps, Math.floor(state.waveCorrect / Math.max(1, state.players.length - state.left.length)) + 1);
+
 function count(state: MatchState, playerId: string, correct: boolean): MatchState {
-  if (!correct || isOver(state) || !(playerId in state.correct)) return state;
+  if (isOver(state) || !(playerId in state.correct)) return state;
+  const relay = state.setup.mode === 'relay';
+  // In a relay only the runner may answer, and every answer moves everyone to the next card.
+  if (relay && playerId !== runner(state)) return state;
+  const seen = relay ? { ...state, cards: state.cards + 1, last: { playerId, correct } } : state;
+  if (!correct) return seen;
   return {
-    ...state,
+    ...seen,
     correct: { ...state.correct, [playerId]: state.correct[playerId] + 1 },
     waveCorrect: state.waveCorrect + 1,
   };

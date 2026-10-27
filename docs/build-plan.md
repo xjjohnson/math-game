@@ -88,7 +88,9 @@ Cross-platform interactive math learning game for kids (ages 5-15), React Native
 **Modes:**
 - Head-to-Head Race: first to 10 correct wins
 - Co-op Defense: shared score bar, clear waves before the timer expires
-- Pass-and-play on one device (no networking)
+- Monster Battle (team): one shared monster, 6 health per player, every right answer is a hit, 2 minutes on the clock
+- Relay (team): one player answers at a time and every phone shows that card so the team can help; a right answer passes the baton; 3 laps, 20 seconds per leg
+- Pass-and-play on one device (no networking): Take Turns (competition) or Team Up (everyone's right answers hit one monster, 7 health per player)
 
 ---
 
@@ -168,6 +170,7 @@ Phases 1-6 deliver a complete single-player game before any native Bluetooth wor
 - [ ] WebRTC transport for PC multiplayer (Phase 9, only if wanted)
 - [ ] LAN WebSocket fallback if WebRTC pairing is flaky (only if needed)
 - [ ] Keep MockTransport for solo testing of multiplayer logic
+- [ ] More co-op modes: Monster Battle and Relay on several phones, Team Up on one phone (protocol v3)
 
 ### Profiles
 - [ ] Multiple kid profiles on one device, each with its own coins and progress (Phase 1 store design)

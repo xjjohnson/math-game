@@ -9,7 +9,7 @@ export const MAX_PLAYERS = 8;
 /** The host's player id. Guests are known by the id the host's phone gives them. */
 export const HOST_ID = 'host';
 
-export type MatchMode = 'race' | 'coop' | 'monster';
+export type MatchMode = 'race' | 'coop' | 'monster' | 'relay';
 
 /** Everything every phone needs to generate the same match. */
 export interface MatchSetup {
@@ -50,7 +50,7 @@ export function encodeMessage(message: GameMessage): string {
   return JSON.stringify(message);
 }
 
-const MODES: readonly string[] = ['race', 'coop', 'monster'];
+const MODES: readonly string[] = ['race', 'coop', 'monster', 'relay'];
 const OPERATIONS: readonly string[] = ['add', 'subtract', 'multiply', 'divide'];
 const DIFFICULTIES: readonly string[] = ['easy', 'medium', 'hard'];
 
