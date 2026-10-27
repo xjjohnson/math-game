@@ -21,10 +21,15 @@ export function spokenProblem(problem: Problem): string {
 
 /** Reads a problem aloud when the setting is on (or when `force` is set, for the speaker button). */
 export function speakProblem(problem: Problem, force = false) {
+  speakText(spokenProblem(problem), force);
+}
+
+/** Reads any text aloud, under the same rule as speakProblem. */
+export function speakText(text: string, force = false) {
   if (!force && !useSettings.getState().textToSpeech) return;
   try {
     Speech.stop();
-    Speech.speak(spokenProblem(problem), { rate: 0.9 });
+    Speech.speak(text, { rate: 0.9 });
   } catch {
     // Some browsers have no speech voices; the game works the same without them.
   }

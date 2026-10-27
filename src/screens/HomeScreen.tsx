@@ -52,6 +52,13 @@ export function HomeScreen() {
         disabled={!profile}
         onPress={() => router.push('/mode')}
       />
+      <BigButton
+        label="📚 Learn how"
+        color={colors.primary}
+        outline
+        accessibilityHint="Step-by-step ways to work out answers, like counting on, carrying and long division."
+        onPress={() => router.push('/learn')}
+      />
       {profile && daily && dailyOp ? (
         <BigButton
           label={dailyDone ? '✓ Daily challenge done' : `⚡ Daily challenge: ${dailyOp.label}`}
