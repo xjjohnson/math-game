@@ -9,6 +9,7 @@ import { OptionGroup } from '@/components/OptionGroup';
 import { QuestionPanel } from '@/components/QuestionPanel';
 import { Screen } from '@/components/Screen';
 import { TimerBar } from '@/components/TimerBar';
+import { stickerText } from '@/constants/art';
 import { colors, fontSizes, radius, spacing, TAP_TARGET } from '@/constants/theme';
 import { usePalette } from '@/hooks/useAccessibility';
 import { useTimer } from '@/hooks/useTimer';
@@ -219,7 +220,7 @@ export function NearbyPlayScreen() {
     setNotice(null);
     setFound([]);
     try {
-      if (asHost) await transport.current?.host(`${me.avatar} ${me.name}`);
+      if (asHost) await transport.current?.host(`${stickerText(me.avatar)} ${me.name}`);
       else await transport.current?.discover();
       setIsHost(asHost);
       setMyId(HOST_ID);
@@ -285,7 +286,7 @@ export function NearbyPlayScreen() {
             <Pressable
               key={peer.id}
               onPress={() =>
-                transport.current?.connect(`${me.avatar} ${me.name}`, peer.id).catch((e) => setNotice(errorText(e)))
+                transport.current?.connect(`${stickerText(me.avatar)} ${me.name}`, peer.id).catch((e) => setNotice(errorText(e)))
               }
               accessibilityRole="button"
               accessibilityLabel={`Join ${peer.name}`}
@@ -310,7 +311,7 @@ export function NearbyPlayScreen() {
             {roster.map((p) => (
               <View key={p.id} style={styles.playerRow}>
                 <Text style={styles.playerName} numberOfLines={1}>
-                  {p.avatar} {p.name}
+                  {stickerText(p.avatar)} {p.name}
                 </Text>
                 <Text style={styles.playerTag}>{p.id === HOST_ID ? 'host' : p.id === myId ? 'you' : ''}</Text>
               </View>
@@ -409,7 +410,7 @@ function Match({
                   {setup.mode === 'race' ? (MEDALS[place] ?? `${place + 1}.`) : '⭐'}
                 </Text>
                 <Text style={styles.playerName} numberOfLines={1}>
-                  {p.avatar} {p.id === me ? 'You' : p.name}
+                  {stickerText(p.avatar)} {p.id === me ? 'You' : p.name}
                   {left ? ' (left)' : ''}
                 </Text>
                 <Text style={styles.playerScore}>{p.correct}</Text>
@@ -437,7 +438,7 @@ function Match({
           {players.map((p) => (
             <ProgressBar
               key={p.id}
-              label={p.id === me ? 'You' : `${p.avatar} ${p.name}`}
+              label={p.id === me ? 'You' : `${stickerText(p.avatar)} ${p.name}`}
               value={match.correct[p.id] ?? 0}
               total={RACE_TARGET}
               color={p.id === me ? palette.correct : colors.accent}

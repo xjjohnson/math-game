@@ -1,6 +1,7 @@
 import { StyleSheet, View } from 'react-native';
 
 import { Text } from '@/components/AppText';
+import { Sticker } from '@/components/Sticker';
 import type { Companion } from '@/constants/shop';
 import { colors, fontSizes, radius, spacing } from '@/constants/theme';
 
@@ -18,7 +19,7 @@ export function CompanionBubble({ companion, correct, turn }: Props) {
   const line = lines ? lines[turn % lines.length] : null;
   return (
     <View style={styles.row} accessibilityLiveRegion="polite">
-      <Text style={[styles.emoji, correct === true && styles.bounce]}>{companion.emoji}</Text>
+      <Sticker value={companion.emoji} size={44} style={correct === true && styles.bounce} />
       {line ? (
         <View style={styles.bubble}>
           <Text style={styles.text}>{line}</Text>
@@ -30,7 +31,6 @@ export function CompanionBubble({ companion, correct, turn }: Props) {
 
 const styles = StyleSheet.create({
   row: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, minHeight: 56 },
-  emoji: { fontSize: 44 },
   bounce: { transform: [{ translateY: -6 }] },
   bubble: {
     flexShrink: 1,

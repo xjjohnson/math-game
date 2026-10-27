@@ -7,6 +7,8 @@ import { BigButton } from '@/components/BigButton';
 import { MatchOptions } from '@/components/MatchOptions';
 import { QuestionPanel } from '@/components/QuestionPanel';
 import { Screen } from '@/components/Screen';
+import { Sticker } from '@/components/Sticker';
+import { stickerText } from '@/constants/art';
 import { colors, fontSizes, radius, spacing } from '@/constants/theme';
 import { useProfiles } from '@/store/profiles';
 import type { Difficulty, Operation } from '@/types';
@@ -53,7 +55,7 @@ function Setup({ onStart }: { onStart: (state: PassState) => void }) {
   const [difficulty, setDifficulty] = useState<Difficulty>('easy');
 
   const options = [
-    ...profiles.map((p) => ({ id: p.id, label: `${p.avatar} ${p.name}` })),
+    ...profiles.map((p) => ({ id: p.id, label: `${stickerText(p.avatar)} ${p.name}` })),
     ...Object.entries(GUESTS).map(([id, g]) => ({ id, label: `${g.avatar} ${g.name}` })),
   ];
   const player = (id: string): PassPlayer => {
@@ -133,7 +135,7 @@ function Game({ start, onAgain }: { start: PassState; onAgain: () => void }) {
     const top = state.players[winners[0]];
     const ranked = state.players.map((p, seat) => ({ ...p, seat })).sort((a, b) => scores[b.seat] - scores[a.seat]);
     return (
-      <Screen title={winners.length > 1 ? "It's a tie!" : `${top.avatar} ${top.name} wins!`}>
+      <Screen title={winners.length > 1 ? "It's a tie!" : `${stickerText(top.avatar)} ${top.name} wins!`}>
         <View style={styles.standings}>
           {ranked.map((p) => {
             const place = scores.filter((x) => x > scores[p.seat]).length;
@@ -141,7 +143,7 @@ function Game({ start, onAgain }: { start: PassState; onAgain: () => void }) {
               <View key={p.seat} style={[styles.scoreRow, winners.includes(p.seat) && styles.winnerRow]}>
                 <Text style={styles.place}>{MEDALS[place] ?? `${place + 1}.`}</Text>
                 <Text style={styles.scoreName} numberOfLines={1}>
-                  {p.avatar} {p.name}
+                  {stickerText(p.avatar)} {p.name}
                 </Text>
                 <Text style={styles.scoreValue}>
                   {scores[p.seat]} / {PASS_QUESTIONS}
@@ -160,7 +162,7 @@ function Game({ start, onAgain }: { start: PassState; onAgain: () => void }) {
   if (state.phase === 'handoff') {
     return (
       <Screen title={state.turn === 0 ? 'First up' : 'Pass the phone!'}>
-        <Text style={styles.handoffAvatar}>{current.avatar}</Text>
+        <Sticker value={current.avatar} size={96} style={styles.handoffAvatar} />
         <Text style={styles.handoffName}>{current.name}, it's your turn</Text>
         {leader !== null ? (
           <Text style={styles.note}>
@@ -177,7 +179,7 @@ function Game({ start, onAgain }: { start: PassState; onAgain: () => void }) {
     <Screen>
       <View style={styles.statusRow}>
         <Text style={styles.status}>
-          {current.avatar} {current.name}
+          {stickerText(current.avatar)} {current.name}
         </Text>
         <Text style={styles.status}>
           {state.index + 1} / {PASS_QUESTIONS}
@@ -200,7 +202,7 @@ const styles = StyleSheet.create({
   note: { fontSize: fontSizes.body, color: colors.textMuted, textAlign: 'center' },
   statusRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   status: { fontSize: fontSizes.body, fontWeight: '800', color: colors.text },
-  handoffAvatar: { fontSize: 96, textAlign: 'center' },
+  handoffAvatar: { alignSelf: 'center' },
   handoffName: { fontSize: fontSizes.title, fontWeight: '900', color: colors.text, textAlign: 'center' },
   group: { gap: spacing.sm },
   label: { fontSize: fontSizes.body, fontWeight: '700', color: colors.textMuted },

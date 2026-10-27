@@ -9,6 +9,7 @@ export interface CardStyle {
 }
 
 export interface Companion {
+  /** An emoji, or an "@key" drawing from constants/art. */
   emoji: string;
   cheers: string[];
   comforts: string[];
@@ -22,6 +23,7 @@ interface BaseItem {
 }
 
 export type ShopItem =
+  /** `emoji` may also be an "@key" drawing from constants/art. */
   | (BaseItem & { category: 'avatar'; emoji: string })
   | (BaseItem & { category: 'background'; color: string })
   | (BaseItem & { category: 'cardStyle'; style: CardStyle })
@@ -43,6 +45,8 @@ export const SHOP_ITEMS: ShopItem[] = [
   { id: 'avatar-wizard', category: 'avatar', name: 'Wizard', emoji: '🧙', price: 60 },
   { id: 'avatar-robot', category: 'avatar', name: 'Robot', emoji: '🤖', price: 80 },
   { id: 'avatar-crown', category: 'avatar', name: 'Royal', emoji: '👑', price: 150 },
+  { id: 'avatar-bluey', category: 'avatar', name: 'Bluey', emoji: '@bluey', price: 120 },
+  { id: 'avatar-stitch', category: 'avatar', name: 'Stitch', emoji: '@stitch', price: 120 },
 
   { id: 'bg-cream', category: 'background', name: 'Sunny Cream', color: '#FFF8E7', price: 0 },
   { id: 'bg-sky', category: 'background', name: 'Sky', color: '#E3F2FD', price: 40 },
@@ -129,6 +133,28 @@ export const SHOP_ITEMS: ShopItem[] = [
       emoji: '🐉',
       cheers: ['On fire!', 'Legendary!', 'Blazing fast!'],
       comforts: ['Even dragons miss!', 'Breathe and retry!', 'You got this!'],
+    },
+  },
+  {
+    id: 'buddy-bluey',
+    category: 'companion',
+    name: 'Bluey',
+    price: 200,
+    companion: {
+      emoji: '@bluey',
+      cheers: ['Hooray!', 'Wackadoo!', 'Best game ever!'],
+      comforts: ["That's okay!", "Let's play again!", 'Have another go!'],
+    },
+  },
+  {
+    id: 'buddy-stitch',
+    category: 'companion',
+    name: 'Stitch',
+    price: 200,
+    companion: {
+      emoji: '@stitch',
+      cheers: ['Ohana!', 'Aloha, smarty!', 'Super good!'],
+      comforts: ['No one gets left behind!', 'Try again!', 'Still good!'],
     },
   },
 ];

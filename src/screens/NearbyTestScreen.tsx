@@ -5,6 +5,7 @@ import { Pressable, StyleSheet, View } from 'react-native';
 import { Text } from '@/components/AppText';
 import { BigButton } from '@/components/BigButton';
 import { Screen } from '@/components/Screen';
+import { stickerText } from '@/constants/art';
 import { colors, fontSizes, radius, spacing, TAP_TARGET } from '@/constants/theme';
 import { useActiveProfile } from '@/store/profiles';
 import { allGranted, checkPermissions, devicePermissions } from '@/utils/nearbyPermissions';
@@ -25,7 +26,7 @@ const MAX_LOG = 30;
  */
 export function NearbyTestScreen() {
   const profile = useActiveProfile();
-  const myName = profile ? `${profile.avatar} ${profile.name}` : 'Player';
+  const myName = profile ? `${stickerText(profile.avatar)} ${profile.name}` : 'Player';
   const [role, setRole] = useState<Role>('idle');
   const [found, setFound] = useState<Peer[]>([]);
   const [connected, setConnected] = useState<Peer[]>([]);

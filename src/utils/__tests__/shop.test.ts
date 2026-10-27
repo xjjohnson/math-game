@@ -1,3 +1,4 @@
+import { artFor, stickerText } from '@/constants/art';
 import { SHOP_ITEMS } from '@/constants/shop';
 import { makeProfile, results } from '@/test/fixtures';
 import { newBadges } from '@/utils/badges';
@@ -13,6 +14,20 @@ describe('shop catalog', () => {
     expect(new Set(ids).size).toBe(ids.length);
     expect(SHOP_ITEMS.some((i) => i.category === 'background' && i.price === 0)).toBe(true);
     expect(SHOP_ITEMS.some((i) => i.category === 'cardStyle' && i.price === 0)).toBe(true);
+  });
+
+  it('has a drawing for every "@" avatar and buddy, short enough to send to other phones', () => {
+    const faces = SHOP_ITEMS.flatMap((i) =>
+      i.category === 'avatar' ? [i.emoji] : i.category === 'companion' ? [i.companion.emoji] : [],
+    );
+    const drawn = faces.filter((f) => f.startsWith('@'));
+    expect(drawn).toEqual(expect.arrayContaining(['@bluey', '@stitch']));
+    for (const f of drawn) {
+      expect(artFor(f)).toBeDefined();
+      expect(f.length).toBeLessThanOrEqual(8);
+    }
+    expect(stickerText('@bluey')).toBe('🐶');
+    expect(stickerText('🦊')).toBe('🦊');
   });
 });
 

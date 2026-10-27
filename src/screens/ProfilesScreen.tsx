@@ -5,6 +5,7 @@ import { Pressable, StyleSheet, TextInput, View } from 'react-native';
 import { Text } from '@/components/AppText';
 import { BigButton } from '@/components/BigButton';
 import { Screen } from '@/components/Screen';
+import { Sticker } from '@/components/Sticker';
 import { AVATARS, colors, fontSizes, radius, spacing, TAP_TARGET } from '@/constants/theme';
 import { useProfiles } from '@/store/profiles';
 
@@ -36,7 +37,7 @@ export function ProfilesScreen() {
                 router.back();
               }}
             >
-              <Text style={styles.rowAvatar}>{p.avatar}</Text>
+              <Sticker value={p.avatar} size={40} />
               <Text style={styles.rowName}>{p.name}</Text>
             </Pressable>
             <Pressable
@@ -92,7 +93,6 @@ const styles = StyleSheet.create({
   },
   activeRow: { borderColor: colors.primary },
   rowMain: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: spacing.md, minHeight: TAP_TARGET, paddingHorizontal: spacing.md },
-  rowAvatar: { fontSize: 40 },
   rowName: { fontSize: fontSizes.button, fontWeight: '700', color: colors.text },
   remove: { width: TAP_TARGET, height: TAP_TARGET, alignItems: 'center', justifyContent: 'center' },
   removeText: { fontSize: fontSizes.button, color: colors.wrong, fontWeight: '800' },
