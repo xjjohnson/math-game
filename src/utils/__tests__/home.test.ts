@@ -1,7 +1,7 @@
-import { APPLIANCES, CUPBOARDS, findRoomItem, GADGETS, HOME_AREAS, MONTH_NAMES, ROOM_SPAN, seasonOf, SURFACES } from '@/constants/room';
+import { APPLIANCES, BUILT_IN_SEATS, CUPBOARDS, findRoomItem, GADGETS, HOME_AREAS, MONTH_NAMES, ROOM_SPAN, seasonOf, SURFACES } from '@/constants/room';
 import { makeProfile } from '@/test/fixtures';
 import type { Profile, RoomThing } from '@/types';
-import { dropBuddy, dropThing, gadgetBox, homeSize, layoutHome, pieceAt, ridersOf, shelvesOf, surfaceLine, type Piece } from '@/utils/home';
+import { dropBuddy, dropThing, gadgetBox, homeSize, layoutHome, pieceAt, ridersOf, seatLine, shelvesOf, surfaceLine, type Piece } from '@/utils/home';
 import { BUDDY_KEY, buddiesHome, buyRoomItem, FIXTURE_KEY, placeBuddy, placeThing, setBuddyHome, setPlaced } from '@/utils/room';
 
 const NOVEMBER = 10;
@@ -173,6 +173,23 @@ describe('dropping things', () => {
     expect(dropBuddy(pieces, buddy, dx, dy, size).on).toBe('couch');
     const [fx, fy] = to(buddy, couch.x + size.areaWidth * 0.5, couch.y);
     expect(dropBuddy(pieces, buddy, fx, fy, size).on).toBeUndefined();
+  });
+
+  it('puts a buddy in the bathtub, behind its front, and on the toilet', () => {
+    const p = withThings([]);
+    const pieces = layout(p);
+    const buddy = piece(pieces, `${BUDDY_KEY}puppy`);
+    for (const seat of BUILT_IN_SEATS) {
+      const line = seatLine(seat, size);
+      const [dx, dy] = to(buddy, (line.left + line.right) / 2, line.rimY - size.unit * 0.1);
+      const place = dropBuddy(pieces, buddy, dx, dy, size);
+      expect(place.on).toBe(FIXTURE_KEY + seat.id);
+      const sitting = piece(layout(placeBuddy(p, 'puppy', place)), `${BUDDY_KEY}puppy`);
+      expect(sitting.y).toBeCloseTo(line.y);
+      expect(sitting.builtIn).toBe(seat.id);
+      expect(sitting.sunk ?? 0).toBeCloseTo(line.y - line.rimY);
+    }
+    expect(BUILT_IN_SEATS.find((s) => s.id === 'inTub')?.rim).toBeGreaterThan(0);
   });
 });
 

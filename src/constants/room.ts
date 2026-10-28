@@ -94,6 +94,8 @@ export interface RoomItem {
   light?: boolean;
   /** Drawn as a candle with this wax color, instead of its emoji. */
   candle?: string;
+  /** Drawn as a table lamp, instead of its emoji. */
+  lamp?: boolean;
   /** Pops up when it is tapped. */
   fx?: string;
   /** What the buddy says when it is tapped. */
@@ -148,7 +150,7 @@ export const ROOM_ITEMS: RoomItem[] = [
   { id: 'picture', name: 'Picture', emoji: '🖼️', price: 25, size: 0.18, group: 'living' },
   { id: 'plant', name: 'Plant', emoji: '🪴', price: 15, size: 0.18, group: 'living', fx: '💧', says: 'waters the plant' },
   { id: 'candleLiving', name: 'Candle', emoji: '🕯️', price: 15, size: 0.12, group: 'living', light: true, candle: '#FFF3E0' },
-  { id: 'lamp', name: 'Lamp', emoji: '🪔', price: 25, size: 0.12, group: 'living', light: true },
+  { id: 'lamp', name: 'Lamp', emoji: '💡', price: 25, size: 0.16, group: 'living', light: true, lamp: true },
   { id: 'fish', name: 'Fish bowl', emoji: '🐠', price: 30, size: 0.12, group: 'living', fx: '🫧', says: 'waves at the fish' },
   { id: 'trophy', name: 'Trophy', emoji: '🏆', price: 60, size: 0.14, group: 'living', fx: '🌟' },
   // Kitchen
@@ -329,17 +331,44 @@ export const APPLIANCES: Appliance[] = [
   { id: 'livingTv', name: 'TV', kind: 'tv', area: 'living', left: 2.17, width: 0.26, bottom: 0.14, height: 0.17 },
   { id: 'tub', name: 'bathtub', kind: 'tub', area: 'bathroom', left: 0.2, width: 0.62, bottom: 0, height: 0.6 },
   { id: 'toilet', name: 'toilet', kind: 'toilet', area: 'bathroom', left: 1.38, width: 0.2, bottom: 0, height: 0.26 },
-  { id: 'ballPit', name: 'ball pit', kind: 'ballPit', area: 'playroom', left: 0.55, width: 0.5, bottom: 0, height: 0.13 },
+  { id: 'ballPit', name: 'ball pit', kind: 'ballPit', area: 'playroom', left: 0.55, width: 0.5, bottom: 0, height: 0.16 },
   { id: 'playTv', name: 'TV', kind: 'tv', area: 'playroom', left: 1.17, width: 0.26, bottom: 0.14, height: 0.17 },
   { id: 'chalkboard', name: 'chalkboard', kind: 'chalkboard', area: 'playroom', left: 1.6, width: 0.42, bottom: 0.18, height: 0.3 },
 ];
+
+/**
+ * A spot in a built-in a buddy can be dropped into: in the bathtub, on the toilet, in the ball pit.
+ * Across like a FixtureSpot; `bottom` is where the buddy sits and below `rim` (both in size units
+ * above the floor line) it is hidden behind the built-in's front.
+ */
+export interface BuiltInSeat {
+  id: string;
+  /** The appliance it belongs to. */
+  appliance: string;
+  name: string;
+  area: AreaId;
+  left: number;
+  width: number;
+  bottom: number;
+  rim?: number;
+}
+
+export const BUILT_IN_SEATS: BuiltInSeat[] = [
+  { id: 'inTub', appliance: 'tub', name: 'bathtub', area: 'bathroom', left: 0.3, width: 0.42, bottom: 0.06, rim: 0.22 },
+  { id: 'onToilet', appliance: 'toilet', name: 'toilet', area: 'bathroom', left: 1.4, width: 0.16, bottom: 0.05, rim: 0.13 },
+  { id: 'inBallPit', appliance: 'ballPit', name: 'ball pit', area: 'playroom', left: 0.6, width: 0.4, bottom: 0.02, rim: 0.12 },
+];
+
+export function findBuiltInSeat(id: string): BuiltInSeat | undefined {
+  return BUILT_IN_SEATS.find((s) => s.id === id);
+}
 
 /** Pictures a chalkboard cycles through; the first is a clean board. */
 export const CHALK_DRAWINGS = ['', 'sun', 'house', 'smiley face'];
 
 /**
  * A built-in light to tap: a switch that turns its room's lights off and on, or a lamp.
- * Drawn as its emoji (or a switch plate), `size` tall (in size units), centered `x` screens from the left wall.
+ * Drawn as its emoji, a lamp or a switch plate, `size` tall (in size units), centered `x` screens from the left wall.
  */
 export interface Gadget {
   id: string;
@@ -348,8 +377,10 @@ export interface Gadget {
   x: number;
   bottom: number;
   size: number;
-  /** What it looks like; with more than one, each tap shows the next. None draws a switch plate. */
+  /** What it looks like; with more than one, each tap shows the next. None draws a switch plate or lamp. */
   looks: string[];
+  /** Drawn as a desk lamp. */
+  lamp?: boolean;
   fx?: string;
   says?: string;
   /** Turns the lights in its area off and on. */
@@ -362,7 +393,7 @@ export const GADGETS: Gadget[] = [
   { id: 'livingSwitch', name: 'light switch', area: 'living', x: 0.32, bottom: 0.3, size: 0.06, looks: [], lightSwitch: true },
   { id: 'kitchenSwitch', name: 'light switch', area: 'kitchen', x: 1.0, bottom: 0.3, size: 0.06, looks: [], lightSwitch: true },
   { id: 'bedSwitch', name: 'light switch', area: 'bedroom', x: 1.05, bottom: 0.3, size: 0.06, looks: [], lightSwitch: true },
-  { id: 'deskLamp', name: 'desk lamp', area: 'bedroom', x: 1.35, bottom: 0.2, size: 0.12, looks: ['🪔'], glow: true },
+  { id: 'deskLamp', name: 'desk lamp', area: 'bedroom', x: 1.35, bottom: 0.2, size: 0.2, looks: [], lamp: true, glow: true },
   { id: 'bathSwitch', name: 'light switch', area: 'bathroom', x: 0.1, bottom: 0.3, size: 0.06, looks: [], lightSwitch: true },
   { id: 'playSwitch', name: 'light switch', area: 'playroom', x: 0.6, bottom: 0.3, size: 0.06, looks: [], lightSwitch: true },
 ];

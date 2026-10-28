@@ -15,6 +15,7 @@ import { Sticker } from '@/components/Sticker';
 import {
   CHALK_DRAWINGS,
   findCupboard,
+  findBuiltInSeat,
   findRoomItem,
   FLOOR_COLORS,
   HOME_AREAS,
@@ -64,13 +65,20 @@ import {
 } from '@/utils/buddy';
 import { dateKey } from '@/utils/dates';
 import { generate } from '@/utils/mathEngine';
-import { BUDDY_KEY, buddiesHome } from '@/utils/room';
+import { BUDDY_KEY, buddiesHome, FIXTURE_KEY } from '@/utils/room';
 import { createRng, pick, randomSeed } from '@/utils/seededRandom';
 import { owns } from '@/utils/shop';
 import { canWear, clothOf, lookOf, outfitOf } from '@/utils/wardrobe';
 import { playSound } from '@/utils/soundEffects';
 
 /** The tabs along the bottom; each opens a drawer over the home. */
+/** What's said when a buddy is dropped into a built-in. */
+const BUILT_IN_LINES: Record<string, (name: string) => string> = {
+  inTub: (name) => `${name} hops in the bathtub. Tap it to turn on the water!`,
+  onToilet: (name) => `${name} sits on the toilet. Tap it to flush when done!`,
+  inBallPit: (name) => `${name} dives into the ball pit! Tap it to bounce.`,
+};
+
 type Tab = 'care' | 'dress' | 'shop' | 'toys' | 'buddies' | 'paint';
 
 const TABS: { id: Tab; emoji: string; name: string }[] = [
@@ -314,8 +322,10 @@ export function BuddyScreen() {
           }}
           onPlaceBuddy={(id, place) => {
             moveInRoom(profile.id, BUDDY_KEY + id, place);
+            const builtIn = place.on?.startsWith(FIXTURE_KEY) ? findBuiltInSeat(place.on.slice(FIXTURE_KEY.length)) : undefined;
             const seat = place.on && findRoomItem(profile.room.things.find((t) => t.key === place.on)?.itemId ?? '');
-            if (seat) say(seat.sleep ? `${nameOf(id)} is having a nap. 💤` : `${nameOf(id)} sits on the ${seat.name.toLowerCase()}.`);
+            if (builtIn) say(BUILT_IN_LINES[builtIn.id]?.(nameOf(id)) ?? `${nameOf(id)} is in the ${builtIn.name}.`);
+            else if (seat) say(seat.sleep ? `${nameOf(id)} is having a nap. 💤` : `${nameOf(id)} sits on the ${seat.name.toLowerCase()}.`);
           }}
           onTapThing={tapThing}
           onTapBuddy={tapBuddy}
@@ -333,7 +343,15 @@ export function BuddyScreen() {
             else if (g.glow) say(on ? `${name} turns on the ${g.name}. ✨` : `${name} turns off the ${g.name}.`);
             else if (g.says) say(`${name} ${g.says}! ${g.fx ?? ''}`);
           }}
-          onTapAppliance={(a, on, step) => {
+          onWash={(on, done) => {
+            if (done) say('Ding! The washing is all clean. ✨');
+            else say(on ? `${name} starts the washing machine. Swish, swish! 🫧` : 'The washing machine stops.');
+          }}
+          onTapAppliance={(a, on, step, inside) => {
+            const who = inside.length ? nameOf(inside[0]) : null;
+            if (who && a.kind === 'tub') return say(on ? `${who} has a bubble bath! 🫧` : `${who} is all clean and sparkly! ✨`);
+            if (who && a.kind === 'toilet' && !on) return say(`${who} flushes. Whoosh! Now wash your hands. 🧼`);
+            if (who && a.kind === 'ballPit' && on) return say(`${who} bounces in the balls! Boing, boing!`);
             const lines: Record<Appliance['kind'], [string, string]> = {
               fireplace: [`${name} lights a cozy fire. So warm!`, 'The fire is out.'],
               tv: [`${name} turns on the TV. Show time!`, 'TV off.'],
@@ -342,7 +360,7 @@ export function BuddyScreen() {
               ballPit: [`${name} jumps in the ball pit! Boing!`, 'The balls settle down.'],
               chalkboard: [`${name} draws a ${CHALK_DRAWINGS[step]}!`, 'Wiped clean!'],
             };
-            say(lines[a.kind][on ? 0 : 1]);
+                    say(lines[a.kind][on ? 0 : 1]);
           }}
         />
         <Confetti burst={party} />
