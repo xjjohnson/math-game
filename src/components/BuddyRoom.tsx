@@ -13,10 +13,11 @@ import {
 } from 'react-native';
 
 import { Text } from '@/components/AppText';
+import { Candle } from '@/components/Candle';
 import { BuddyFigure, type Dressed } from '@/components/BuddyFigure';
 import { PersonFigure, type PersonDressed } from '@/components/PersonFigure';
 import { Furniture } from '@/components/Furniture';
-import { Drifting, FloatUp, Lively, type BounceKind } from '@/components/Motion';
+import { Drifting, Flicker, FloatUp, Lively, type BounceKind } from '@/components/Motion';
 import { PopIn } from '@/components/PopIn';
 import { ApplianceView } from '@/components/Appliance';
 import {
@@ -128,7 +129,7 @@ const TABLES: FixtureSpot[] = [
 const PLAY_SHELF: FixtureSpot = { area: 'playroom', left: 1.1, width: 0.4, bottom: 0.395, height: 0.025 };
 const DARK = 'rgba(16, 18, 52, 0.55)';
 /** Sizes of the rings in a pool of light, as shares of how far it reaches. */
-const POOL_RINGS = [1, 0.9, 0.8, 0.7, 0.6, 0.5, 0.42, 0.34, 0.26, 0.18];
+const POOL_RINGS = Array.from({ length: 16 }, (_, i) => 1 - i * 0.055);
 
 /** A finger dragging a piece, and what rides along with it. */
 interface Track {
@@ -661,6 +662,8 @@ export function BuddyRoom(props: Props) {
                       )
                     ) : piece.item?.draw ? (
                       <Furniture shape={piece.item.draw} width={piece.width} height={piece.height} />
+                    ) : piece.item?.candle ? (
+                      <Candle width={piece.width} height={piece.height} wax={piece.item.candle} lit={lit.has(piece.key)} seed={piece.key} />
                     ) : (
                       <Text style={{ fontSize: Math.round(piece.height * 0.85), lineHeight: tall }}>
                         {piece.item?.emoji}
@@ -688,16 +691,21 @@ export function BuddyRoom(props: Props) {
           ) : null,
         )}
         {/* Fires, candles and lamps light up the dark around them. */}
-        {lightPools().flatMap((l) =>
-          // Rings of warm light, brightest where they overlap in the middle.
-          POOL_RINGS.map((k) => (
-            <View
-              key={`${l.key}-${k}`}
-              pointerEvents="none"
-              style={[styles.pool, { left: l.x - l.r * k, top: l.y - l.r * k, width: l.r * k * 2, height: l.r * k * 2, borderRadius: l.r * k }]}
-            />
-          )),
-        )}
+        {lightPools().map((l) => (
+          <Flicker
+            key={l.key}
+            seed={l.key}
+            style={[styles.poolBox, { left: l.x - l.r, top: l.y - l.r, width: l.r * 2, height: l.r * 2 }]}
+          >
+            {/* Rings of warm light, brightest where they overlap in the middle. */}
+            {POOL_RINGS.map((k) => (
+              <View
+                key={k}
+                style={[styles.pool, { left: l.r * (1 - k), top: l.r * (1 - k), width: l.r * k * 2, height: l.r * k * 2, borderRadius: l.r * k }]}
+              />
+            ))}
+          </Flicker>
+        ))}
 
         {pops.map((p) => (
           <FloatUp
@@ -1180,7 +1188,8 @@ const styles = StyleSheet.create({
   fill: { width: '100%', height: '100%', alignItems: 'center', justifyContent: 'flex-end' },
   layer: { position: 'absolute', left: 0, top: 0, right: 0, bottom: 0 },
   dark: { position: 'absolute', top: 0, bottom: 0, backgroundColor: DARK },
-  pool: { position: 'absolute', backgroundColor: 'rgba(255, 205, 120, 0.075)' },
+  pool: { position: 'absolute', backgroundColor: 'rgba(255, 205, 120, 0.05)' },
+  poolBox: { position: 'absolute' },
   gadget: { position: 'absolute', alignItems: 'center', justifyContent: 'flex-end' },
   switchPlate: {
     width: '70%',

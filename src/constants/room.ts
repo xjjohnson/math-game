@@ -92,6 +92,8 @@ export interface RoomItem {
   top?: number;
   /** Tapping it turns its light on and off. */
   light?: boolean;
+  /** Drawn as a candle with this wax color, instead of its emoji. */
+  candle?: string;
   /** Pops up when it is tapped. */
   fx?: string;
   /** What the buddy says when it is tapped. */
@@ -145,6 +147,7 @@ export const ROOM_ITEMS: RoomItem[] = [
   { id: 'clock', name: 'Clock', emoji: '🕰️', price: 25, size: 0.14, group: 'living', fx: '⏰', says: 'hears tick, tock' },
   { id: 'picture', name: 'Picture', emoji: '🖼️', price: 25, size: 0.18, group: 'living' },
   { id: 'plant', name: 'Plant', emoji: '🪴', price: 15, size: 0.18, group: 'living', fx: '💧', says: 'waters the plant' },
+  { id: 'candleLiving', name: 'Candle', emoji: '🕯️', price: 15, size: 0.12, group: 'living', light: true, candle: '#FFF3E0' },
   { id: 'lamp', name: 'Lamp', emoji: '🪔', price: 25, size: 0.12, group: 'living', light: true },
   { id: 'fish', name: 'Fish bowl', emoji: '🐠', price: 30, size: 0.12, group: 'living', fx: '🫧', says: 'waves at the fish' },
   { id: 'trophy', name: 'Trophy', emoji: '🏆', price: 60, size: 0.14, group: 'living', fx: '🌟' },
@@ -203,7 +206,7 @@ export const ROOM_ITEMS: RoomItem[] = [
   { id: 'lollipop', name: 'Lollipop', emoji: '🍭', price: 10, size: 0.12, group: 'halloween', month: OCTOBER },
   { id: 'broom', name: 'Witch’s broom', emoji: '🧹', price: 20, size: 0.2, group: 'halloween', month: OCTOBER, fx: '🌙', says: 'zooms on the broom' },
   { id: 'crystal', name: 'Crystal ball', emoji: '🔮', price: 25, size: 0.12, group: 'halloween', month: OCTOBER, fx: '✨', says: 'sees the future' },
-  { id: 'candle', name: 'Spooky candle', emoji: '🕯️', price: 15, size: 0.12, group: 'halloween', month: OCTOBER, light: true },
+  { id: 'candle', name: 'Spooky candle', emoji: '🕯️', price: 15, size: 0.12, group: 'halloween', month: OCTOBER, light: true, candle: '#8E6CC9' },
   // Thanksgiving, sold in November only
   { id: 'turkey', name: 'Turkey', emoji: '🦃', price: 25, size: 0.18, group: 'thanksgiving', month: NOVEMBER, fx: '💬', says: 'hears gobble, gobble' },
   { id: 'pie', name: 'Pumpkin pie', emoji: '🥧', price: 15, size: 0.1, group: 'thanksgiving', month: NOVEMBER },

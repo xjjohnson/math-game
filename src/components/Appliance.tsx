@@ -1,5 +1,6 @@
 import { Pressable, StyleSheet, View, type ViewStyle } from 'react-native';
 
+import { Flicker } from '@/components/Motion';
 import type { Appliance } from '@/constants/room';
 
 const OUTLINE = '#5B3A24';
@@ -56,13 +57,16 @@ function at(left: number, top: number, width: number, height: number): ViewStyle
 function Fireplace({ w, h, on }: Drawn) {
   const mantel = h * 0.1;
   const open = { left: w * 0.27, top: h * 0.35, width: w * 0.46, height: h * 0.65 };
-  const flame = (x: number, fw: number, fh: number, color: string) => (
-    <View
-      style={[
-        at(open.left + open.width * x - fw / 2, h - fh - h * 0.04, fw, fh),
-        { backgroundColor: color, borderTopLeftRadius: fw, borderTopRightRadius: fw * 0.2, borderBottomLeftRadius: fw * 0.5, borderBottomRightRadius: fw * 0.5, transform: [{ rotate: '-8deg' }] },
-      ]}
-    />
+  // Each flame sways and flickers on its own, from its base.
+  const flame = (x: number, fw: number, fh: number, color: string, seed: string) => (
+    <Flicker
+      key={seed}
+      seed={seed}
+      sway={14}
+      style={[at(open.left + open.width * x - fw / 2, h - fh - h * 0.04, fw, fh), { transformOrigin: 'bottom' }]}
+    >
+      <View style={[styles.flame, { backgroundColor: color, borderTopLeftRadius: fw, borderTopRightRadius: fw * 0.2, borderBottomLeftRadius: fw * 0.5, borderBottomRightRadius: fw * 0.5 }]} />
+    </Flicker>
   );
   return (
     <>
@@ -74,9 +78,9 @@ function Fireplace({ w, h, on }: Drawn) {
       <View style={[styles.log, at(open.left + open.width * 0.15, h * 0.88, open.width * 0.7, h * 0.07)]} />
       {on ? (
         <>
-          {flame(0.35, open.width * 0.32, h * 0.38, '#FF7043')}
-          {flame(0.62, open.width * 0.3, h * 0.32, '#FF7043')}
-          {flame(0.48, open.width * 0.22, h * 0.26, '#FFD54F')}
+          {flame(0.35, open.width * 0.32, h * 0.38, '#FF7043', 'fire-left')}
+          {flame(0.62, open.width * 0.3, h * 0.32, '#FF7043', 'fire-right')}
+          {flame(0.48, open.width * 0.22, h * 0.26, '#FFD54F', 'fire-middle')}
         </>
       ) : null}
     </>
@@ -236,6 +240,7 @@ function Chalkboard({ w, h, step }: { w: number; h: number; step: number }) {
 }
 
 const styles = StyleSheet.create({
+  flame: { flex: 1, transform: [{ rotate: '-8deg' }] },
   glow: { borderRadius: 999, backgroundColor: 'rgba(255, 183, 77, 0.35)' },
   brick: { backgroundColor: '#B5523B', borderWidth: 3, borderColor: OUTLINE },
   mantel: { backgroundColor: TRIM, borderWidth: 3, borderColor: OUTLINE, borderRadius: 4 },

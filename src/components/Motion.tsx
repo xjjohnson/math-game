@@ -240,6 +240,45 @@ export function Drifting({ children, rise, style }: { children: ReactNode; rise:
   );
 }
 
+/**
+ * A firelight flicker: a gentle, uneven wobble in size and brightness, and a sway for flames. `seed` sets each
+ * light's own rhythm so lights side by side don't pulse together. Still when motion is off.
+ */
+export function Flicker({
+  children,
+  seed,
+  sway = 0,
+  style,
+}: {
+  children: ReactNode;
+  seed: string;
+  /** How far it leans side to side, in degrees, like a flame in a draft. */
+  sway?: number;
+  style?: StyleProp<ViewStyle>;
+}) {
+  const { animate } = useMotion();
+  const t = useSharedValue(0);
+  useEffect(() => {
+    if (!animate) return;
+    const r = seedOf(seed);
+    const step = (to: number, ms: number) => withTiming(to, { duration: ms, easing: Easing.inOut(Easing.sin) });
+    t.value = withDelay(
+      Math.round(r * 400),
+      withRepeat(withSequence(step(1, 260 + r * 120), step(0.35, 180), step(0.8, 220 + r * 90), step(0, 300)), -1),
+    );
+    return () => cancelAnimation(t);
+  }, [animate, seed, t]);
+  const look = useAnimatedStyle(() => ({
+    opacity: 0.82 + t.value * 0.18,
+    transform: [{ rotate: `${(t.value - 0.5) * sway}deg` }, { scaleY: 0.92 + t.value * 0.12 }, { scaleX: 0.97 + t.value * 0.04 }],
+  }));
+  return (
+    <Animated.View pointerEvents="none" style={[style, look]}>
+      {children}
+    </Animated.View>
+  );
+}
+
 const CONFETTI_COLORS = ['#FF6B6B', '#FFD93D', '#6BCB77', '#4D96FF', '#C77DFF', '#FF9F45'];
 
 interface ConfettiProps {
