@@ -1,3 +1,4 @@
+import type { Cloth } from '@/components/PersonFigure';
 import { findWearable, PEOPLE, type PersonLook } from '@/constants/wardrobe';
 import type { Outfit, Profile } from '@/types';
 
@@ -54,4 +55,10 @@ export function setLook(profile: Profile, buddyId: string, change: Partial<Perso
   const look = lookOf(profile, buddyId);
   if (!look) return profile;
   return { ...profile, looks: { ...profile.looks, [buddyId]: { ...look, ...change } } };
+}
+
+/** A top or bottom, ready for a person to wear. */
+export function clothOf(wearableId?: string): Cloth | undefined {
+  const w = wearableId ? findWearable(wearableId) : undefined;
+  return w?.color ? { color: w.color, cut: w.cut, pattern: w.pattern, patternColor: w.patternColor } : undefined;
 }

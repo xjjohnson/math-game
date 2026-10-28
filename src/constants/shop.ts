@@ -310,14 +310,14 @@ export const SHOP_ITEMS: ShopItem[] = [
       comforts: ['No one gets left behind!', 'Try again!', 'Still good!'],
     },
   },
-  // People, with the same bodies and clothes as the animal buddies.
+  // People, drawn in their own look (PEOPLE in constants/wardrobe) and dressed like the animal buddies.
   {
     id: 'buddy-girl',
     category: 'companion',
-    name: 'Girl',
+    name: 'Little sister',
     price: 100,
     companion: {
-      emoji: '👧🏻',
+      emoji: '@girl',
       treat: '🍓',
       cheers: ['Yay, you did it!', 'So smart!', 'High five!'],
       comforts: ["That's okay!", 'Try again!', 'You can do it!'],
@@ -329,7 +329,7 @@ export const SHOP_ITEMS: ShopItem[] = [
     name: 'Boy',
     price: 100,
     companion: {
-      emoji: '👦🏾',
+      emoji: '@boy',
       treat: '🍕',
       cheers: ['Awesome!', 'Nailed it!', 'Way to go!'],
       comforts: ['No problem!', 'Next one!', "Let's keep going!"],
@@ -338,10 +338,10 @@ export const SHOP_ITEMS: ShopItem[] = [
   {
     id: 'buddy-kid',
     category: 'companion',
-    name: 'Kid',
+    name: 'Big sister',
     price: 100,
     companion: {
-      emoji: '🧒🏽',
+      emoji: '@kid',
       treat: '🧃',
       cheers: ['Woo-hoo!', 'Great job!', 'You rock!'],
       comforts: ['Oops, okay!', 'Try the next one!', 'Keep at it!'],
@@ -353,7 +353,7 @@ export const SHOP_ITEMS: ShopItem[] = [
     name: 'Mom',
     price: 100,
     companion: {
-      emoji: '👩🏼',
+      emoji: '@mom',
       treat: '☕',
       cheers: ['Proud of you!', 'Brilliant!', 'Look at you go!'],
       comforts: ['Good try, sweetie!', 'Mistakes help us learn!', 'Take your time!'],
@@ -365,7 +365,7 @@ export const SHOP_ITEMS: ShopItem[] = [
     name: 'Dad',
     price: 100,
     companion: {
-      emoji: '👨🏿',
+      emoji: '@dad',
       treat: '🥪',
       cheers: ['Touchdown!', 'Nice work, champ!', 'That’s my kid!'],
       comforts: ['Shake it off!', 'Next play!', 'You’ll get it!'],
@@ -377,7 +377,7 @@ export const SHOP_ITEMS: ShopItem[] = [
     name: 'Grandma',
     price: 100,
     companion: {
-      emoji: '👵🏽',
+      emoji: '@grandma',
       treat: '🥧',
       cheers: ['Wonderful, dear!', 'Clever cookie!', 'Splendid!'],
       comforts: ['Never mind, dear!', 'Try again, love!', 'Slow and steady!'],
@@ -389,7 +389,7 @@ export const SHOP_ITEMS: ShopItem[] = [
     name: 'Grandpa',
     price: 100,
     companion: {
-      emoji: '👴🏻',
+      emoji: '@grandpa',
       treat: '🍩',
       cheers: ['Well done, kiddo!', 'Top notch!', 'Sharp as a tack!'],
       comforts: ['Back in my day I missed some too!', 'Try again!', 'Keep on trucking!'],
@@ -401,7 +401,7 @@ export const SHOP_ITEMS: ShopItem[] = [
     name: 'Baby',
     price: 100,
     companion: {
-      emoji: '👶🏾',
+      emoji: '@baby',
       treat: '🍼',
       cheers: ['Goo goo, yay!', 'Wheee!', 'Clap clap!'],
       comforts: ['Uh-oh!', 'Bababa, again!', 'Peekaboo, try again!'],

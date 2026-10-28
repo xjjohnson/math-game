@@ -226,6 +226,7 @@ Phases 1-6 deliver a complete single-player game before any native Bluetooth wor
 - [x] People buddies (girl, boy, kid, mom, dad, grandma, grandpa, baby; several skin tones, everyday clothes) in the Shop
 - [x] Buddy bodies (face as the head, fur-colored body, arms that hold things, feet) and 22 clothes and accessories (hats, glasses, neck, shirts, shoes) in a Dress up tab; bought once, any buddy can wear them, each buddy keeps its own outfit (profile store version 9)
 - [x] People drawn in a Toca-style cartoon look (round head, dot eyes, rosy cheeks, separate hair) with free Hair, Hair color, Beard and Skin tabs in Dress up; tops, dresses and bottoms come off (undershirt underneath) with an All off button, and each person starts in their own outfit (profile store version 10)
+- [x] Shop has ready-made family characters (Mom, Dad, Little sister, Big sister) drawn like the family photo; Shop, Buddies and Home tiles show every person as their drawing instead of an emoji
 
 ---
 
