@@ -36,7 +36,7 @@ export function BuddyFigure({ value, size, fur, belly, shirt: everyday, shoes, d
   const s = size;
   const line = Math.max(2, Math.round(s * 0.015));
   const edge = { borderWidth: line, borderColor: LINE };
-  const head = Math.round(s * 0.62);
+  const head = Math.round(s * 0.66);
   const bodyW = s * 0.5;
   const bodyH = s * 0.42;
   const bodyBottom = s * 0.06;
@@ -98,8 +98,9 @@ export function BuddyFigure({ value, size, fur, belly, shirt: everyday, shoes, d
           ))
         : null}
       {/* Head on top. */}
-      <View style={[styles.part, { top: 0, left: (s - head) / 2, width: head, height: head }]}>
-        <Sticker value={value} size={head} />
+      {/* An emoji draws about 1.25 times its font size, so this fills the head's box without being cut off. */}
+      <View style={[styles.part, styles.head, { top: 0, left: (s - head) / 2, width: head, height: head }]}>
+        <Sticker value={value} size={Math.round(head * 0.8)} />
       </View>
       {dressed.neck ? (
         <Text style={[styles.part, styles.center, { fontSize: Math.round(s * 0.17), top: head * 0.86, width: s }]}>
@@ -126,6 +127,7 @@ export function BuddyFigure({ value, size, fur, belly, shirt: everyday, shoes, d
 const styles = StyleSheet.create({
   part: { position: 'absolute' },
   center: { left: 0, textAlign: 'center' },
+  head: { alignItems: 'center', justifyContent: 'center', overflow: 'visible' },
   body: { overflow: 'hidden', alignItems: 'center', justifyContent: 'flex-end' },
   belly: { marginBottom: '10%' },
   shirt: { position: 'absolute', top: 0, left: 0, right: 0, alignItems: 'center' },
