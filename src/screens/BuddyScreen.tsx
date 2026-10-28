@@ -13,6 +13,7 @@ import { Confetti } from '@/components/Motion';
 import { Screen } from '@/components/Screen';
 import { Sticker } from '@/components/Sticker';
 import {
+  CHALK_DRAWINGS,
   findCupboard,
   findRoomItem,
   FLOOR_COLORS,
@@ -25,6 +26,7 @@ import {
   seasonOf,
   WALL_COLORS,
   type RoomItem,
+  type Appliance,
   type RoomItemGroup,
 } from '@/constants/room';
 import { itemsIn, type ShopItem } from '@/constants/shop';
@@ -330,6 +332,17 @@ export function BuddyScreen() {
             if (g.lightSwitch) say(on ? 'Lights on! 💡' : g.fx ? `Party time! ${g.fx}` : 'Lights off. Night night! 🌙');
             else if (g.glow) say(on ? `${name} turns on the ${g.name}. ✨` : `${name} turns off the ${g.name}.`);
             else if (g.says) say(`${name} ${g.says}! ${g.fx ?? ''}`);
+          }}
+          onTapAppliance={(a, on, step) => {
+            const lines: Record<Appliance['kind'], [string, string]> = {
+              fireplace: [`${name} lights a cozy fire. So warm!`, 'The fire is out.'],
+              tv: [`${name} turns on the TV. Show time!`, 'TV off.'],
+              tub: [`${name} turns on the shower. Splish, splash!`, 'Shower off. All clean!'],
+              toilet: ['Lid up!', `${name} flushes the toilet. Whoosh!`],
+              ballPit: [`${name} jumps in the ball pit! Boing!`, 'The balls settle down.'],
+              chalkboard: [`${name} draws a ${CHALK_DRAWINGS[step]}!`, 'Wiped clean!'],
+            };
+            say(lines[a.kind][on ? 0 : 1]);
           }}
         />
         <Confetti burst={party} />

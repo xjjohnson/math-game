@@ -13,17 +13,22 @@ import {
 } from 'react-native';
 
 import { Text } from '@/components/AppText';
+import { Candle } from '@/components/Candle';
 import { BuddyFigure, type Dressed } from '@/components/BuddyFigure';
 import { PersonFigure, type PersonDressed } from '@/components/PersonFigure';
 import { Furniture } from '@/components/Furniture';
-import { Drifting, FloatUp, Lively, type BounceKind } from '@/components/Motion';
+import { Drifting, Flicker, FloatUp, Lively, type BounceKind } from '@/components/Motion';
 import { PopIn } from '@/components/PopIn';
+import { ApplianceView } from '@/components/Appliance';
 import {
+  APPLIANCES,
+  CHALK_DRAWINGS,
   CUPBOARDS,
   FLOOR_COLORS,
   GADGETS,
   HOME_AREAS,
   WALL_COLORS,
+  type Appliance,
   type AreaId,
   type Cupboard,
   type FixtureSpot,
@@ -83,6 +88,8 @@ interface Props {
   onToggle?: (name: string, open: boolean) => void;
   /** A built-in thing was tapped; `on` is whether it is now switched on. */
   onTapGadget?: (gadget: Gadget, on: boolean) => void;
+  /** An appliance was tapped: whether it is now on, and a chalkboard's drawing. */
+  onTapAppliance?: (appliance: Appliance, on: boolean, step: number) => void;
   /** Change `n` to have that buddy hop and wave, as when it levels up. */
   cheer?: { buddyId: string; n: number };
 }
@@ -111,7 +118,7 @@ const MORE_WINDOWS: { id: string; spot: FixtureSpot; night?: boolean }[] = [
   { id: 'livingCurtains2', spot: { area: 'living', left: 1.7, width: 0.42, bottom: 0.27, height: 0.34 } },
   { id: 'kitchenCurtains', spot: { area: 'kitchen', left: 1.25, width: 0.4, bottom: 0.36, height: 0.28 } },
   { id: 'bedCurtains2', spot: { area: 'bedroom', left: 1.28, width: 0.4, bottom: 0.38, height: 0.26 }, night: true },
-  { id: 'bathCurtains', spot: { area: 'bathroom', left: 0.35, width: 0.4, bottom: 0.4, height: 0.22 } },
+  { id: 'bathCurtains', spot: { area: 'bathroom', left: 0.95, width: 0.36, bottom: 0.4, height: 0.22 } },
   { id: 'playCurtains', spot: { area: 'playroom', left: 0.12, width: 0.36, bottom: 0.33, height: 0.3 } },
 ];
 /** Built-in tables, under the dining table and desk ledges. */
@@ -121,6 +128,8 @@ const TABLES: FixtureSpot[] = [
 ];
 const PLAY_SHELF: FixtureSpot = { area: 'playroom', left: 1.1, width: 0.4, bottom: 0.395, height: 0.025 };
 const DARK = 'rgba(16, 18, 52, 0.55)';
+/** Sizes of the rings in a pool of light, as shares of how far it reaches. */
+const POOL_RINGS = Array.from({ length: 16 }, (_, i) => 1 - i * 0.055);
 
 /** A finger dragging a piece, and what rides along with it. */
 interface Track {
@@ -150,12 +159,15 @@ interface Pop {
  */
 export function BuddyRoom(props: Props) {
   const { room, buddies, area, onAreaChange, onView, tidying, season, onPlaceThing, onPlaceBuddy } = props;
-  const { onTapThing, onTapBuddy, onToggle, onTapGadget, cheer } = props;
+  const { onTapThing, onTapBuddy, onToggle, onTapGadget, onTapAppliance, cheer } = props;
   const [view, setView] = useState({ width: 0, height: 0 });
   const [open, setOpen] = useState<ReadonlySet<string>>(new Set());
   const [lit, setLit] = useState<ReadonlySet<string>>(new Set());
   const [dark, setDark] = useState<ReadonlySet<AreaId>>(new Set());
   const [looks, setLooks] = useState<Record<string, number>>({});
+  /** Appliances switched on, and each chalkboard's drawing. */
+  const [running, setRunning] = useState<ReadonlySet<string>>(new Set());
+  const [steps, setSteps] = useState<Record<string, number>>({});
   /** How far each piece being dragged (or riding along) has moved, by piece key. */
   const [moving, setMoving] = useState<Record<string, { dx: number; dy: number }>>({});
   const [pops, setPops] = useState<Pop[]>([]);
@@ -322,6 +334,45 @@ export function BuddyRoom(props: Props) {
     // A switch's picture (a disco ball's dance) shows when the lights go off.
     if (g.fx && (g.lightSwitch ? !on : on)) pop(box.left + box.width / 2, box.top, g.fx);
     onTapGadget?.(g, on);
+  };
+
+  /** Where light shines in a dark room: lit fires, candles and lamps, with how far it reaches. */
+  const lightPools = () => {
+    const inDark = (x: number) => dark.has(HOME_AREAS[Math.min(AREA_COUNT - 1, Math.floor(x / size.areaWidth))]?.id);
+    const pools: { key: string; x: number; y: number; r: number }[] = [];
+    for (const p of pieces) {
+      if (p.item?.light && lit.has(p.key)) pools.push({ key: p.key, x: p.x, y: p.y - p.height * 0.6, r: size.unit * 0.3 });
+    }
+    for (const g of GADGETS) {
+      if (g.glow && lit.has(g.id)) {
+        const b = gadgetBox(g, size);
+        pools.push({ key: g.id, x: b.left + b.width / 2, y: b.top + b.height * 0.4, r: size.unit * 0.3 });
+      }
+    }
+    for (const a of APPLIANCES) {
+      if (a.kind === 'fireplace' && running.has(a.id)) {
+        const b = fixtureBox(a, size);
+        pools.push({ key: a.id, x: b.left + b.width / 2, y: b.top + b.height * 0.75, r: size.unit * 0.55 });
+      }
+    }
+    return pools.filter((l) => inDark(l.x));
+  };
+
+  const tapAppliance = (a: Appliance) => {
+    if (a.kind === 'chalkboard') {
+      const step = ((steps[a.id] ?? 0) + 1) % CHALK_DRAWINGS.length;
+      setSteps((all) => ({ ...all, [a.id]: step }));
+      onTapAppliance?.(a, step > 0, step);
+      return;
+    }
+    const on = !running.has(a.id);
+    setRunning((set) => {
+      const next = new Set(set);
+      if (on) next.add(a.id);
+      else next.delete(a.id);
+      return next;
+    });
+    onTapAppliance?.(a, on, 0);
   };
 
   // Dragging: one responder takes every finger that lands on a piece, so two can be moved at once.
@@ -512,6 +563,22 @@ export function BuddyRoom(props: Props) {
             onPress={() => toggle(c.id, c.name)}
           />
         ))}
+        {APPLIANCES.map((a) => {
+          const box = fixtureBox(a, size);
+          const on = running.has(a.id);
+          const step = steps[a.id] ?? 0;
+          return (
+            <ApplianceView
+              key={a.id}
+              appliance={a}
+              {...box}
+              on={on}
+              step={step}
+              label={a.kind === 'chalkboard' ? `Draw on the ${a.name}` : `${on ? 'Turn off' : 'Turn on'} the ${a.name}`}
+              onPress={() => tapAppliance(a)}
+            />
+          );
+        })}
 
         <View
           style={styles.layer}
@@ -595,6 +662,8 @@ export function BuddyRoom(props: Props) {
                       )
                     ) : piece.item?.draw ? (
                       <Furniture shape={piece.item.draw} width={piece.width} height={piece.height} />
+                    ) : piece.item?.candle ? (
+                      <Candle width={piece.width} height={piece.height} wax={piece.item.candle} lit={lit.has(piece.key)} seed={piece.key} />
                     ) : (
                       <Text style={{ fontSize: Math.round(piece.height * 0.85), lineHeight: tall }}>
                         {piece.item?.emoji}
@@ -621,6 +690,22 @@ export function BuddyRoom(props: Props) {
             />
           ) : null,
         )}
+        {/* Fires, candles and lamps light up the dark around them. */}
+        {lightPools().map((l) => (
+          <Flicker
+            key={l.key}
+            seed={l.key}
+            style={[styles.poolBox, { left: l.x - l.r, top: l.y - l.r, width: l.r * 2, height: l.r * 2 }]}
+          >
+            {/* Rings of warm light, brightest where they overlap in the middle. */}
+            {POOL_RINGS.map((k) => (
+              <View
+                key={k}
+                style={[styles.pool, { left: l.r * (1 - k), top: l.r * (1 - k), width: l.r * k * 2, height: l.r * k * 2, borderRadius: l.r * k }]}
+              />
+            ))}
+          </Flicker>
+        ))}
 
         {pops.map((p) => (
           <FloatUp
@@ -757,13 +842,15 @@ const INSIDE: Record<Cupboard['kind'], string> = {
   fridge: '#E3F2FD',
   freezer: '#D6ECFA',
   oven: '#2B2F33',
+  drawers: '#7A4E30',
+  washer: '#CFD8DC',
 };
 
 /** A built-in with a door: tap to open it onto its shelves, tap again to shut it. */
 function CupboardView({ cupboard: c, size, open, onPress }: { cupboard: Cupboard; size: HomeSize; open: boolean; onPress: () => void }) {
   const box = fixtureBox(c, size);
   const { inner, band } = shelvesOf(c, size);
-  const cold = c.kind === 'fridge' || c.kind === 'freezer';
+  const cold = c.kind === 'fridge' || c.kind === 'freezer' || c.kind === 'washer';
   const doorColor = cold ? '#F4F7F9' : c.kind === 'oven' ? '#5F6B73' : DOOR;
   const label = `${open ? 'Shut' : 'Open'} the ${c.name}`;
   return (
@@ -800,6 +887,22 @@ function CupboardView({ cupboard: c, size, open, onPress }: { cupboard: Cupboard
           {c.doors > 1 ? (
             <View style={[styles.openDoor, { right: 0, backgroundColor: doorColor, width: inner.width * OPEN_DOOR }]} />
           ) : null}
+        </View>
+      ) : c.kind === 'drawers' ? (
+        <View style={styles.drawers}>
+          {Array.from({ length: c.shelves }, (_, i) => (
+            <View key={i} style={[styles.cupboardDoor, { backgroundColor: doorColor }]}>
+              <View style={styles.drawerKnob} />
+            </View>
+          ))}
+        </View>
+      ) : c.kind === 'washer' ? (
+        <View style={styles.washer}>
+          <View style={styles.washerPanel}>
+            <View style={styles.dial} />
+            <View style={styles.dial} />
+          </View>
+          <View style={[styles.washerDoor, { width: box.height * 0.5, height: box.height * 0.5, borderRadius: box.height }]} />
         </View>
       ) : (
         <View style={styles.doors}>
@@ -1058,6 +1161,12 @@ const styles = StyleSheet.create({
   handleLeft: { left: '12%' },
   handleRight: { right: '12%' },
   coldHandle: { left: '10%', backgroundColor: '#8FA3B0', height: '30%', top: '30%' },
+  drawers: { flex: 1, gap: 4, padding: 4 },
+  drawerKnob: { width: 10, height: 10, borderRadius: 5, backgroundColor: '#F2C14E', borderWidth: 2, borderColor: OUTLINE },
+  washer: { flex: 1, alignItems: 'center', justifyContent: 'space-around' },
+  washerPanel: { alignSelf: 'stretch', flexDirection: 'row', justifyContent: 'flex-end', gap: 6, paddingHorizontal: 8, paddingVertical: 4, borderBottomWidth: 2, borderColor: OUTLINE },
+  dial: { width: 10, height: 10, borderRadius: 5, backgroundColor: '#90A4AE', borderWidth: 1.5, borderColor: OUTLINE },
+  washerDoor: { backgroundColor: '#B3E5FC', borderWidth: 4, borderColor: '#90A4AE' },
   ovenWindow: { width: '70%', height: '45%', borderRadius: 3, backgroundColor: '#2B2F33' },
   inside: { position: 'absolute', borderWidth: 2, borderColor: OUTLINE },
   board: { position: 'absolute', left: 0, right: 0, height: 5, backgroundColor: TRIM },
@@ -1079,6 +1188,8 @@ const styles = StyleSheet.create({
   fill: { width: '100%', height: '100%', alignItems: 'center', justifyContent: 'flex-end' },
   layer: { position: 'absolute', left: 0, top: 0, right: 0, bottom: 0 },
   dark: { position: 'absolute', top: 0, bottom: 0, backgroundColor: DARK },
+  pool: { position: 'absolute', backgroundColor: 'rgba(255, 205, 120, 0.05)' },
+  poolBox: { position: 'absolute' },
   gadget: { position: 'absolute', alignItems: 'center', justifyContent: 'flex-end' },
   switchPlate: {
     width: '70%',

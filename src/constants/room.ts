@@ -92,6 +92,8 @@ export interface RoomItem {
   top?: number;
   /** Tapping it turns its light on and off. */
   light?: boolean;
+  /** Drawn as a candle with this wax color, instead of its emoji. */
+  candle?: string;
   /** Pops up when it is tapped. */
   fx?: string;
   /** What the buddy says when it is tapped. */
@@ -145,6 +147,7 @@ export const ROOM_ITEMS: RoomItem[] = [
   { id: 'clock', name: 'Clock', emoji: '🕰️', price: 25, size: 0.14, group: 'living', fx: '⏰', says: 'hears tick, tock' },
   { id: 'picture', name: 'Picture', emoji: '🖼️', price: 25, size: 0.18, group: 'living' },
   { id: 'plant', name: 'Plant', emoji: '🪴', price: 15, size: 0.18, group: 'living', fx: '💧', says: 'waters the plant' },
+  { id: 'candleLiving', name: 'Candle', emoji: '🕯️', price: 15, size: 0.12, group: 'living', light: true, candle: '#FFF3E0' },
   { id: 'lamp', name: 'Lamp', emoji: '🪔', price: 25, size: 0.12, group: 'living', light: true },
   { id: 'fish', name: 'Fish bowl', emoji: '🐠', price: 30, size: 0.12, group: 'living', fx: '🫧', says: 'waves at the fish' },
   { id: 'trophy', name: 'Trophy', emoji: '🏆', price: 60, size: 0.14, group: 'living', fx: '🌟' },
@@ -203,7 +206,7 @@ export const ROOM_ITEMS: RoomItem[] = [
   { id: 'lollipop', name: 'Lollipop', emoji: '🍭', price: 10, size: 0.12, group: 'halloween', month: OCTOBER },
   { id: 'broom', name: 'Witch’s broom', emoji: '🧹', price: 20, size: 0.2, group: 'halloween', month: OCTOBER, fx: '🌙', says: 'zooms on the broom' },
   { id: 'crystal', name: 'Crystal ball', emoji: '🔮', price: 25, size: 0.12, group: 'halloween', month: OCTOBER, fx: '✨', says: 'sees the future' },
-  { id: 'candle', name: 'Spooky candle', emoji: '🕯️', price: 15, size: 0.12, group: 'halloween', month: OCTOBER, light: true },
+  { id: 'candle', name: 'Spooky candle', emoji: '🕯️', price: 15, size: 0.12, group: 'halloween', month: OCTOBER, light: true, candle: '#8E6CC9' },
   // Thanksgiving, sold in November only
   { id: 'turkey', name: 'Turkey', emoji: '🦃', price: 25, size: 0.18, group: 'thanksgiving', month: NOVEMBER, fx: '💬', says: 'hears gobble, gobble' },
   { id: 'pie', name: 'Pumpkin pie', emoji: '🥧', price: 15, size: 0.1, group: 'thanksgiving', month: NOVEMBER },
@@ -254,7 +257,7 @@ export interface FixtureSpot {
   height: number;
 }
 
-export type CupboardKind = 'cupboard' | 'fridge' | 'freezer' | 'oven' | 'wardrobe';
+export type CupboardKind = 'cupboard' | 'fridge' | 'freezer' | 'oven' | 'wardrobe' | 'drawers' | 'washer';
 
 /** A built-in with a door that opens onto shelves things can be kept on. */
 export interface Cupboard extends FixtureSpot {
@@ -280,6 +283,10 @@ export const CUPBOARDS: Cupboard[] = [
   { id: 'cabinet', name: 'mirror cabinet', kind: 'cupboard', area: 'bathroom', left: 1.8, width: 0.26, bottom: 0.4, height: 0.2, shelves: 2, doors: 1 },
   { id: 'toyChest', name: 'toy chest', kind: 'cupboard', area: 'playroom', left: 0.12, width: 0.36, bottom: 0, height: 0.2, shelves: 1, doors: 1 },
   { id: 'toyShelf', name: 'toy shelf', kind: 'cupboard', area: 'playroom', left: 2.13, width: 0.32, bottom: 0, height: 0.55, shelves: 3, doors: 2 },
+  { id: 'tvUnit', name: 'TV cabinet', kind: 'cupboard', area: 'living', left: 2.15, width: 0.3, bottom: 0, height: 0.14, shelves: 1, doors: 2 },
+  { id: 'dresser', name: 'dresser', kind: 'drawers', area: 'bedroom', left: 1.78, width: 0.27, bottom: 0, height: 0.26, shelves: 3, doors: 1 },
+  { id: 'washer', name: 'washing machine', kind: 'washer', area: 'bathroom', left: 2.18, width: 0.26, bottom: 0, height: 0.26, shelves: 1, doors: 1 },
+  { id: 'playTvUnit', name: 'TV cabinet', kind: 'cupboard', area: 'playroom', left: 1.15, width: 0.3, bottom: 0, height: 0.14, shelves: 1, doors: 2 },
 ];
 
 /** A built-in ledge small things can stand on, `bottom` up from the floor line. */
@@ -303,7 +310,32 @@ export const SURFACES: Surface[] = [
   { id: 'vanityTop', area: 'bathroom', left: 1.75, width: 0.36, bottom: 0.22, depth: 0.08 },
   { id: 'chestTop', area: 'playroom', left: 0.12, width: 0.36, bottom: 0.2, depth: 0.06 },
   { id: 'playShelf', area: 'playroom', left: 1.1, width: 0.4, bottom: 0.42, depth: 0.04 },
+  { id: 'mantel', area: 'living', left: 1.0, width: 0.6, bottom: 0.3, depth: 0.04 },
+  { id: 'dresserTop', area: 'bedroom', left: 1.78, width: 0.27, bottom: 0.26, depth: 0.06 },
+  { id: 'washerTop', area: 'bathroom', left: 2.18, width: 0.26, bottom: 0.26, depth: 0.06 },
 ];
+
+/** Built-in appliances drawn into a room that switch on and off, or (a chalkboard) change on each tap. */
+export type ApplianceKind = 'fireplace' | 'tv' | 'tub' | 'toilet' | 'ballPit' | 'chalkboard';
+
+export interface Appliance extends FixtureSpot {
+  id: string;
+  name: string;
+  kind: ApplianceKind;
+}
+
+export const APPLIANCES: Appliance[] = [
+  { id: 'fireplace', name: 'fireplace', kind: 'fireplace', area: 'living', left: 1.0, width: 0.6, bottom: 0, height: 0.3 },
+  { id: 'livingTv', name: 'TV', kind: 'tv', area: 'living', left: 2.17, width: 0.26, bottom: 0.14, height: 0.17 },
+  { id: 'tub', name: 'bathtub', kind: 'tub', area: 'bathroom', left: 0.2, width: 0.62, bottom: 0, height: 0.6 },
+  { id: 'toilet', name: 'toilet', kind: 'toilet', area: 'bathroom', left: 1.38, width: 0.2, bottom: 0, height: 0.26 },
+  { id: 'ballPit', name: 'ball pit', kind: 'ballPit', area: 'playroom', left: 0.55, width: 0.5, bottom: 0, height: 0.13 },
+  { id: 'playTv', name: 'TV', kind: 'tv', area: 'playroom', left: 1.17, width: 0.26, bottom: 0.14, height: 0.17 },
+  { id: 'chalkboard', name: 'chalkboard', kind: 'chalkboard', area: 'playroom', left: 1.6, width: 0.42, bottom: 0.18, height: 0.3 },
+];
+
+/** Pictures a chalkboard cycles through; the first is a clean board. */
+export const CHALK_DRAWINGS = ['', 'sun', 'house', 'smiley face'];
 
 /**
  * A built-in light to tap: a switch that turns its room's lights off and on, or a lamp.

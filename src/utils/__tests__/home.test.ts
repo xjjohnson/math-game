@@ -1,4 +1,4 @@
-import { CUPBOARDS, findRoomItem, GADGETS, HOME_AREAS, MONTH_NAMES, ROOM_SPAN, seasonOf, SURFACES } from '@/constants/room';
+import { APPLIANCES, CUPBOARDS, findRoomItem, GADGETS, HOME_AREAS, MONTH_NAMES, ROOM_SPAN, seasonOf, SURFACES } from '@/constants/room';
 import { makeProfile } from '@/test/fixtures';
 import type { Profile, RoomThing } from '@/types';
 import { dropBuddy, dropThing, gadgetBox, homeSize, layoutHome, pieceAt, ridersOf, shelvesOf, surfaceLine, type Piece } from '@/utils/home';
@@ -37,7 +37,7 @@ describe('home layout', () => {
   });
 
   it('keeps every built-in inside its own room', () => {
-    for (const f of [...CUPBOARDS, ...SURFACES]) {
+    for (const f of [...CUPBOARDS, ...SURFACES, ...APPLIANCES]) {
       expect(f.left).toBeGreaterThanOrEqual(0);
       expect(f.left + f.width).toBeLessThanOrEqual(ROOM_SPAN);
     }
@@ -47,6 +47,18 @@ describe('home layout', () => {
       expect(box.left).toBeGreaterThanOrEqual(area * size.areaWidth);
       expect(box.left + box.width).toBeLessThanOrEqual((area + 1) * size.areaWidth);
       expect(box.top).toBeGreaterThan(0);
+    }
+  });
+
+  it('keeps cupboards and appliances from overlapping', () => {
+    const fixtures = [...CUPBOARDS, ...APPLIANCES];
+    for (const a of fixtures) {
+      for (const b of fixtures) {
+        if (a === b || a.area !== b.area) continue;
+        const across = a.left < b.left + b.width && b.left < a.left + a.width;
+        const up = a.bottom < b.bottom + b.height && b.bottom < a.bottom + a.height;
+        expect(across && up ? `${a.id} overlaps ${b.id}` : 'clear').toBe('clear');
+      }
     }
   });
 
