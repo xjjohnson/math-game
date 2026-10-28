@@ -17,6 +17,7 @@ import {
   setPlaced,
   setPaint,
   upgradeRoom,
+  widenHome,
   type Placement,
   type RoomBuyResult,
 } from '@/utils/room';
@@ -91,13 +92,14 @@ interface ProfilesState {
   /** Pets, feeds or plays with the buddy in use. */
   careForBuddy: (id: string, action: CareAction) => CareResult;
   /** Buys a thing for the buddies' home and sets it down in `area` (an index into HOME_AREAS). */
-  buyRoomItem: (id: string, itemId: string, area: number) => RoomBuyResult;
+  /** `at` is where new things land, as a share of the home's width (the middle of the screen). */
+  buyRoomItem: (id: string, itemId: string, area: number, at?: number) => RoomBuyResult;
   /** Moves a thing in the home, or a buddy when `key` is BUDDY_KEY plus its id. */
   moveInRoom: (id: string, key: string, place: Placement) => void;
-  setPlaced: (id: string, key: string, placed: boolean, area: number) => void;
+  setPlaced: (id: string, key: string, placed: boolean, area: number, at?: number) => void;
   paintRoom: (id: string, part: 'wall' | 'floor', color: number, area: number) => void;
   /** Invites a buddy into the home, or sends it off for a nap. */
-  setBuddyHome: (id: string, buddyId: string, home: boolean, area: number) => void;
+  setBuddyHome: (id: string, buddyId: string, home: boolean, area: number, at?: number) => void;
   /** Puts clothes on a buddy (buying them first if needed), or takes them off. */
   wear: (id: string, buddyId: string, wearableId: string) => WearResult;
   undress: (id: string, buddyId: string) => void;
@@ -169,10 +171,10 @@ export const useProfiles = create<ProfilesState>()(
         }
         return result;
       },
-      buyRoomItem: (id, itemId, area) => {
+      buyRoomItem: (id, itemId, area, at) => {
         const current = get().profiles.find((p) => p.id === id);
         if (!current) return { ok: false, reason: 'unknown' };
-        const result = buyRoomItem(current, itemId, newId(), area);
+        const result = buyRoomItem(current, itemId, newId(), area, undefined, at);
         if (result.ok) {
           set((s) => ({ profiles: s.profiles.map((p) => (p.id === id ? result.profile : p)) }));
         }
@@ -182,15 +184,15 @@ export const useProfiles = create<ProfilesState>()(
         set((s) => ({
           profiles: s.profiles.map((p) => (p.id === id ? moveInRoom(p, key, spot) : p)),
         })),
-      setPlaced: (id, key, placed, area) =>
+      setPlaced: (id, key, placed, area, at) =>
         set((s) => ({
-          profiles: s.profiles.map((p) => (p.id === id ? setPlaced(p, key, placed, area) : p)),
+          profiles: s.profiles.map((p) => (p.id === id ? setPlaced(p, key, placed, area, at) : p)),
         })),
       paintRoom: (id, part, color, area) =>
         set((s) => ({ profiles: s.profiles.map((p) => (p.id === id ? setPaint(p, part, color, area) : p)) })),
-      setBuddyHome: (id, buddyId, home, area) =>
+      setBuddyHome: (id, buddyId, home, area, at) =>
         set((s) => ({
-          profiles: s.profiles.map((p) => (p.id === id ? setBuddyHome(p, buddyId, home, area) : p)),
+          profiles: s.profiles.map((p) => (p.id === id ? setBuddyHome(p, buddyId, home, area, at) : p)),
         })),
       wear: (id, buddyId, wearableId) => {
         const current = get().profiles.find((p) => p.id === id);
@@ -208,7 +210,7 @@ export const useProfiles = create<ProfilesState>()(
     }),
     {
       name: 'math-game.profiles',
-      version: 10,
+      version: 11,
       storage: persistStorage,
       migrate: (persisted, version) => {
         const state = persisted as Pick<ProfilesState, 'profiles' | 'activeProfileId'>;
@@ -267,6 +269,10 @@ export const useProfiles = create<ProfilesState>()(
         if (version < 10) {
           // Version 10 added hair, skin and beards for people buddies.
           state.profiles = state.profiles.map((p) => ({ ...p, looks: p.looks ?? {} }));
+        }
+        if (version < 11) {
+          // Version 11 made the rooms wider and added the bathroom and playroom.
+          state.profiles = state.profiles.map((p) => ({ ...p, room: widenHome(p.room) }));
         }
         return state as ProfilesState;
       },

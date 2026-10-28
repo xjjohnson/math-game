@@ -1,17 +1,24 @@
 /** The parts of the buddy's home, left to right. The home scrolls sideways through them. */
-export type AreaId = 'living' | 'kitchen' | 'bedroom';
+export type AreaId = 'living' | 'kitchen' | 'bedroom' | 'bathroom' | 'playroom';
 
 export interface HomeArea {
   id: AreaId;
   name: string;
   emoji: string;
+  /** Paint it starts with, as indexes into WALL_COLORS and FLOOR_COLORS. */
+  paint: { wall: number; floor: number };
 }
 
 export const HOME_AREAS: HomeArea[] = [
-  { id: 'living', name: 'Living room', emoji: '🛋️' },
-  { id: 'kitchen', name: 'Kitchen', emoji: '🍳' },
-  { id: 'bedroom', name: 'Bedroom', emoji: '🛏️' },
+  { id: 'living', name: 'Living room', emoji: '🛋️', paint: { wall: 0, floor: 0 } },
+  { id: 'kitchen', name: 'Kitchen', emoji: '🍳', paint: { wall: 0, floor: 0 } },
+  { id: 'bedroom', name: 'Bedroom', emoji: '🛏️', paint: { wall: 0, floor: 0 } },
+  { id: 'bathroom', name: 'Bathroom', emoji: '🛁', paint: { wall: 2, floor: 6 } },
+  { id: 'playroom', name: 'Playroom', emoji: '🧸', paint: { wall: 5, floor: 3 } },
 ];
+
+/** How many screens wide each area is. */
+export const ROOM_SPAN = 2.5;
 
 /** Holidays with their own shop shelf, sold only in their month. */
 export type Season = 'halloween' | 'thanksgiving';
@@ -46,7 +53,7 @@ export function seasonOf(month: number): Season | null {
 }
 
 /** Shelves of the "Add things" shop. */
-export type RoomItemGroup = 'furniture' | 'living' | 'kitchen' | 'bedroom' | 'toys' | Season;
+export type RoomItemGroup = 'furniture' | 'living' | 'kitchen' | 'bedroom' | 'bathroom' | 'toys' | Season;
 
 export const ROOM_ITEM_GROUPS: { id: RoomItemGroup; name: string }[] = [
   { id: 'thanksgiving', name: '🦃 Thanksgiving' },
@@ -55,6 +62,7 @@ export const ROOM_ITEM_GROUPS: { id: RoomItemGroup; name: string }[] = [
   { id: 'living', name: '📺 Living' },
   { id: 'kitchen', name: '🍕 Kitchen' },
   { id: 'bedroom', name: '🪞 Bedroom' },
+  { id: 'bathroom', name: '🧼 Bathroom' },
   { id: 'toys', name: '⚽ Toys' },
 ];
 
@@ -163,6 +171,13 @@ export const ROOM_ITEMS: RoomItem[] = [
   { id: 'dolls', name: 'Nesting dolls', emoji: '🪆', price: 20, size: 0.12, group: 'bedroom' },
   { id: 'teddy', name: 'Teddy bear', emoji: '🧸', price: 15, size: 0.14, group: 'bedroom', fx: '💕', says: 'hugs the teddy' },
   { id: 'guitar', name: 'Guitar', emoji: '🎸', price: 30, size: 0.2, group: 'bedroom', fx: '🎵', says: 'strums the guitar' },
+  // Bathroom
+  { id: 'sponge', name: 'Sponge', emoji: '🧽', price: 10, size: 0.09, group: 'bathroom', fx: '🫧', says: 'scrubs up' },
+  { id: 'looRoll', name: 'Toilet paper', emoji: '🧻', price: 10, size: 0.1, group: 'bathroom' },
+  { id: 'lotion', name: 'Lotion', emoji: '🧴', price: 10, size: 0.1, group: 'bathroom', fx: '✨', says: 'smells nice' },
+  { id: 'toothbrush', name: 'Toothbrush', emoji: '🪥', price: 10, size: 0.1, group: 'bathroom', fx: '😁', says: 'brushes teeth' },
+  { id: 'soap', name: 'Soap', emoji: '🧼', price: 10, size: 0.08, group: 'bathroom', fx: '🫧', says: 'washes up' },
+  { id: 'basket', name: 'Laundry basket', emoji: '🧺', price: 15, size: 0.14, group: 'bathroom', fx: '👕', says: 'folds the laundry' },
   // Toys and fun
   { id: 'ball', name: 'Ball', emoji: '⚽', price: 10, size: 0.1, group: 'toys', fx: '💫', says: 'kicks the ball' },
   { id: 'duck', name: 'Rubber duck', emoji: '🦆', price: 10, size: 0.1, group: 'toys', fx: '💦', says: 'hears quack, quack' },
@@ -173,6 +188,11 @@ export const ROOM_ITEMS: RoomItem[] = [
   { id: 'yoyo', name: 'Yo-yo', emoji: '🪀', price: 10, size: 0.1, group: 'toys', fx: '🌀' },
   { id: 'game', name: 'Video game', emoji: '🎮', price: 30, size: 0.11, group: 'toys', fx: '👾', says: 'plays a game' },
   { id: 'drum', name: 'Drum', emoji: '🥁', price: 25, size: 0.14, group: 'toys', fx: '💥', says: 'plays the drum' },
+  { id: 'robot', name: 'Robot', emoji: '🤖', price: 30, size: 0.14, group: 'toys', fx: '⚡', says: 'dances like a robot' },
+  { id: 'puzzle', name: 'Puzzle', emoji: '🧩', price: 15, size: 0.1, group: 'toys', fx: '🎉', says: 'finishes the puzzle' },
+  { id: 'unicorn', name: 'Unicorn', emoji: '🦄', price: 25, size: 0.15, group: 'toys', fx: '🌈', says: 'rides the unicorn' },
+  { id: 'dice', name: 'Dice', emoji: '🎲', price: 10, size: 0.08, group: 'toys', fx: '🎲', says: 'rolls a six' },
+  { id: 'skateboard', name: 'Skateboard', emoji: '🛹', price: 25, size: 0.12, group: 'toys', fx: '💨', says: 'does a trick' },
   // Halloween, sold in October only
   { id: 'pumpkin', name: 'Jack-o’-lantern', emoji: '🎃', price: 15, size: 0.14, group: 'halloween', month: OCTOBER, light: true },
   { id: 'ghost', name: 'Friendly ghost', emoji: '👻', price: 20, size: 0.16, group: 'halloween', month: OCTOBER, fx: '💬', says: 'hears the ghost say Boo!' },
@@ -222,8 +242,9 @@ export function isSmall(item: RoomItem): boolean {
 }
 
 /**
- * Built-in pieces of each room. Across, `left` and `width` are shares of the area's width;
- * up, `bottom` (above the floor line) and `height` are in the room's size unit.
+ * Built-in pieces of each room. Across, `left` and `width` are in screens from the area's
+ * left wall (an area is ROOM_SPAN screens wide); up, `bottom` (above the floor line) and
+ * `height` are in the room's size unit.
  */
 export interface FixtureSpot {
   area: AreaId;
@@ -253,6 +274,12 @@ export const CUPBOARDS: Cupboard[] = [
   { id: 'freezer', name: 'freezer', kind: 'freezer', area: 'kitchen', left: 0.68, width: 0.24, bottom: 0.38, height: 0.2, shelves: 1, doors: 1 },
   { id: 'fridge', name: 'fridge', kind: 'fridge', area: 'kitchen', left: 0.68, width: 0.24, bottom: 0, height: 0.37, shelves: 2, doors: 1 },
   { id: 'wardrobe', name: 'wardrobe', kind: 'wardrobe', area: 'bedroom', left: 0.64, width: 0.3, bottom: 0, height: 0.62, shelves: 3, doors: 2 },
+  { id: 'pantry', name: 'pantry', kind: 'cupboard', area: 'kitchen', left: 1.95, width: 0.3, bottom: 0, height: 0.6, shelves: 3, doors: 2 },
+  { id: 'bookcase', name: 'bookcase', kind: 'cupboard', area: 'bedroom', left: 2.1, width: 0.28, bottom: 0, height: 0.5, shelves: 3, doors: 2 },
+  { id: 'vanity', name: 'sink cupboard', kind: 'cupboard', area: 'bathroom', left: 1.75, width: 0.36, bottom: 0, height: 0.22, shelves: 1, doors: 2 },
+  { id: 'cabinet', name: 'mirror cabinet', kind: 'cupboard', area: 'bathroom', left: 1.8, width: 0.26, bottom: 0.4, height: 0.2, shelves: 2, doors: 1 },
+  { id: 'toyChest', name: 'toy chest', kind: 'cupboard', area: 'playroom', left: 0.12, width: 0.36, bottom: 0, height: 0.2, shelves: 1, doors: 1 },
+  { id: 'toyShelf', name: 'toy shelf', kind: 'cupboard', area: 'playroom', left: 2.13, width: 0.32, bottom: 0, height: 0.55, shelves: 3, doors: 2 },
 ];
 
 /** A built-in ledge small things can stand on, `bottom` up from the floor line. */
@@ -271,6 +298,64 @@ export const SURFACES: Surface[] = [
   { id: 'counter', area: 'kitchen', left: 0.06, width: 0.54, bottom: 0.26, depth: 0.2 },
   { id: 'bedSill', area: 'bedroom', left: 0.04, width: 0.34, bottom: 0.33, depth: 0.04 },
   { id: 'wallShelf', area: 'bedroom', left: 0.41, width: 0.19, bottom: 0.44, depth: 0.04 },
+  { id: 'diningTable', area: 'kitchen', left: 1.2, width: 0.5, bottom: 0.2, depth: 0.08 },
+  { id: 'desk', area: 'bedroom', left: 1.25, width: 0.45, bottom: 0.2, depth: 0.08 },
+  { id: 'vanityTop', area: 'bathroom', left: 1.75, width: 0.36, bottom: 0.22, depth: 0.08 },
+  { id: 'chestTop', area: 'playroom', left: 0.12, width: 0.36, bottom: 0.2, depth: 0.06 },
+  { id: 'playShelf', area: 'playroom', left: 1.1, width: 0.4, bottom: 0.42, depth: 0.04 },
+];
+
+/**
+ * A built-in thing to tap: it shows a little picture and the buddy says what it does.
+ * Drawn as its emoji, `size` tall (in size units), centered `x` screens from the left wall.
+ */
+export interface Gadget {
+  id: string;
+  name: string;
+  area: AreaId;
+  x: number;
+  bottom: number;
+  size: number;
+  /** What it looks like; with more than one, each tap shows the next. None draws a switch plate. */
+  looks: string[];
+  fx?: string;
+  says?: string;
+  /** Turns the lights in its area off and on. */
+  lightSwitch?: boolean;
+  /** Glows while switched on. */
+  glow?: boolean;
+}
+
+export const GADGETS: Gadget[] = [
+  // Living room
+  { id: 'livingSwitch', name: 'light switch', area: 'living', x: 0.32, bottom: 0.3, size: 0.06, looks: [], lightSwitch: true },
+  { id: 'clock', name: 'grandfather clock', area: 'living', x: 1.08, bottom: 0, size: 0.42, looks: ['🕰️'], fx: '🔔', says: 'hears bong, bong' },
+  { id: 'painting', name: 'painting', area: 'living', x: 1.5, bottom: 0.3, size: 0.2, looks: ['🖼️', '🌄', '🌅', '🏞️', '🌌'], says: 'changes the picture' },
+  { id: 'bigPlant', name: 'big plant', area: 'living', x: 2.3, bottom: 0, size: 0.3, looks: ['🪴'], fx: '💧', says: 'waters the plant' },
+  // Kitchen
+  { id: 'kitchenSwitch', name: 'light switch', area: 'kitchen', x: 1.0, bottom: 0.3, size: 0.06, looks: [], lightSwitch: true },
+  { id: 'coffee', name: 'cocoa maker', area: 'kitchen', x: 0.5, bottom: 0.26, size: 0.09, looks: ['☕'], fx: '♨️', says: 'makes hot cocoa' },
+  { id: 'popcorn', name: 'popcorn maker', area: 'kitchen', x: 1.6, bottom: 0.2, size: 0.1, looks: ['🍿'], fx: '💥', says: 'pops popcorn' },
+  { id: 'bin', name: 'trash can', area: 'kitchen', x: 2.38, bottom: 0, size: 0.14, looks: ['🗑️'], fx: '💨', says: 'takes out the trash' },
+  // Bedroom
+  { id: 'bedSwitch', name: 'light switch', area: 'bedroom', x: 1.05, bottom: 0.3, size: 0.06, looks: [], lightSwitch: true },
+  { id: 'deskLamp', name: 'desk lamp', area: 'bedroom', x: 1.35, bottom: 0.2, size: 0.12, looks: ['🪔'], glow: true },
+  { id: 'globe', name: 'globe', area: 'bedroom', x: 1.6, bottom: 0.2, size: 0.11, looks: ['🌍', '🌎', '🌏'], says: 'spins the globe' },
+  { id: 'alarm', name: 'alarm clock', area: 'bedroom', x: 0.5, bottom: 0.44, size: 0.08, looks: ['⏰'], fx: '🔔', says: 'hears ring, ring' },
+  // Bathroom
+  { id: 'bathSwitch', name: 'light switch', area: 'bathroom', x: 0.1, bottom: 0.3, size: 0.06, looks: [], lightSwitch: true },
+  { id: 'tub', name: 'bathtub', area: 'bathroom', x: 0.55, bottom: 0, size: 0.3, looks: ['🛁'], fx: '🫧', says: 'takes a bubble bath' },
+  { id: 'shower', name: 'shower', area: 'bathroom', x: 1.1, bottom: 0.38, size: 0.16, looks: ['🚿'], fx: '💦', says: 'turns on the shower' },
+  { id: 'toilet', name: 'toilet', area: 'bathroom', x: 1.45, bottom: 0, size: 0.24, looks: ['🚽'], fx: '🌀', says: 'flushes the toilet' },
+  { id: 'tap2', name: 'sink', area: 'bathroom', x: 1.93, bottom: 0.22, size: 0.08, looks: ['🚰'], fx: '💧', says: 'washes hands' },
+  { id: 'towel', name: 'towel', area: 'bathroom', x: 2.35, bottom: 0.3, size: 0.14, looks: ['🧣'], fx: '✨', says: 'dries off' },
+  // Playroom
+  { id: 'playSwitch', name: 'disco ball', area: 'playroom', x: 0.95, bottom: 0.58, size: 0.11, looks: ['🪩'], lightSwitch: true, fx: '🕺' },
+  { id: 'slide', name: 'slide', area: 'playroom', x: 0.75, bottom: 0, size: 0.34, looks: ['🛝'], fx: '💨', says: 'zooms down the slide' },
+  { id: 'easel', name: 'easel', area: 'playroom', x: 1.6, bottom: 0, size: 0.28, looks: ['🎨', '🖍️', '🌈'], says: 'paints a picture' },
+  { id: 'tent', name: 'play tent', area: 'playroom', x: 1.2, bottom: 0, size: 0.26, looks: ['⛺'], fx: '🔦', says: 'hides in the tent' },
+  { id: 'rocket', name: 'rocket', area: 'playroom', x: 1.95, bottom: 0, size: 0.28, looks: ['🚀'], fx: '🔥', says: 'blasts off' },
+  { id: 'pinata', name: 'piñata', area: 'playroom', x: 1.6, bottom: 0.55, size: 0.12, looks: ['🪅'], fx: '🍬', says: 'hits the piñata' },
 ];
 
 export function findCupboard(id: string): Cupboard | undefined {

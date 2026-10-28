@@ -1,7 +1,7 @@
-import { CUPBOARDS, findRoomItem, MONTH_NAMES, seasonOf, SURFACES } from '@/constants/room';
+import { CUPBOARDS, findRoomItem, GADGETS, HOME_AREAS, MONTH_NAMES, ROOM_SPAN, seasonOf, SURFACES } from '@/constants/room';
 import { makeProfile } from '@/test/fixtures';
 import type { Profile, RoomThing } from '@/types';
-import { dropBuddy, dropThing, homeSize, layoutHome, ridersOf, shelvesOf, surfaceLine, type Piece } from '@/utils/home';
+import { dropBuddy, dropThing, gadgetBox, homeSize, layoutHome, pieceAt, ridersOf, shelvesOf, surfaceLine, type Piece } from '@/utils/home';
 import { BUDDY_KEY, buddiesHome, buyRoomItem, FIXTURE_KEY, placeBuddy, placeThing, setBuddyHome, setPlaced } from '@/utils/room';
 
 const NOVEMBER = 10;
@@ -28,11 +28,37 @@ const piece = (pieces: Piece[], key: string) => {
 const to = (p: Piece, x: number, y: number) => [x - p.x, y - p.y] as const;
 
 describe('home layout', () => {
-  it('fills a tall phone screen, with rooms a little wider than the screen', () => {
+  it('fills a tall phone screen, with rooms a few screens wide', () => {
     expect(size.height).toBe(760);
-    expect(size.areaWidth).toBeGreaterThanOrEqual(400);
-    expect(size.width).toBe(size.areaWidth * 3);
+    expect(size.screen).toBeGreaterThanOrEqual(400);
+    expect(size.areaWidth).toBe(Math.round(size.screen * ROOM_SPAN));
+    expect(size.width).toBe(size.areaWidth * HOME_AREAS.length);
     expect(size.unit).toBeLessThanOrEqual(760);
+  });
+
+  it('keeps every built-in inside its own room', () => {
+    for (const f of [...CUPBOARDS, ...SURFACES]) {
+      expect(f.left).toBeGreaterThanOrEqual(0);
+      expect(f.left + f.width).toBeLessThanOrEqual(ROOM_SPAN);
+    }
+    for (const g of GADGETS) {
+      const box = gadgetBox(g, size);
+      const area = HOME_AREAS.findIndex((a) => a.id === g.area);
+      expect(box.left).toBeGreaterThanOrEqual(area * size.areaWidth);
+      expect(box.left + box.width).toBeLessThanOrEqual((area + 1) * size.areaWidth);
+      expect(box.top).toBeGreaterThan(0);
+    }
+  });
+
+  it('finds the piece under a finger, the one on top first', () => {
+    const p = withThings([
+      { key: 'table', itemId: 'table', x: 0.05, y: 0.9 },
+      { key: 'cup', itemId: 'milk', x: 0.05, y: 0, on: 'table' },
+    ]);
+    const pieces = layoutHome(p.room, [], size, new Set());
+    const cup = pieces.find((q) => q.key === 'cup')!;
+    expect(pieceAt(pieces, cup.x, cup.y - 2)?.key).toBe('cup');
+    expect(pieceAt(pieces, 1, 1)).toBeNull();
   });
 
   it('keeps things in shut cupboards hidden and shows them where they were put on the shelf', () => {

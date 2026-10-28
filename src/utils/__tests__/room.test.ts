@@ -1,4 +1,5 @@
-import { findRoomItem, MAX_ROOM_THINGS } from '@/constants/room';
+import { findRoomItem, HOME_AREAS, MAX_ROOM_THINGS, ROOM_SPAN } from '@/constants/room';
+import type { Room } from '@/types';
 import { makeProfile } from '@/test/fixtures';
 import {
   areaAt,
@@ -11,6 +12,7 @@ import {
   setPaint,
   setPlaced,
   upgradeRoom,
+  widenHome,
 } from '@/utils/room';
 
 const OCTOBER = 9;
@@ -98,7 +100,28 @@ describe('buddy home', () => {
     expect(home.buddies.puppy.x).toBeCloseTo(0.2);
     expect(home.buddies.puppy.y).toBe(0.8);
     expect(home.things[0].x).toBeCloseTo(0.3);
-    expect(areaAt(home.things[0].x)).toBe(0);
     expect(upgradeRoom(home, 'puppy')).toBe(home);
+  });
+
+  it('keeps everything by its own room when the rooms get wider', () => {
+    const old: Room = {
+      paint: [{ wall: 1, floor: 1 }, { wall: 2, floor: 2 }, { wall: 3, floor: 3 }],
+      buddies: { puppy: { x: 0.5, y: 0.8, on: 'couch' } },
+      things: [
+        { key: 'a', itemId: 'bed', x: 0.9, y: 0.9, placed: true },
+        { key: 'b', itemId: 'milk', x: 0.4, y: 0, placed: true, in: 'fridge', shelf: 1 },
+      ],
+    };
+    const home = widenHome(old);
+    expect(home.paint).toHaveLength(HOME_AREAS.length);
+    expect(home.paint[2]).toEqual({ wall: 3, floor: 3 });
+    expect(home.paint[3]).toEqual(HOME_AREAS[3].paint);
+    // The middle of the old kitchen is half a screen into the new one.
+    expect(areaAt(home.buddies.puppy.x)).toBe(1);
+    expect(home.buddies.puppy.x).toBeCloseTo((1 + 0.5 / ROOM_SPAN) / HOME_AREAS.length);
+    expect(home.buddies.puppy.on).toBe('couch');
+    expect(areaAt(home.things[0].x)).toBe(2);
+    // Things on cupboard shelves keep their spot along the shelf.
+    expect(home.things[1]).toEqual(old.things[1]);
   });
 });

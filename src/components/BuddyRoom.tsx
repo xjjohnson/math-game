@@ -1,6 +1,5 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import {
-  PanResponder,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -8,6 +7,8 @@ import {
   type LayoutChangeEvent,
   type NativeScrollEvent,
   type NativeSyntheticEvent,
+  type GestureResponderEvent,
+  type HostInstance,
   type ScrollViewInstance,
 } from 'react-native';
 
@@ -19,11 +20,13 @@ import { PopIn } from '@/components/PopIn';
 import {
   CUPBOARDS,
   FLOOR_COLORS,
+  GADGETS,
   HOME_AREAS,
   WALL_COLORS,
   type AreaId,
   type Cupboard,
   type FixtureSpot,
+  type Gadget,
   type Season,
 } from '@/constants/room';
 import type { PersonLook } from '@/constants/wardrobe';
@@ -32,16 +35,18 @@ import {
   dropBuddy,
   dropThing,
   fixtureBox,
+  gadgetBox,
   homeSize,
   layoutHome,
   OPEN_DOOR,
+  pieceAt,
   ridersOf,
   shelvesOf,
   type Box,
   type HomeSize,
   type Piece,
 } from '@/utils/home';
-import { AREA_COUNT, type Placement } from '@/utils/room';
+import { AREA_COUNT, paintOf, type Placement } from '@/utils/room';
 
 export interface HomeBuddy {
   /** Shop item id. */
@@ -63,6 +68,8 @@ interface Props {
   /** Area in view, an index into HOME_AREAS. Changing it scrolls there. */
   area: number;
   onAreaChange: (area: number) => void;
+  /** The middle of the screen, as a share of the home's width, as the home scrolls. */
+  onView?: (at: number) => void;
   /** Put-away mode: tapping a thing sends it to the toy box instead. */
   tidying: boolean;
   /** This month's holiday, which shows outside the windows. */
@@ -73,6 +80,8 @@ interface Props {
   onTapBuddy: (buddyId: string) => void;
   /** A door was opened or shut: a cupboard's name, or "door" and "curtains". */
   onToggle?: (name: string, open: boolean) => void;
+  /** A built-in thing was tapped; `on` is whether it is now switched on. */
+  onTapGadget?: (gadget: Gadget, on: boolean) => void;
 }
 
 const TRIM = '#A86B45';
@@ -94,12 +103,32 @@ const WALL_SHELF: FixtureSpot = { area: 'bedroom', left: 0.41, width: 0.19, bott
 const COUNTER: FixtureSpot = { area: 'kitchen', left: 0.06, width: 0.54, bottom: 0, height: 0.26 };
 const TAP: FixtureSpot = { area: 'kitchen', left: 0.2, width: 0.03, bottom: 0.26, height: 0.06 };
 const FRIDGE: FixtureSpot = { area: 'kitchen', left: 0.68, width: 0.24, bottom: 0, height: 0.58 };
+/** More windows, in the wider parts of each room; the bedroom's and bathroom's look out at night and day. */
+const MORE_WINDOWS: { id: string; spot: FixtureSpot; night?: boolean }[] = [
+  { id: 'livingCurtains2', spot: { area: 'living', left: 1.7, width: 0.42, bottom: 0.27, height: 0.34 } },
+  { id: 'kitchenCurtains', spot: { area: 'kitchen', left: 1.25, width: 0.4, bottom: 0.36, height: 0.28 } },
+  { id: 'bedCurtains2', spot: { area: 'bedroom', left: 1.28, width: 0.4, bottom: 0.38, height: 0.26 }, night: true },
+  { id: 'bathCurtains', spot: { area: 'bathroom', left: 0.35, width: 0.4, bottom: 0.4, height: 0.22 } },
+  { id: 'playCurtains', spot: { area: 'playroom', left: 0.12, width: 0.36, bottom: 0.33, height: 0.3 } },
+];
+/** Built-in tables, under the dining table and desk ledges. */
+const TABLES: FixtureSpot[] = [
+  { area: 'kitchen', left: 1.2, width: 0.5, bottom: 0, height: 0.2 },
+  { area: 'bedroom', left: 1.25, width: 0.45, bottom: 0, height: 0.2 },
+];
+const PLAY_SHELF: FixtureSpot = { area: 'playroom', left: 1.1, width: 0.4, bottom: 0.395, height: 0.025 };
+const DARK = 'rgba(16, 18, 52, 0.55)';
 
-/** Lets a dragged piece scroll the home when it is held at the side. */
-interface Scroller {
-  /** Scrolls by up to `dx` pixels and returns how far it really moved. */
-  scrollBy: (dx: number) => number;
-  viewWidth: number;
+/** A finger dragging a piece, and what rides along with it. */
+interface Track {
+  piece: Piece;
+  keys: Set<string>;
+  /** Where the finger went down, across the whole home. */
+  startX: number;
+  startY: number;
+  pageX: number;
+  pageY: number;
+  moved: boolean;
 }
 
 interface Pop {
@@ -110,36 +139,54 @@ interface Pop {
 }
 
 /**
- * The buddies' home, filling the space it is given: a living room, kitchen and bedroom
- * side by side that scroll left and right, drawn with flat shapes. Buddies and things
- * can be dragged anywhere; small things can go in cupboards, on tables and seats, or
- * into a buddy's hands, and buddies can sit on seats. Doors and curtains open on a tap.
+ * The buddies' home, filling the space it is given: rooms several screens wide side by
+ * side that scroll left and right, drawn with flat shapes. Buddies and things can be
+ * dragged anywhere, two at once with two fingers; small things can go in cupboards, on
+ * tables and seats, or into a buddy's hands, and buddies can sit on seats. Doors and
+ * curtains open on a tap, and built-in things do something when tapped.
  */
 export function BuddyRoom(props: Props) {
-  const { room, buddies, area, onAreaChange, tidying, season, onPlaceThing, onPlaceBuddy } = props;
-  const { onTapThing, onTapBuddy, onToggle } = props;
+  const { room, buddies, area, onAreaChange, onView, tidying, season, onPlaceThing, onPlaceBuddy } = props;
+  const { onTapThing, onTapBuddy, onToggle, onTapGadget } = props;
   const [view, setView] = useState({ width: 0, height: 0 });
   const [open, setOpen] = useState<ReadonlySet<string>>(new Set());
   const [lit, setLit] = useState<ReadonlySet<string>>(new Set());
-  const [drag, setDrag] = useState<{ keys: Set<string>; dx: number; dy: number } | null>(null);
+  const [dark, setDark] = useState<ReadonlySet<AreaId>>(new Set());
+  const [looks, setLooks] = useState<Record<string, number>>({});
+  /** How far each piece being dragged (or riding along) has moved, by piece key. */
+  const [moving, setMoving] = useState<Record<string, { dx: number; dy: number }>>({});
   const [pops, setPops] = useState<Pop[]>([]);
   const popId = useRef(0);
   const popTimers = useRef<ReturnType<typeof setTimeout>[]>([]);
   const scroll = useRef<ScrollViewInstance>(null);
+  const frameRef = useRef<HostInstance>(null);
+  /** The home's top left corner on the page, for working out what a finger is on. */
+  const frame = useRef({ x: 0, y: 0 });
+  const tracks = useRef(new Map<number, Track>());
+  const latestPieces = useRef<Piece[]>([]);
+  const edgeTimer = useRef<ReturnType<typeof setInterval> | null>(null);
   const scrollX = useRef(0);
   const reported = useRef(area);
   const size: HomeSize | null = view.width > 0 && view.height > 0 ? homeSize(view.width, view.height) : null;
 
-  useEffect(() => () => popTimers.current.forEach(clearTimeout), []);
+  useEffect(
+    () => () => {
+      popTimers.current.forEach(clearTimeout);
+      if (edgeTimer.current) clearInterval(edgeTimer.current);
+    },
+    [],
+  );
 
   const onLayout = (e: LayoutChangeEvent) => {
     const { width, height } = e.nativeEvent.layout;
     setView({ width: Math.round(width), height: Math.round(height) });
+    frameRef.current?.measure((_x, _y, _w, _h, pageX, pageY) => {
+      frame.current = { x: pageX ?? 0, y: pageY ?? 0 };
+    });
   };
 
-  /** Scroll position that puts the middle of an area in the middle of the screen. */
-  const areaScroll = (i: number) =>
-    size ? Math.min(size.width - view.width, Math.max(0, i * size.areaWidth + (size.areaWidth - view.width) / 2)) : 0;
+  /** Scroll position that shows an area from its left wall, where its built-ins start. */
+  const areaScroll = (i: number) => (size ? Math.min(size.width - view.width, Math.max(0, i * size.areaWidth)) : 0);
   const areaInView = (x: number) =>
     size ? Math.min(AREA_COUNT - 1, Math.max(0, Math.floor((x + view.width / 2) / size.areaWidth))) : 0;
 
@@ -156,6 +203,7 @@ export function BuddyRoom(props: Props) {
 
   const onScroll = (e: NativeSyntheticEvent<NativeScrollEvent>) => {
     scrollX.current = e.nativeEvent.contentOffset.x;
+    if (size) onView?.((scrollX.current + view.width / 2) / size.width);
     const now = areaInView(scrollX.current);
     if (now !== reported.current) {
       reported.current = now;
@@ -163,18 +211,13 @@ export function BuddyRoom(props: Props) {
     }
   };
 
-  const scroller: Scroller = {
-    viewWidth: view.width,
-    scrollBy: (dx) => {
-      if (!size) return 0;
-      const to = Math.min(size.width - view.width, Math.max(0, scrollX.current + dx));
-      const moved = to - scrollX.current;
-      if (moved !== 0) {
-        scrollX.current = to;
-        scroll.current?.scrollTo({ x: to, animated: false });
-      }
-      return moved;
-    },
+  const scrollBy = (dx: number) => {
+    if (!size) return;
+    const to = Math.min(size.width - view.width, Math.max(0, scrollX.current + dx));
+    if (to !== scrollX.current) {
+      scrollX.current = to;
+      scroll.current?.scrollTo({ x: to, animated: false });
+    }
   };
 
   const pop = (x: number, y: number, emoji: string) => {
@@ -195,7 +238,7 @@ export function BuddyRoom(props: Props) {
   };
 
   if (!size) {
-    return <View style={styles.frame} onLayout={onLayout} />;
+    return <View ref={frameRef} style={styles.frame} onLayout={onLayout} />;
   }
 
   const pieces = layoutHome(
@@ -204,6 +247,7 @@ export function BuddyRoom(props: Props) {
     size,
     open,
   );
+  latestPieces.current = pieces;
   const byKey = new Map(pieces.map((p) => [p.key, p]));
   const buddyById = new Map(buddies.map((b) => [b.id, b]));
 
@@ -230,12 +274,139 @@ export function BuddyRoom(props: Props) {
     else onPlaceThing(piece.key, dropThing(pieces, piece, dx, dy, size, open));
   };
 
+  const tapGadget = (g: Gadget) => {
+    const box = gadgetBox(g, size);
+    let on = true;
+    if (g.lightSwitch) {
+      on = dark.has(g.area);
+      setDark((set) => {
+        const next = new Set(set);
+        if (on) next.delete(g.area);
+        else next.add(g.area);
+        return next;
+      });
+    } else if (g.glow) {
+      on = !lit.has(g.id);
+      setLit((set) => {
+        const next = new Set(set);
+        if (on) next.add(g.id);
+        else next.delete(g.id);
+        return next;
+      });
+    }
+    if (g.looks.length > 1) setLooks((l) => ({ ...l, [g.id]: ((l[g.id] ?? 0) + 1) % g.looks.length }));
+    // A switch's picture (a disco ball's dance) shows when the lights go off.
+    if (g.fx && (g.lightSwitch ? !on : on)) pop(box.left + box.width / 2, box.top, g.fx);
+    onTapGadget?.(g, on);
+  };
+
+  // Dragging: one responder takes every finger that lands on a piece, so two can be moved at once.
+  /** A finger's spot across the whole home. */
+  const toHome = (pageX: number, pageY: number) => ({
+    x: pageX - frame.current.x + scrollX.current,
+    y: pageY - frame.current.y,
+  });
+
+  const showMoving = () => {
+    const next: Record<string, { dx: number; dy: number }> = {};
+    for (const t of tracks.current.values()) {
+      if (!t.moved) continue;
+      const at = toHome(t.pageX, t.pageY);
+      for (const key of t.keys) next[key] = { dx: at.x - t.startX, dy: at.y - t.startY };
+    }
+    setMoving(next);
+  };
+
+  /** The piece under a finger, unless it is already being carried by another. */
+  const pieceUnder = (pageX: number, pageY: number): Piece | null => {
+    const at = toHome(pageX, pageY);
+    const piece = pieceAt(latestPieces.current, at.x, at.y);
+    if (!piece) return null;
+    const keys = ridersOf(latestPieces.current, piece.key);
+    const taken = [...tracks.current.values()].some((t) => [...keys].some((k) => t.keys.has(k)));
+    return taken ? null : piece;
+  };
+
+  const startTouch = (id: number, pageX: number, pageY: number) => {
+    if (tracks.current.has(id)) return;
+    const piece = pieceUnder(pageX, pageY);
+    if (!piece) return;
+    const at = toHome(pageX, pageY);
+    tracks.current.set(id, {
+      piece,
+      keys: ridersOf(latestPieces.current, piece.key),
+      startX: at.x,
+      startY: at.y,
+      pageX,
+      pageY,
+      moved: false,
+    });
+  };
+
+  const stopEdge = () => {
+    if (edgeTimer.current) clearInterval(edgeTimer.current);
+    edgeTimer.current = null;
+  };
+
+  /** Which way to scroll while a dragged piece is held at the side of the screen. */
+  const edgeDir = () => {
+    for (const t of tracks.current.values()) {
+      if (!t.moved) continue;
+      const x = t.pageX - frame.current.x;
+      if (x < EDGE) return -1;
+      if (x > view.width - EDGE) return 1;
+    }
+    return 0;
+  };
+
+  const moveTouches = (touches: readonly { identifier: number | string; pageX: number; pageY: number }[]) => {
+    let changed = false;
+    for (const touch of touches) {
+      const t = tracks.current.get(Number(touch.identifier));
+      if (!t) continue;
+      t.pageX = touch.pageX;
+      t.pageY = touch.pageY;
+      if (!t.moved) {
+        const at = toHome(touch.pageX, touch.pageY);
+        if (Math.abs(at.x - t.startX) < TAP_SLOP && Math.abs(at.y - t.startY) < TAP_SLOP) continue;
+        t.moved = true;
+      }
+      changed = true;
+    }
+    if (!changed) return;
+    showMoving();
+    if (!edgeTimer.current && edgeDir() !== 0) {
+      edgeTimer.current = setInterval(() => {
+        const dir = edgeDir();
+        if (dir === 0 || tracks.current.size === 0) return stopEdge();
+        scrollBy(dir * EDGE_STEP);
+        showMoving();
+      }, 16);
+    }
+  };
+
+  const endTouch = (id: number) => {
+    const t = tracks.current.get(id);
+    if (!t) return;
+    tracks.current.delete(id);
+    if (tracks.current.size === 0) stopEdge();
+    showMoving();
+    if (!t.moved) return tapPiece(t.piece);
+    const at = toHome(t.pageX, t.pageY);
+    dropPiece(t.piece, at.x - t.startX, at.y - t.startY);
+  };
+
+  const touchesOf = (e: GestureResponderEvent) =>
+    e.nativeEvent.changedTouches?.length ? e.nativeEvent.changedTouches : [e.nativeEvent];
+
+  const dragging = Object.keys(moving).length > 0;
+
   return (
-    <View style={styles.frame} onLayout={onLayout} accessibilityLabel="The buddies' home">
+    <View ref={frameRef} style={styles.frame} onLayout={onLayout} accessibilityLabel="The buddies' home">
       <ScrollView
         ref={scroll}
         horizontal
-        scrollEnabled={!drag}
+        scrollEnabled={!dragging}
         showsHorizontalScrollIndicator={false}
         onScroll={onScroll}
         scrollEventThrottle={32}
@@ -248,8 +419,8 @@ export function BuddyRoom(props: Props) {
             id={a.id}
             index={i}
             size={size}
-            wall={WALL_COLORS[room.paint[i]?.wall ?? 0] ?? WALL_COLORS[0]}
-            floor={FLOOR_COLORS[room.paint[i]?.floor ?? 0] ?? FLOOR_COLORS[0]}
+            wall={WALL_COLORS[paintOf(room, i).wall] ?? WALL_COLORS[0]}
+            floor={FLOOR_COLORS[paintOf(room, i).floor] ?? FLOOR_COLORS[0]}
           />
         ))}
 
@@ -284,6 +455,30 @@ export function BuddyRoom(props: Props) {
           style={[styles.tap, boxStyle(fixtureBox(TAP, size))]}
         />
         <View style={[styles.fridge, boxStyle(fixtureBox(FRIDGE, size))]} />
+        {MORE_WINDOWS.map((w) => (
+          <Window
+            key={w.id}
+            box={fixtureBox(w.spot, size)}
+            shut={open.has(w.id)}
+            night={w.night}
+            season={season}
+            onPress={() => toggle(w.id, 'curtains')}
+          />
+        ))}
+        {TABLES.map((t) => (
+          <TableFixture key={t.area} box={fixtureBox(t, size)} />
+        ))}
+        <View style={[styles.wallShelf, boxStyle(fixtureBox(PLAY_SHELF, size))]} />
+        {GADGETS.map((g) => (
+          <GadgetView
+            key={g.id}
+            gadget={g}
+            box={gadgetBox(g, size)}
+            look={g.looks[looks[g.id] ?? 0]}
+            on={g.lightSwitch ? !dark.has(g.area) : lit.has(g.id)}
+            onPress={() => tapGadget(g)}
+          />
+        ))}
         {CUPBOARDS.map((c) => (
           <CupboardView
             key={c.id}
@@ -294,76 +489,95 @@ export function BuddyRoom(props: Props) {
           />
         ))}
 
-        {pieces.map((piece) => {
-          const riding = drag?.keys.has(piece.key);
-          const buddy = piece.buddyId ? buddyById.get(piece.buddyId) : undefined;
-          const parent = piece.parent ? byKey.get(piece.parent) : undefined;
-          return (
-            <Draggable
-              key={piece.key}
-              box={{ left: piece.x - piece.width / 2, top: piece.y - piece.height, width: piece.width, height: piece.height }}
-              offset={riding && drag ? drag : null}
-              scroller={scroller}
-              onLift={() => setDrag({ keys: ridersOf(pieces, piece.key), dx: 0, dy: 0 })}
-              onDrag={(dx, dy) => setDrag((d) => (d ? { ...d, dx, dy } : d))}
-              onDrop={(dx, dy) => {
-                setDrag(null);
-                dropPiece(piece, dx, dy);
-              }}
-              onCancel={() => setDrag(null)}
-              onTap={() => {
-                setDrag(null);
-                tapPiece(piece);
-              }}
-              wobble={tidying && !piece.buddyId}
-              label={buddy ? buddy.name : piece.item?.name ?? 'Thing'}
-            >
-              {lit.has(piece.key) ? (
-                <View
-                  style={[
-                    styles.glow,
-                    {
-                      width: piece.height * 2.4,
-                      height: piece.height * 2.4,
-                      left: (piece.width - piece.height * 2.4) / 2,
-                      top: -piece.height * 0.9,
-                    },
-                  ]}
-                />
-              ) : null}
-              {buddy ? (
-                <>
-                  {buddy.person ? (
-                    <PersonFigure
-                      look={buddy.person.look}
-                      size={Math.round(piece.height)}
-                      dressed={buddy.person.dressed}
-                      gift={buddy.gift}
-                    />
-                  ) : (
-                    <BuddyFigure
-                      value={buddy.emoji}
-                      size={Math.round(piece.height)}
-                      fur={buddy.fur}
-                      belly={buddy.belly}
-                      dressed={buddy.dressed}
-                      gift={buddy.gift}
-                    />
-                  )}
-                  {parent?.item?.sleep ? (
-                    <Text style={[styles.zzz, { fontSize: Math.round(piece.height * 0.3) }]}>💤</Text>
-                  ) : null}
-                </>
-              ) : piece.item?.draw ? (
-                <Furniture shape={piece.item.draw} width={piece.width} height={piece.height} />
-              ) : (
-                <Text style={{ fontSize: Math.round(piece.height * 0.85), lineHeight: Math.round(piece.height) }}>
-                  {piece.item?.emoji}
-                </Text>
-              )}
-            </Draggable>
-          );
-        })}
+        <View
+          style={styles.layer}
+          pointerEvents="box-none"
+          onStartShouldSetResponder={(e) => pieceUnder(e.nativeEvent.pageX, e.nativeEvent.pageY) !== null}
+          onResponderTerminationRequest={() => false}
+          onResponderGrant={(e) => {
+            startTouch(Number(e.nativeEvent.identifier), e.nativeEvent.pageX, e.nativeEvent.pageY);
+            // Keeps the home from scrolling under the finger.
+            return true;
+          }}
+          onResponderStart={(e) => touchesOf(e).forEach((t) => startTouch(Number(t.identifier), t.pageX, t.pageY))}
+          onResponderMove={(e) => moveTouches(e.nativeEvent.touches?.length ? e.nativeEvent.touches : [e.nativeEvent])}
+          onResponderEnd={(e) => touchesOf(e).forEach((t) => endTouch(Number(t.identifier)))}
+          onResponderRelease={() => [...tracks.current.keys()].forEach(endTouch)}
+          onResponderTerminate={() => {
+            tracks.current.clear();
+            stopEdge();
+            setMoving({});
+          }}
+        >
+          {pieces.map((piece) => {
+            const offset = moving[piece.key];
+            const buddy = piece.buddyId ? buddyById.get(piece.buddyId) : undefined;
+            const parent = piece.parent ? byKey.get(piece.parent) : undefined;
+            return (
+              <PieceView
+                key={piece.key}
+                box={{ left: piece.x - piece.width / 2, top: piece.y - piece.height, width: piece.width, height: piece.height }}
+                offset={offset ?? null}
+                wobble={tidying && !piece.buddyId}
+                label={buddy ? buddy.name : piece.item?.name ?? 'Thing'}
+              >
+                {lit.has(piece.key) ? (
+                  <View
+                    style={[
+                      styles.glow,
+                      {
+                        width: piece.height * 2.4,
+                        height: piece.height * 2.4,
+                        left: (piece.width - piece.height * 2.4) / 2,
+                        top: -piece.height * 0.9,
+                      },
+                    ]}
+                  />
+                ) : null}
+                {buddy ? (
+                  <>
+                    {buddy.person ? (
+                      <PersonFigure
+                        look={buddy.person.look}
+                        size={Math.round(piece.height)}
+                        dressed={buddy.person.dressed}
+                        gift={buddy.gift}
+                      />
+                    ) : (
+                      <BuddyFigure
+                        value={buddy.emoji}
+                        size={Math.round(piece.height)}
+                        fur={buddy.fur}
+                        belly={buddy.belly}
+                        dressed={buddy.dressed}
+                        gift={buddy.gift}
+                      />
+                    )}
+                    {parent?.item?.sleep ? (
+                      <Text style={[styles.zzz, { fontSize: Math.round(piece.height * 0.3) }]}>💤</Text>
+                    ) : null}
+                  </>
+                ) : piece.item?.draw ? (
+                  <Furniture shape={piece.item.draw} width={piece.width} height={piece.height} />
+                ) : (
+                  <Text style={{ fontSize: Math.round(piece.height * 0.85), lineHeight: Math.round(piece.height) }}>
+                    {piece.item?.emoji}
+                  </Text>
+                )}
+              </PieceView>
+            );
+          })}
+        </View>
+
+        {HOME_AREAS.map((a, i) =>
+          dark.has(a.id) ? (
+            <View
+              key={a.id}
+              pointerEvents="none"
+              style={[styles.dark, { left: i * size.areaWidth, width: size.areaWidth }]}
+            />
+          ) : null,
+        )}
 
         {pops.map((p) => (
           <PopIn
@@ -397,10 +611,10 @@ function Area({ id, index, size, wall, floor }: AreaProps) {
     <View style={[styles.area, { left: index * size.areaWidth, width: size.areaWidth, backgroundColor: wall }]}>
       <View style={[styles.floor, { top: size.floorY, backgroundColor: floor }]} />
       <View style={[styles.baseboard, { top: size.floorY - 8 }]} />
-      {id === 'bedroom' ? (
+      {id === 'bedroom' || id === 'bathroom' || id === 'playroom' ? (
         <View
           style={[
-            styles.rug,
+            id === 'bedroom' ? styles.rug : id === 'bathroom' ? styles.bathMat : styles.playMat,
             { top: size.floorY + (size.height - size.floorY) * 0.45, height: (size.height - size.floorY) * 0.25 },
           ]}
         />
@@ -557,84 +771,20 @@ function CupboardView({ cupboard: c, size, open, onPress }: { cupboard: Cupboard
   );
 }
 
-interface DraggableProps {
+interface PieceViewProps {
   /** Where it is drawn, in pixels across the home. */
   box: Box;
   /** How far it has been carried, while it or what it rests on is being dragged. */
   offset: { dx: number; dy: number } | null;
-  scroller: Scroller;
-  onLift: () => void;
-  onDrag: (dx: number, dy: number) => void;
-  onDrop: (dx: number, dy: number) => void;
-  onCancel: () => void;
-  onTap: () => void;
   wobble: boolean;
   label: string;
   children: ReactNode;
 }
 
-function Draggable(props: DraggableProps) {
-  const { box, offset, wobble, label, children } = props;
-  // PanResponder is made once, so it reads the latest props through a ref.
-  const latest = useRef(props);
-  latest.current = props;
-  // How far the home scrolled under the finger during this drag, and the edge scrolling timer.
-  const gesture = useRef({ extra: 0, dx: 0, dy: 0, startX: 0, dir: 0, moved: false });
-  const timer = useRef<ReturnType<typeof setInterval> | null>(null);
-
-  const stopEdgeScroll = () => {
-    if (timer.current) clearInterval(timer.current);
-    timer.current = null;
-  };
-  useEffect(() => stopEdgeScroll, []);
-
-  const responder = useRef(
-    PanResponder.create({
-      onStartShouldSetPanResponder: () => true,
-      onMoveShouldSetPanResponder: () => true,
-      // Keep the page from scrolling while something is being dragged.
-      onPanResponderTerminationRequest: () => false,
-      onPanResponderGrant: (e) => {
-        gesture.current = { extra: 0, dx: 0, dy: 0, startX: e.nativeEvent.pageX, dir: 0, moved: false };
-      },
-      onPanResponderMove: (_, g) => {
-        const now = gesture.current;
-        if (!now.moved) {
-          if (Math.abs(g.dx) < TAP_SLOP && Math.abs(g.dy) < TAP_SLOP) return;
-          now.moved = true;
-          latest.current.onLift();
-        }
-        now.dx = g.dx;
-        now.dy = g.dy;
-        const x = now.startX + g.dx;
-        const { viewWidth } = latest.current.scroller;
-        now.dir = x < EDGE ? -1 : x > viewWidth - EDGE ? 1 : 0;
-        if (now.dir !== 0 && !timer.current) {
-          timer.current = setInterval(() => {
-            const g2 = gesture.current;
-            if (g2.dir === 0) return stopEdgeScroll();
-            g2.extra += latest.current.scroller.scrollBy(g2.dir * EDGE_STEP);
-            latest.current.onDrag(g2.dx + g2.extra, g2.dy);
-          }, 16);
-        }
-        latest.current.onDrag(g.dx + now.extra, g.dy);
-      },
-      onPanResponderRelease: (_, g) => {
-        stopEdgeScroll();
-        const now = gesture.current;
-        if (!now.moved) latest.current.onTap();
-        else latest.current.onDrop(g.dx + now.extra, g.dy);
-      },
-      onPanResponderTerminate: () => {
-        stopEdgeScroll();
-        latest.current.onCancel();
-      },
-    }),
-  ).current;
-
+/** A buddy or thing in the home. Dragging is handled by the layer it sits in. */
+function PieceView({ box, offset, wobble, label, children }: PieceViewProps) {
   return (
     <View
-      {...responder.panHandlers}
       accessible
       accessibilityLabel={label}
       style={[
@@ -645,6 +795,55 @@ function Draggable(props: DraggableProps) {
       ]}
     >
       {children}
+    </View>
+  );
+}
+
+interface GadgetViewProps {
+  gadget: Gadget;
+  box: Box;
+  look: string | undefined;
+  on: boolean;
+  onPress: () => void;
+}
+
+/** A built-in thing to tap: its emoji, or a light switch plate. */
+function GadgetView({ gadget: g, box, look, on, onPress }: GadgetViewProps) {
+  // A disco ball glows with the lights off; a lamp glows while on.
+  const glowing = g.lightSwitch ? !on && !!look : g.glow && on;
+  return (
+    <Pressable
+      onPress={onPress}
+      accessibilityRole="button"
+      accessibilityLabel={g.lightSwitch ? `${g.name}, lights ${on ? 'on' : 'off'}` : g.name}
+      style={[styles.gadget, boxStyle(box)]}
+    >
+      {glowing ? (
+        <View
+          style={[
+            styles.glow,
+            { width: box.height * 2.4, height: box.height * 2.4, left: -box.height * 0.7, top: -box.height * 0.7 },
+          ]}
+        />
+      ) : null}
+      {look ? (
+        <Text style={{ fontSize: Math.round(box.height * 0.8), lineHeight: Math.round(box.height) }}>{look}</Text>
+      ) : (
+        <View style={styles.switchPlate}>
+          <View style={[styles.switchToggle, on ? styles.switchUp : styles.switchDown]} />
+        </View>
+      )}
+    </Pressable>
+  );
+}
+
+/** A built-in table under a ledge: a top and two legs. */
+function TableFixture({ box }: { box: Box }) {
+  return (
+    <View style={[styles.tableFixture, boxStyle(box)]} pointerEvents="none">
+      <View style={styles.tableTop} />
+      <View style={[styles.tableLeg, { left: '8%' }]} />
+      <View style={[styles.tableLeg, { right: '8%' }]} />
     </View>
   );
 }
@@ -833,6 +1032,44 @@ const styles = StyleSheet.create({
   },
   openDoor: { position: 'absolute', top: -2, bottom: -2, borderWidth: 2, borderColor: OUTLINE, borderRadius: 3 },
   piece: { position: 'absolute', alignItems: 'center', justifyContent: 'flex-end' },
+  layer: { position: 'absolute', left: 0, top: 0, right: 0, bottom: 0 },
+  dark: { position: 'absolute', top: 0, bottom: 0, backgroundColor: DARK },
+  gadget: { position: 'absolute', alignItems: 'center', justifyContent: 'flex-end' },
+  switchPlate: {
+    width: '70%',
+    height: '100%',
+    borderRadius: 4,
+    backgroundColor: '#FAFAFA',
+    borderWidth: 2,
+    borderColor: OUTLINE,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  switchToggle: { width: '40%', height: '40%', borderRadius: 2, backgroundColor: '#B0BEC5', borderWidth: 1, borderColor: OUTLINE },
+  switchUp: { marginBottom: '30%' },
+  switchDown: { marginTop: '30%' },
+  tableFixture: { position: 'absolute' },
+  tableTop: { height: '16%', backgroundColor: TRIM, borderWidth: 3, borderColor: OUTLINE, borderRadius: 4 },
+  tableLeg: { position: 'absolute', top: '14%', bottom: 0, width: '7%', backgroundColor: TRIM, borderWidth: 2, borderColor: OUTLINE },
+  bathMat: {
+    position: 'absolute',
+    left: '8%',
+    width: '18%',
+    borderRadius: 10,
+    backgroundColor: '#80CBC4',
+    borderWidth: 2,
+    borderColor: OUTLINE,
+  },
+  playMat: {
+    position: 'absolute',
+    left: '30%',
+    width: '40%',
+    borderRadius: 999,
+    backgroundColor: '#FFCC80',
+    borderWidth: 2,
+    borderColor: OUTLINE,
+    opacity: 0.9,
+  },
   lifted: { transform: [{ scale: 1.08 }], zIndex: 10 },
   wobble: { transform: [{ rotate: '-6deg' }], opacity: 0.85 },
   glow: { position: 'absolute', borderRadius: 999, backgroundColor: 'rgba(255, 214, 102, 0.45)' },

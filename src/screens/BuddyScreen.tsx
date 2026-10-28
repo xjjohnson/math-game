@@ -42,6 +42,7 @@ import {
 } from '@/constants/wardrobe';
 import { colors, fontSizes, radius, spacing } from '@/constants/theme';
 import { useActiveProfile, useProfiles } from '@/store/profiles';
+import { useSettings } from '@/store/settings';
 import type { Operation, Problem, Profile, RoomThing } from '@/types';
 import {
   buddyCompanion,
@@ -107,6 +108,10 @@ export function BuddyScreen() {
   );
   const [tab, setTab] = useState<Tab | null>(profile?.equipped.companion ? null : 'buddies');
   const [area, setArea] = useState(0);
+  /** The middle of the screen, as a share of the home's width; new things land there. */
+  const viewAt = useRef<number | undefined>(undefined);
+  const homeTips = useSettings((s) => s.homeTips);
+  const updateSettings = useSettings((s) => s.update);
   const [game, setGame] = useState<Game | null>(null);
   const rng = useRef(createRng(randomSeed()));
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -187,7 +192,7 @@ export function BuddyScreen() {
     const before = home.find((b) => b.id === buddyId);
     if (before) moveInRoom(profile.id, BUDDY_KEY + before.id, before.spot);
     equip(profile.id, id);
-    setBuddyHome(profile.id, id, true, area);
+    setBuddyHome(profile.id, id, true, area, viewAt.current);
     say(`${nameOf(id)} is with you now!`);
   };
 
@@ -262,7 +267,7 @@ export function BuddyScreen() {
 
   const buy = (itemId: string) => {
     const item = findRoomItem(itemId);
-    const result = buyRoomItem(profile.id, itemId, area);
+    const result = buyRoomItem(profile.id, itemId, area, viewAt.current);
     if (result.ok) {
       playSound('reward');
       say(`${item?.emoji} New ${item?.name.toLowerCase()} in the ${areaName}! Drag it where you like.`);
@@ -286,6 +291,9 @@ export function BuddyScreen() {
           buddies={homeBuddies}
           area={area}
           onAreaChange={setArea}
+          onView={(at) => {
+            viewAt.current = at;
+          }}
           season={seasonOf(month)}
           tidying={tab === 'toys'}
           onPlaceThing={(key, place) => {
@@ -308,6 +316,12 @@ export function BuddyScreen() {
             else if (what === 'oven') say('The oven is warm. Bake something in it!');
             else if (what === 'cupboard' || what === 'wardrobe') say(`Drag small things onto the ${what} shelves.`);
             else if (what === 'door') say(`${name} peeks outside. Hello, world!`);
+            else if (what !== 'curtains') say(`Drag small things into the ${what}.`);
+          }}
+          onTapGadget={(g, on) => {
+            if (g.lightSwitch) say(on ? 'Lights on! 💡' : g.fx ? `Party time! ${g.fx}` : 'Lights off. Night night! 🌙');
+            else if (g.glow) say(on ? `${name} turns on the ${g.name}. ✨` : `${name} turns off the ${g.name}.`);
+            else if (g.says) say(`${name} ${g.says}! ${g.fx ?? ''}`);
           }}
         />
 
@@ -329,9 +343,9 @@ export function BuddyScreen() {
                   accessibilityRole="button"
                   accessibilityLabel={a.name}
                   accessibilityState={{ selected: area === i }}
-                  style={({ pressed }) => [styles.round, area === i && styles.roundOn, pressed && styles.pressed]}
+                  style={({ pressed }) => [styles.round, styles.roomButton, area === i && styles.roundOn, pressed && styles.pressed]}
                 >
-                  <Text style={styles.roundText}>{a.emoji}</Text>
+                  <Text style={styles.roomText}>{a.emoji}</Text>
                 </Pressable>
               ))}
             </View>
@@ -341,14 +355,40 @@ export function BuddyScreen() {
               </Text>
             </View>
           </View>
-          {buddyId ? (
-            <View style={styles.tag}>
-              <Text style={styles.tagText}>
-                {name} · Lv {level} · ❤️ {hearts}
-              </Text>
+          {!homeTips ? (
+            <Pressable
+              onPress={() => updateSettings({ homeTips: true })}
+              accessibilityRole="button"
+              accessibilityLabel="Show tips"
+              style={({ pressed }) => [styles.round, styles.tipsButton, pressed && styles.pressed]}
+            >
+              <Text style={styles.roomText}>💬</Text>
+            </Pressable>
+          ) : null}
+          {homeTips ? (
+            <View style={styles.tagRow}>
+              {buddyId ? (
+                <View style={styles.tag}>
+                  <Text style={styles.tagText}>
+                    {name} · Lv {level} · ❤️ {hearts}
+                  </Text>
+                </View>
+              ) : null}
+              <Pressable
+                onPress={() => {
+                  updateSettings({ homeTips: false });
+                  setLine(null);
+                }}
+                accessibilityRole="button"
+                accessibilityLabel="Hide tips"
+                hitSlop={8}
+                style={({ pressed }) => [styles.tag, pressed && styles.pressed]}
+              >
+                <Text style={styles.tagText}>✕ Hide</Text>
+              </Pressable>
             </View>
           ) : null}
-          {line ? (
+          {line && homeTips ? (
             <View style={styles.bubble}>
               <Text style={styles.bubbleText} accessibilityLiveRegion="polite">
                 {line}
@@ -425,7 +465,7 @@ export function BuddyScreen() {
               <ToyDrawer
                 stored={profile.room.things.filter((t) => !t.placed)}
                 areaName={areaName}
-                onTakeOut={(key) => setPlaced(profile.id, key, true, area)}
+                onTakeOut={(key) => setPlaced(profile.id, key, true, area, viewAt.current)}
               />
             ) : null}
             {!game && tab === 'buddies' ? (
@@ -436,7 +476,7 @@ export function BuddyScreen() {
                 using={buddyId}
                 onPick={switchTo}
                 onHome={(id, atHome) => {
-                  setBuddyHome(profile.id, id, atHome, area);
+                  setBuddyHome(profile.id, id, atHome, area, viewAt.current);
                   say(atHome ? `${nameOf(id)} came over to play!` : `${nameOf(id)} went off for a nap. 💤`);
                 }}
               />
@@ -718,7 +758,8 @@ function ShopDrawer({ coins, month, area, full, onBuy }: ShopDrawerProps) {
   const groups = ROOM_ITEM_GROUPS.filter((g) => ROOM_ITEMS.some((i) => i.group === g.id && inSeason(i, month)));
   const [picked, setShelf] = useState<RoomItemGroup | null>(null);
   const holiday = groups.find((g) => ROOM_ITEMS.some((i) => i.group === g.id && i.month === month));
-  const shelf = picked ?? holiday?.id ?? HOME_AREAS[area]?.id ?? 'living';
+  const here = HOME_AREAS[area]?.id ?? 'living';
+  const shelf = picked ?? holiday?.id ?? (here === 'playroom' ? 'toys' : here);
   const areaName = HOME_AREAS[area]?.name.toLowerCase() ?? 'room';
   return (
     <>
@@ -930,6 +971,10 @@ const styles = StyleSheet.create({
   },
   roundOn: { backgroundColor: '#FFE082' },
   roundText: { fontSize: 22 },
+  roomButton: { width: 40, height: 40, borderRadius: 20 },
+  roomText: { fontSize: 19 },
+  tipsButton: { width: 40, height: 40, borderRadius: 20, alignSelf: 'flex-end' },
+  tagRow: { flexDirection: 'row', gap: spacing.xs, alignItems: 'center' },
   coins: {
     minHeight: 48,
     paddingHorizontal: spacing.sm,
