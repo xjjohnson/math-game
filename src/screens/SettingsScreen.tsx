@@ -11,7 +11,7 @@ import { useAppUpdate, type UpdateStatus } from '@/hooks/useAppUpdate';
 import { useOtaUpdate } from '@/hooks/useOtaUpdate';
 import { useSettings, type ReduceMotion, type Settings } from '@/store/settings';
 
-type ToggleKey = Exclude<keyof Settings, 'reduceMotion' | 'parentPin' | 'coinPayout'>;
+type ToggleKey = Exclude<keyof Settings, 'reduceMotion' | 'coinPayout'>;
 
 const TOGGLES: { key: ToggleKey; label: string }[] = [
   { key: 'sound', label: 'Sound effects' },
