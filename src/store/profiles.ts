@@ -9,7 +9,16 @@ import type { Difficulty, Grade, InputStyle, Profile, RoomSpot } from '@/types';
 import { dateKey } from '@/utils/dates';
 import { applyRound, type RoundOutcome, type RoundResult } from '@/utils/progress';
 import { careForBuddy as applyCare, heartForRound, type CareAction, type CareResult } from '@/utils/buddy';
-import { buyRoomItem, emptyRoom, moveInRoom, nextPaint, setPlaced, type RoomBuyResult } from '@/utils/room';
+import {
+  buyRoomItem,
+  emptyRoom,
+  moveInRoom,
+  nextPaint,
+  setBuddyHome,
+  setPlaced,
+  upgradeRoom,
+  type RoomBuyResult,
+} from '@/utils/room';
 import { buyItem, equipItem, freeAvatars, type BuyResult } from '@/utils/shop';
 
 function emptyStats(): Profile['stats'] {
@@ -75,11 +84,14 @@ interface ProfilesState {
   adjustBalance: (id: string, change: { coins?: number; stars?: number }) => void;
   /** Pets, feeds or plays with the buddy in use. */
   careForBuddy: (id: string, action: CareAction) => CareResult;
-  buyRoomItem: (id: string, itemId: string) => RoomBuyResult;
-  /** Moves a thing in the buddy's room, or the buddy itself when `key` is "buddy". */
+  /** Buys a thing for the buddies' home and sets it down in `area` (an index into HOME_AREAS). */
+  buyRoomItem: (id: string, itemId: string, area: number) => RoomBuyResult;
+  /** Moves a thing in the home, or a buddy when `key` is BUDDY_KEY plus its id. */
   moveInRoom: (id: string, key: string, spot: RoomSpot) => void;
-  setPlaced: (id: string, key: string, placed: boolean) => void;
-  paintRoom: (id: string, part: 'wall' | 'floor') => void;
+  setPlaced: (id: string, key: string, placed: boolean, area: number) => void;
+  paintRoom: (id: string, part: 'wall' | 'floor', area: number) => void;
+  /** Invites a buddy into the home, or sends it off for a nap. */
+  setBuddyHome: (id: string, buddyId: string, home: boolean, area: number) => void;
 }
 
 export const useProfiles = create<ProfilesState>()(
@@ -146,10 +158,10 @@ export const useProfiles = create<ProfilesState>()(
         }
         return result;
       },
-      buyRoomItem: (id, itemId) => {
+      buyRoomItem: (id, itemId, area) => {
         const current = get().profiles.find((p) => p.id === id);
         if (!current) return { ok: false, reason: 'unknown' };
-        const result = buyRoomItem(current, itemId, newId());
+        const result = buyRoomItem(current, itemId, newId(), area);
         if (result.ok) {
           set((s) => ({ profiles: s.profiles.map((p) => (p.id === id ? result.profile : p)) }));
         }
@@ -159,16 +171,20 @@ export const useProfiles = create<ProfilesState>()(
         set((s) => ({
           profiles: s.profiles.map((p) => (p.id === id ? moveInRoom(p, key, spot) : p)),
         })),
-      setPlaced: (id, key, placed) =>
+      setPlaced: (id, key, placed, area) =>
         set((s) => ({
-          profiles: s.profiles.map((p) => (p.id === id ? setPlaced(p, key, placed) : p)),
+          profiles: s.profiles.map((p) => (p.id === id ? setPlaced(p, key, placed, area) : p)),
         })),
-      paintRoom: (id, part) =>
-        set((s) => ({ profiles: s.profiles.map((p) => (p.id === id ? nextPaint(p, part) : p)) })),
+      paintRoom: (id, part, area) =>
+        set((s) => ({ profiles: s.profiles.map((p) => (p.id === id ? nextPaint(p, part, area) : p)) })),
+      setBuddyHome: (id, buddyId, home, area) =>
+        set((s) => ({
+          profiles: s.profiles.map((p) => (p.id === id ? setBuddyHome(p, buddyId, home, area) : p)),
+        })),
     }),
     {
       name: 'math-game.profiles',
-      version: 7,
+      version: 8,
       storage: persistStorage,
       migrate: (persisted, version) => {
         const state = persisted as Pick<ProfilesState, 'profiles' | 'activeProfileId'>;
@@ -211,6 +227,14 @@ export const useProfiles = create<ProfilesState>()(
           // Version 7 added grade levels. Start near the classic level they last played.
           const nearest: Record<Difficulty, Grade> = { easy: 1, medium: 3, hard: 5 };
           state.profiles = state.profiles.map((p) => ({ ...p, grade: p.grade ?? nearest[p.lastDifficulty] ?? DEFAULT_GRADE }));
+        }
+        if (version < 8) {
+          // Version 8 grew the one room into a home with areas and room for several buddies.
+          // The old room becomes the living room, with the buddy in use where it stood.
+          state.profiles = state.profiles.map((p) => ({
+            ...p,
+            room: upgradeRoom(p.room, p.equipped?.companion ?? null),
+          }));
         }
         return state as ProfilesState;
       },

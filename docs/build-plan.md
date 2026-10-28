@@ -218,6 +218,7 @@ Phases 1-6 deliver a complete single-player game before any native Bluetooth wor
 - [x] Themed backgrounds with faint pictures: space, ocean, jungle, candy, dinos, rainbow, snow, backyard, beach
 - [x] More buddies (bunny, panda, fox, penguin, octopus, unicorn) and a "My buddy" home: pet, treats, a fetch math game, hearts, levels 1-5 with a gift worn at each level
 - [x] Buddy room in a side-view dollhouse style: 20 things to buy with coins (furniture, toys, food bowl, decorations), drag to place, toy box to put away, free wall and floor colors
+- [x] Buddy home that scrolls left and right through a living room, kitchen and bedroom (each with its own free paint), several buddies home at once, 45 everyday things in shop shelves, and 10 Halloween things sold only in October (bought ones stay all year); drag a thing to the side to carry it to the next room
 
 ---
 
