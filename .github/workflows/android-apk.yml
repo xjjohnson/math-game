@@ -1,6 +1,10 @@
-# Builds the Android app and posts it as a download on the "Latest Android app"
-# release, so phones can install it straight from GitHub. Runs on every merge
-# to main, or by hand from the Actions tab ("Run workflow").
+# Ships each merge to main to the phones, one of two ways:
+# - Only the JavaScript changed: publish it over the air with EAS Update. The
+#   app downloads it by itself; no new APK, no 30 minute build.
+# - Native code changed (new native library, Nearby module, permissions, Expo
+#   upgrade), or there's no EXPO_TOKEN secret: build the APK and post it on the
+#   "Latest Android app" release, where the app's Update now button finds it.
+# Running it by hand from the Actions tab ("Run workflow") always builds the APK.
 name: Android APK
 
 on:
@@ -27,13 +31,6 @@ jobs:
           node-version: 22
           cache: npm
 
-      - uses: actions/setup-java@v4
-        with:
-          distribution: temurin
-          java-version: 17
-
-      - uses: gradle/actions/setup-gradle@v4
-
       - run: npm ci
 
       - name: Typecheck and tests
@@ -41,29 +38,91 @@ jobs:
           npm run typecheck
           npm test -- --ci
 
+      # The runtime version is a fingerprint of the native side of the app.
+      # The released APK records its own in version.json; when this commit's
+      # matches, an over-the-air update fits the phones as they are.
+      - name: Decide between an over-the-air update and a new APK
+        id: plan
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+          EVENT: ${{ github.event_name }}
+        run: |
+          field() { node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{try{console.log(JSON.parse(s)[process.argv[1]]??"")}catch{console.log("")}})' "$1"; }
+          runtime=$(npx expo-updates runtimeversion:resolve --platform android | field runtimeVersion)
+          released=$(curl -fsSL "https://github.com/${GITHUB_REPOSITORY}/releases/download/latest-apk/version.json" || echo '{}')
+          released_runtime=$(echo "$released" | field runtime)
+          released_build=$(echo "$released" | field build)
+          echo "This commit: runtime $runtime. Released APK: build ${released_build:-none}, runtime ${released_runtime:-none}."
+          if [ -z "$runtime" ]; then
+            echo "Couldn't work out the runtime version." >&2
+            exit 1
+          fi
+          if [ "$EVENT" = "push" ] && [ -n "$EXPO_TOKEN" ] && [ -n "$released_build" ] && [ "$runtime" = "$released_runtime" ]; then
+            mode=ota
+          else
+            mode=apk
+          fi
+          echo "Shipping as: $mode"
+          echo "mode=$mode" >> "$GITHUB_OUTPUT"
+          echo "runtime=$runtime" >> "$GITHUB_OUTPUT"
+          echo "released_build=$released_build" >> "$GITHUB_OUTPUT"
+
+      # The update keeps the installed APK's build number, so Update now still
+      # compares against the APK that's actually on the phone.
+      - name: Publish over the air
+        if: steps.plan.outputs.mode == 'ota'
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+          EXPO_PUBLIC_BUILD_NUMBER: ${{ steps.plan.outputs.released_build }}
+          EXPO_NO_TELEMETRY: 1
+          MESSAGE: ${{ github.event.head_commit.message }}
+        run: |
+          npx -y eas-cli@26 update --channel production --environment production \
+            --platform android --non-interactive \
+            --message "$(echo "$MESSAGE" | head -n 1 | cut -c1-200)"
+
+      - uses: actions/setup-java@v4
+        if: steps.plan.outputs.mode == 'apk'
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - uses: gradle/actions/setup-gradle@v4
+        if: steps.plan.outputs.mode == 'apk'
+
       - name: Generate the Android project
+        if: steps.plan.outputs.mode == 'apk'
         run: npx expo prebuild --platform android --no-install
         env:
           EXPO_NO_TELEMETRY: 1
 
-      # The app compares this number with version.json on the release to offer updates.
+      # The app compares this number with version.json on the release to offer
+      # updates. The fingerprint override bakes in exactly the runtime version
+      # written to version.json, so later over-the-air updates match it.
       - name: Build the APK
+        if: steps.plan.outputs.mode == 'apk'
         working-directory: android
         run: ./gradlew assembleRelease --no-daemon
         env:
           EXPO_PUBLIC_BUILD_NUMBER: ${{ github.run_number }}
+          EXPO_UPDATES_FINGERPRINT_OVERRIDE: ${{ steps.plan.outputs.runtime }}
 
       - name: Name the APK and write its version
+        if: steps.plan.outputs.mode == 'apk'
+        env:
+          RUNTIME: ${{ steps.plan.outputs.runtime }}
         run: |
           cp android/app/build/outputs/apk/release/app-release.apk math-game.apk
-          echo "{\"build\": ${{ github.run_number }}, \"sha\": \"${GITHUB_SHA::7}\"}" > version.json
+          echo "{\"build\": ${{ github.run_number }}, \"sha\": \"${GITHUB_SHA::7}\", \"runtime\": \"$RUNTIME\"}" > version.json
 
       - uses: actions/upload-artifact@v4
+        if: steps.plan.outputs.mode == 'apk'
         with:
           name: math-game-apk
           path: math-game.apk
 
       - name: Post it on the "Latest Android app" release
+        if: steps.plan.outputs.mode == 'apk'
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
@@ -71,4 +130,4 @@ jobs:
           gh release create latest-apk math-game.apk version.json \
             --target "$GITHUB_SHA" \
             --title "Latest Android app" \
-            --notes "Build ${{ github.run_number }}, from ${GITHUB_REF_NAME} at ${GITHUB_SHA::7}. To install, open this page on the phone, tap math-game.apk, and allow installing from your browser when asked. Once installed, the app offers new versions itself on its Home screen."
+            --notes "Build ${{ github.run_number }}, from ${GITHUB_REF_NAME} at ${GITHUB_SHA::7}. To install, open this page on the phone, tap math-game.apk, and allow installing from your browser when asked. Once installed, the app offers new versions itself on its Home screen. Smaller changes arrive over the air without a new APK."

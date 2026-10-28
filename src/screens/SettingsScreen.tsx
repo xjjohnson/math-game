@@ -8,6 +8,7 @@ import { Screen } from '@/components/Screen';
 import { BUILD_NUMBER } from '@/constants/build';
 import { colors, fontSizes, spacing, TAP_TARGET } from '@/constants/theme';
 import { useAppUpdate, type UpdateStatus } from '@/hooks/useAppUpdate';
+import { useOtaUpdate } from '@/hooks/useOtaUpdate';
 import { useSettings, type ReduceMotion, type Settings } from '@/store/settings';
 
 type ToggleKey = Exclude<keyof Settings, 'reduceMotion' | 'parentPin' | 'coinPayout'>;
@@ -70,6 +71,7 @@ const UPDATE_TEXT: Record<UpdateStatus, string> = {
 
 function AppVersion() {
   const { canUpdate, status, latest, checkAgain, install } = useAppUpdate();
+  const ota = useOtaUpdate();
   if (!canUpdate) {
     return <Text style={styles.note}>App updates are only for the Android app from GitHub.</Text>;
   }
@@ -77,6 +79,7 @@ function AppVersion() {
     <View style={styles.section}>
       <Text style={styles.note}>
         Version: build {BUILD_NUMBER}
+        {ota.runningId ? ` + update ${ota.runningId}` : ''}
         {latest ? ` · newest is build ${latest}` : ''}. {UPDATE_TEXT[status]}
       </Text>
       {status === 'available' || status === 'downloading' || status === 'error' ? (
@@ -86,6 +89,8 @@ function AppVersion() {
           disabled={status === 'downloading'}
           onPress={install}
         />
+      ) : ota.ready ? (
+        <BigButton label="Restart to get new stuff" color={colors.correct} onPress={ota.restart} />
       ) : (
         <BigButton
           label="Check for updates"

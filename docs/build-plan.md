@@ -30,6 +30,7 @@ Cross-platform interactive math learning game for kids (ages 5-15), React Native
 - Zustand + persist middleware on AsyncStorage (coins, stars, streaks, unlocks, high scores, profile stats, settings)
 - React Native Reanimated (card flips, answer pops, celebrations)
 - expo-audio (sound effects), expo-speech (text-to-speech), expo-haptics (Android)
+- expo-updates + EAS Update (over-the-air updates, Expo free plan, project `math-game` in team xjjohnsonxs-team)
 
 ---
 
@@ -144,6 +145,15 @@ Cross-platform interactive math learning game for kids (ages 5-15), React Native
 10. **Device testing and APK build**
 
 Phases 1-6 deliver a complete single-player game before any native Bluetooth work, so the riskiest part cannot block the rest.
+
+---
+
+## Updates
+
+- **JavaScript-only changes ship over the air** with EAS Update (channel `production`). On each merge the Android workflow compares the native fingerprint (runtime version) with the released APK's; if it matches, it skips the APK build and runs `eas update`. Phones download it in the background at launch, and Home offers "Restart to get it". Needs the `EXPO_TOKEN` repository secret.
+- **Native changes ship as a new APK** (new native libraries, the Nearby module, permissions, icon/name, Expo SDK upgrades, app.json changes). The fingerprint changes, the workflow builds the APK, and the in-app Update now button offers it. Running the workflow by hand always builds an APK.
+- **Multiplayer:** phones on different updates can still play as long as `PROTOCOL_VERSION` matches; it is already checked in the hello/welcome handshake. Bump it whenever messages change shape.
+- Free plan covers 1,000 monthly active devices with no overage charges, far above family use.
 
 ---
 
