@@ -279,6 +279,91 @@ export function Flicker({
   );
 }
 
+/**
+ * Bobs up and down on its own rhythm: a little jiggle at rest, and jumps `rise` high while `active`
+ * (a ball in a ball pit someone is bouncing in). Still when motion is off.
+ */
+export function Bob({
+  children,
+  seed,
+  rise,
+  active,
+  style,
+}: {
+  children: ReactNode;
+  seed: string;
+  rise: number;
+  active: boolean;
+  style?: StyleProp<ViewStyle>;
+}) {
+  const { animate } = useMotion();
+  const t = useSharedValue(0);
+  useEffect(() => {
+    if (!animate) {
+      t.value = 0;
+      return;
+    }
+    const r = seedOf(seed);
+    const up = active ? 1 : 0.07;
+    const ms = active ? 300 + r * 260 : 900 + r * 700;
+    t.value = withDelay(
+      Math.round(r * (active ? 250 : 900)),
+      withRepeat(
+        withSequence(
+          withTiming(up, { duration: ms, easing: Easing.out(Easing.quad) }),
+          withTiming(0, { duration: ms, easing: Easing.in(Easing.quad) }),
+        ),
+        -1,
+      ),
+    );
+    return () => cancelAnimation(t);
+  }, [animate, active, seed, t]);
+  const look = useAnimatedStyle(() => ({ transform: [{ translateY: -rise * t.value }] }));
+  return (
+    <Animated.View pointerEvents="none" style={[style, look]}>
+      {children}
+    </Animated.View>
+  );
+}
+
+/** Turns round and round while `active`, like the drum of a washing machine. Still when motion is off. */
+export function Spin({ children, active, style }: { children: ReactNode; active: boolean; style?: StyleProp<ViewStyle> }) {
+  const { animate } = useMotion();
+  const t = useSharedValue(0);
+  useEffect(() => {
+    if (!animate || !active) {
+      cancelAnimation(t);
+      return;
+    }
+    t.value = 0;
+    t.value = withRepeat(withTiming(1, { duration: 900, easing: Easing.linear }), -1);
+    return () => cancelAnimation(t);
+  }, [animate, active, t]);
+  const look = useAnimatedStyle(() => ({ transform: [{ rotate: `${t.value * 360}deg` }] }));
+  return (
+    <Animated.View pointerEvents="none" style={[style, look]}>
+      {children}
+    </Animated.View>
+  );
+}
+
+/** Shakes a little side to side while `active`, like a washing machine on spin. Still when motion is off. */
+export function Rumble({ children, active, style }: { children: ReactNode; active: boolean; style?: StyleProp<ViewStyle> }) {
+  const { animate } = useMotion();
+  const t = useSharedValue(0);
+  useEffect(() => {
+    if (!animate || !active) {
+      cancelAnimation(t);
+      t.value = withTiming(0, { duration: 80 });
+      return;
+    }
+    t.value = withRepeat(withSequence(withTiming(1, { duration: 70 }), withTiming(-1, { duration: 140 }), withTiming(0, { duration: 70 })), -1);
+    return () => cancelAnimation(t);
+  }, [animate, active, t]);
+  const look = useAnimatedStyle(() => ({ transform: [{ translateX: t.value * 1.5 }, { rotate: `${t.value * 0.6}deg` }] }));
+  return <Animated.View style={[style, look]}>{children}</Animated.View>;
+}
+
 const CONFETTI_COLORS = ['#FF6B6B', '#FFD93D', '#6BCB77', '#4D96FF', '#C77DFF', '#FF9F45'];
 
 interface ConfettiProps {

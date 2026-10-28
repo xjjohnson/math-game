@@ -1,6 +1,6 @@
 import { Pressable, StyleSheet, View, type ViewStyle } from 'react-native';
 
-import { Flicker } from '@/components/Motion';
+import { Bob, Flicker } from '@/components/Motion';
 import type { Appliance } from '@/constants/room';
 
 const OUTLINE = '#5B3A24';
@@ -142,53 +142,67 @@ function Tub({ w, h, on }: Drawn) {
 
 /** A toilet: tap to lift the lid, tap again to put it down (and flush). */
 function Toilet({ w, h, on }: Drawn) {
-  const tank = { left: w * 0.15, top: 0, width: w * 0.7, height: h * 0.42 };
-  const bowlTop = h * 0.5;
+  const tank = { left: w * 0.18, top: 0, width: w * 0.64, height: h * 0.4 };
+  const seatTop = h * 0.46;
+  const seatH = h * 0.1;
   return (
     <>
-      <View style={[styles.porcelain, { ...tank, position: 'absolute', borderRadius: 6 }]} />
-      <View style={[styles.flush, at(w * 0.62, h * 0.08, w * 0.14, h * 0.05)]} />
+      <View style={[styles.porcelain, { ...tank, position: 'absolute', borderTopLeftRadius: 10, borderTopRightRadius: 10, borderBottomLeftRadius: 4, borderBottomRightRadius: 4 }]} />
+      <View style={[styles.flush, at(w * 0.6, h * 0.07, w * 0.16, h * 0.045)]} />
+      {/* The pipe from the tank down to the bowl. */}
+      <View style={[styles.porcelain, at(w * 0.42, tank.height - 3, w * 0.16, seatTop - tank.height + 6), { borderWidth: 2.5 }]} />
       {on ? (
         // The lid stands up against the tank.
-        <View style={[styles.porcelain, at(w * 0.1, h * 0.12, w * 0.8, h * 0.36), { borderRadius: w * 0.4 }]} />
+        <View style={[styles.lid, at(w * 0.14, h * 0.06, w * 0.72, seatTop - h * 0.04), { borderRadius: w * 0.36 }]} />
       ) : null}
-      <View style={[styles.porcelain, at(w * 0.05, bowlTop, w * 0.9, h * 0.14), { borderRadius: w }]}>
+      {/* The bowl, round at the bottom, on a narrow foot. */}
+      <View style={[styles.porcelain, at(w * 0.35, h * 0.78, w * 0.3, h * 0.22), { borderBottomLeftRadius: 6, borderBottomRightRadius: 6 }]} />
+      <View style={[styles.porcelain, at(w * 0.1, seatTop + seatH * 0.5, w * 0.8, h * 0.36), { borderBottomLeftRadius: w * 0.4, borderBottomRightRadius: w * 0.4 }]} />
+      <View style={[on ? styles.seatUp : styles.seat, at(w * 0.02, seatTop, w * 0.96, seatH), { borderRadius: w }]}>
         {on ? <View style={[styles.waterDark, { margin: 3, borderRadius: w }]} /> : null}
       </View>
-      <View
-        style={[
-          styles.porcelain,
-          at(w * 0.2, bowlTop + h * 0.12, w * 0.6, h - bowlTop - h * 0.12),
-          { borderBottomLeftRadius: 8, borderBottomRightRadius: 8 },
-        ]}
-      />
     </>
   );
 }
 
 const BALL_COLORS = ['#EF5350', '#42A5F5', '#FFCA28', '#66BB6A', '#AB47BC', '#FF7043', '#26C6DA'];
 
-/** A ball pit; switched on, the balls jump about. */
+/** A ball pit heaped with balls that jiggle; switched on, they bounce high. */
 function BallPit({ w, h, on }: Drawn) {
-  const ball = h * 0.42;
-  const balls = Array.from({ length: 12 }, (_, i) => ({
-    x: (i % 6) * (w - ball) / 5,
-    y: i < 6 ? h * 0.05 : -h * 0.25,
-    color: BALL_COLORS[i % BALL_COLORS.length],
-  }));
+  const ball = h * 0.32;
+  const wallTop = h * 0.42;
+  // Three rows, back to front, each a little lower and shifted half a ball.
+  const rows = [h * 0.04, h * 0.14, h * 0.24];
+  const across = Math.max(4, Math.floor((w - ball * 0.4) / (ball * 0.92)));
+  const step = (w - ball) / (across - 1);
   return (
     <>
-      {balls.map((b, i) => (
-        <View
-          key={i}
-          style={[
-            styles.ball,
-            at(b.x + (i % 2 ? 2 : -2), b.y - (on ? (i % 3) * h * 0.35 + h * 0.2 : 0), ball, ball),
-            { backgroundColor: b.color, borderRadius: ball },
-          ]}
-        />
-      ))}
-      <View style={[styles.pit, at(0, h * 0.35, w, h * 0.65)]} />
+      {rows.map((y, row) =>
+        Array.from({ length: across - (row % 2) }, (_, i) => {
+          const n = row * across + i;
+          const color = BALL_COLORS[(n * 3 + row) % BALL_COLORS.length];
+          return (
+            <Bob
+              key={n}
+              seed={`ball-${n}`}
+              rise={h * (0.8 + ((n * 7) % 5) * 0.2)}
+              active={on}
+              style={at(i * step + (row % 2) * step * 0.5, y, ball, ball)}
+            >
+              <View style={[styles.ball, { flex: 1, backgroundColor: color, borderRadius: ball }]}>
+                <View style={[styles.ballShine, { width: ball * 0.28, height: ball * 0.28, borderRadius: ball }]} />
+              </View>
+            </Bob>
+          );
+        }),
+      )}
+      {/* A padded wall around the front, with a soft rim on top. */}
+      <View style={[styles.pit, at(0, wallTop, w, h - wallTop)]}>
+        {Array.from({ length: Math.max(3, Math.round(w / (h * 0.9))) }, (_, i) => (
+          <View key={i} style={[styles.pad, i % 2 ? styles.padAlt : null]} />
+        ))}
+      </View>
+      <View style={[styles.rim, at(-3, wallTop - h * 0.04, w + 6, h * 0.14), { borderRadius: h }]} />
     </>
   );
 }
@@ -264,7 +278,14 @@ const styles = StyleSheet.create({
   flush: { backgroundColor: '#B0BEC5', borderWidth: 1.5, borderColor: OUTLINE, borderRadius: 3 },
   waterDark: { flex: 1, backgroundColor: WATER },
   ball: { borderWidth: 1.5, borderColor: OUTLINE },
-  pit: { backgroundColor: '#29B6F6', borderWidth: 3, borderColor: OUTLINE, borderRadius: 10 },
+  ballShine: { position: 'absolute', left: '18%', top: '16%', backgroundColor: 'rgba(255,255,255,0.7)' },
+  pit: { flexDirection: 'row', backgroundColor: '#29B6F6', borderWidth: 3, borderColor: OUTLINE, borderRadius: 10, overflow: 'hidden' },
+  pad: { flex: 1, backgroundColor: '#29B6F6', borderRightWidth: 2, borderColor: 'rgba(0,0,0,0.15)' },
+  padAlt: { backgroundColor: '#4FC3F7' },
+  rim: { backgroundColor: '#FFCA28', borderWidth: 3, borderColor: OUTLINE },
+  lid: { backgroundColor: PORCELAIN, borderWidth: 3, borderColor: OUTLINE },
+  seat: { backgroundColor: PORCELAIN, borderWidth: 3, borderColor: OUTLINE },
+  seatUp: { backgroundColor: '#E0E0E0', borderWidth: 3, borderColor: OUTLINE },
   leg: { backgroundColor: TRIM, borderWidth: 2, borderColor: OUTLINE },
   board: { backgroundColor: '#2E5E4E', borderWidth: 6, borderColor: TRIM, borderRadius: 4, overflow: 'hidden' },
   tray: { backgroundColor: TRIM, borderWidth: 2, borderColor: OUTLINE, borderRadius: 3 },

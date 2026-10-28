@@ -17,11 +17,13 @@ import { Candle } from '@/components/Candle';
 import { BuddyFigure, type Dressed } from '@/components/BuddyFigure';
 import { PersonFigure, type PersonDressed } from '@/components/PersonFigure';
 import { Furniture } from '@/components/Furniture';
-import { Drifting, Flicker, FloatUp, Lively, type BounceKind } from '@/components/Motion';
+import { Lamp } from '@/components/Lamp';
+import { Bob, Drifting, Flicker, FloatUp, Lively, Rumble, Spin, type BounceKind } from '@/components/Motion';
 import { PopIn } from '@/components/PopIn';
 import { ApplianceView } from '@/components/Appliance';
 import {
   APPLIANCES,
+  BUILT_IN_SEATS,
   CHALK_DRAWINGS,
   CUPBOARDS,
   FLOOR_COLORS,
@@ -44,7 +46,6 @@ import {
   gadgetBox,
   homeSize,
   layoutHome,
-  OPEN_DOOR,
   pieceAt,
   ridersOf,
   shelvesOf,
@@ -88,8 +89,10 @@ interface Props {
   onToggle?: (name: string, open: boolean) => void;
   /** A built-in thing was tapped; `on` is whether it is now switched on. */
   onTapGadget?: (gadget: Gadget, on: boolean) => void;
-  /** An appliance was tapped: whether it is now on, and a chalkboard's drawing. */
-  onTapAppliance?: (appliance: Appliance, on: boolean, step: number) => void;
+  /** An appliance was tapped: whether it is now on, a chalkboard's drawing, and the buddies sitting in it. */
+  onTapAppliance?: (appliance: Appliance, on: boolean, step: number, inside: string[]) => void;
+  /** A washing machine started (`on`) or stopped; `done` when it finished by itself. */
+  onWash?: (on: boolean, done: boolean) => void;
   /** Change `n` to have that buddy hop and wave, as when it levels up. */
   cheer?: { buddyId: string; n: number };
 }
@@ -104,6 +107,8 @@ const EDGE = 40;
 const EDGE_STEP = 10;
 /** How long a tap's little picture floats over a thing. */
 const POP_MS = 1300;
+/** How long a washing machine runs. */
+const WASH_MS = 6000;
 
 /** Built-ins that are only drawn, plus the front door and windows that open and shut. */
 const FRONT_DOOR: FixtureSpot = { area: 'living', left: 0.06, width: 0.2, bottom: 0, height: 0.56 };
@@ -159,7 +164,7 @@ interface Pop {
  */
 export function BuddyRoom(props: Props) {
   const { room, buddies, area, onAreaChange, onView, tidying, season, onPlaceThing, onPlaceBuddy } = props;
-  const { onTapThing, onTapBuddy, onToggle, onTapGadget, onTapAppliance, cheer } = props;
+  const { onTapThing, onTapBuddy, onToggle, onTapGadget, onTapAppliance, onWash, cheer } = props;
   const [view, setView] = useState({ width: 0, height: 0 });
   const [open, setOpen] = useState<ReadonlySet<string>>(new Set());
   const [lit, setLit] = useState<ReadonlySet<string>>(new Set());
@@ -177,6 +182,7 @@ export function BuddyRoom(props: Props) {
   const drawn = useRef(false);
   const popId = useRef(0);
   const popTimers = useRef<ReturnType<typeof setTimeout>[]>([]);
+  const washTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const scroll = useRef<ScrollViewInstance>(null);
   const frameRef = useRef<HostInstance>(null);
   /** The home's top left corner on the page, for working out what a finger is on. */
@@ -191,6 +197,7 @@ export function BuddyRoom(props: Props) {
   useEffect(
     () => () => {
       popTimers.current.forEach(clearTimeout);
+      if (washTimer.current) clearTimeout(washTimer.current);
       if (edgeTimer.current) clearInterval(edgeTimer.current);
     },
     [],
@@ -358,21 +365,50 @@ export function BuddyRoom(props: Props) {
     return pools.filter((l) => inDark(l.x));
   };
 
+  const setRun = (id: string, on: boolean) =>
+    setRunning((set) => {
+      const next = new Set(set);
+      if (on) next.add(id);
+      else next.delete(id);
+      return next;
+    });
+
+  /** Starts or stops a washing machine; it stops by itself after a while. */
+  const wash = (c: Cupboard) => {
+    const on = !running.has(c.id);
+    setRun(c.id, on);
+    if (washTimer.current) clearTimeout(washTimer.current);
+    washTimer.current = null;
+    if (on) {
+      const box = fixtureBox(c, size);
+      pop(box.left + box.width / 2, box.top, '🫧');
+      washTimer.current = setTimeout(() => {
+        washTimer.current = null;
+        setRun(c.id, false);
+        onWash?.(false, true);
+      }, WASH_MS);
+    }
+    onWash?.(on, false);
+  };
+
   const tapAppliance = (a: Appliance) => {
+    const inside = pieces
+      .filter((p) => p.buddyId && p.builtIn && BUILT_IN_SEATS.find((s) => s.id === p.builtIn)?.appliance === a.id)
+      .map((p) => p.buddyId as string);
     if (a.kind === 'chalkboard') {
       const step = ((steps[a.id] ?? 0) + 1) % CHALK_DRAWINGS.length;
       setSteps((all) => ({ ...all, [a.id]: step }));
-      onTapAppliance?.(a, step > 0, step);
+      onTapAppliance?.(a, step > 0, step, inside);
       return;
     }
     const on = !running.has(a.id);
-    setRunning((set) => {
-      const next = new Set(set);
-      if (on) next.add(a.id);
-      else next.delete(a.id);
-      return next;
-    });
-    onTapAppliance?.(a, on, 0);
+    setRun(a.id, on);
+    const box = fixtureBox(a, size);
+    // Putting the lid down flushes.
+    if (a.kind === 'toilet' && !on) pop(box.left + box.width / 2, box.top + box.height * 0.4, '💦');
+    if (a.kind === 'ballPit' && on) inside.forEach((id) => bump(BUDDY_KEY + id, 'hop'));
+    if (a.kind === 'tub' && on && inside.length) pop(box.left + box.width / 2, box.top + box.height * 0.4, '🫧');
+    onTapAppliance?.(a, on, 0, inside);
   };
 
   // Dragging: one responder takes every finger that lands on a piece, so two can be moved at once.
@@ -560,7 +596,13 @@ export function BuddyRoom(props: Props) {
             cupboard={c}
             size={size}
             open={open.has(c.id)}
-            onPress={() => toggle(c.id, c.name)}
+            washing={running.has(c.id)}
+            onPress={() => {
+              // Opening a washing machine stops it.
+              if (running.has(c.id)) wash(c);
+              toggle(c.id, c.name);
+            }}
+            onWash={() => wash(c)}
           />
         ))}
         {APPLIANCES.map((a) => {
@@ -628,49 +670,53 @@ export function BuddyRoom(props: Props) {
                     ]}
                   />
                 ) : null}
-                <PopIn skip={!drawn.current} damping={9} style={styles.fill}>
-                  <Lively
-                    height={tall}
-                    seed={piece.key}
-                    breathe={!!buddy && !offset}
-                    asleep={asleep}
-                    bounce={b?.n}
-                    bounceKind={b?.kind}
-                    style={styles.fill}
-                  >
-                    {buddy ? (
-                      buddy.person ? (
-                        <PersonFigure
-                          look={buddy.person.look}
-                          size={tall}
-                          dressed={buddy.person.dressed}
-                          gift={buddy.gift}
-                          alive
-                          asleep={asleep}
-                          wave={b?.kind === 'hop' ? b.n : undefined}
-                        />
+                <Sunk piece={piece} running={piece.builtIn ? running.has(BUILT_IN_SEATS.find((x) => x.id === piece.builtIn)?.appliance ?? '') : false}>
+                  <PopIn skip={!drawn.current} damping={9} style={styles.fill}>
+                    <Lively
+                      height={tall}
+                      seed={piece.key}
+                      breathe={!!buddy && !offset}
+                      asleep={asleep}
+                      bounce={b?.n}
+                      bounceKind={b?.kind}
+                      style={styles.fill}
+                    >
+                      {buddy ? (
+                        buddy.person ? (
+                          <PersonFigure
+                            look={buddy.person.look}
+                            size={tall}
+                            dressed={buddy.person.dressed}
+                            gift={buddy.gift}
+                            alive
+                            asleep={asleep}
+                            wave={b?.kind === 'hop' ? b.n : undefined}
+                          />
+                        ) : (
+                          <BuddyFigure
+                            value={buddy.emoji}
+                            size={tall}
+                            fur={buddy.fur}
+                            belly={buddy.belly}
+                            dressed={buddy.dressed}
+                            gift={buddy.gift}
+                            wave={b?.kind === 'hop' ? b.n : undefined}
+                          />
+                        )
+                      ) : piece.item?.draw ? (
+                        <Furniture shape={piece.item.draw} width={piece.width} height={piece.height} />
+                      ) : piece.item?.lamp ? (
+                        <Lamp width={piece.width} height={piece.height} lit={lit.has(piece.key)} />
+                      ) : piece.item?.candle ? (
+                        <Candle width={piece.width} height={piece.height} wax={piece.item.candle} lit={lit.has(piece.key)} seed={piece.key} />
                       ) : (
-                        <BuddyFigure
-                          value={buddy.emoji}
-                          size={tall}
-                          fur={buddy.fur}
-                          belly={buddy.belly}
-                          dressed={buddy.dressed}
-                          gift={buddy.gift}
-                          wave={b?.kind === 'hop' ? b.n : undefined}
-                        />
-                      )
-                    ) : piece.item?.draw ? (
-                      <Furniture shape={piece.item.draw} width={piece.width} height={piece.height} />
-                    ) : piece.item?.candle ? (
-                      <Candle width={piece.width} height={piece.height} wax={piece.item.candle} lit={lit.has(piece.key)} seed={piece.key} />
-                    ) : (
-                      <Text style={{ fontSize: Math.round(piece.height * 0.85), lineHeight: tall }}>
-                        {piece.item?.emoji}
-                      </Text>
-                    )}
-                  </Lively>
-                </PopIn>
+                        <Text style={{ fontSize: Math.round(piece.height * 0.85), lineHeight: tall }}>
+                          {piece.item?.emoji}
+                        </Text>
+                      )}
+                    </Lively>
+                  </PopIn>
+                </Sunk>
                 {buddy && asleep ? (
                   <Drifting rise={piece.height * 0.25} style={styles.zzz}>
                     <Text style={{ fontSize: Math.round(piece.height * 0.3) }}>💤</Text>
@@ -843,80 +889,202 @@ const INSIDE: Record<Cupboard['kind'], string> = {
   freezer: '#D6ECFA',
   oven: '#2B2F33',
   drawers: '#7A4E30',
-  washer: '#CFD8DC',
+  washer: '#F4F7F9',
 };
 
+interface CupboardViewProps {
+  cupboard: Cupboard;
+  size: HomeSize;
+  open: boolean;
+  /** A washing machine that is running. */
+  washing?: boolean;
+  onPress: () => void;
+  /** Starts or stops a washing machine, from its buttons. */
+  onWash?: () => void;
+}
+
+/** An open door, swung out past the side of its cupboard on its hinge. */
+function SwungDoor({ c, box, side, color }: { c: Cupboard; box: Box; side: 'left' | 'right'; color: string }) {
+  const w = box.width / c.doors;
+  const cold = c.kind === 'fridge' || c.kind === 'freezer';
+  return (
+    <View
+      pointerEvents="none"
+      style={[
+        styles.swung,
+        {
+          width: w,
+          backgroundColor: cold ? '#E8EEF2' : color,
+          [side]: -w - 1,
+          transformOrigin: side === 'right' ? 'left' : 'right',
+          transform: [{ perspective: 800 }, { rotateY: side === 'right' ? '-62deg' : '62deg' }],
+        },
+      ]}
+    >
+      {cold
+        ? // Shelves on the inside of the fridge door, with milk and juice.
+          Array.from({ length: c.shelves }, (_, i) => (
+            <View key={i} style={styles.doorShelf}>
+              <View style={[styles.bottle, { backgroundColor: i % 2 ? '#FFB74D' : '#FFFFFF' }]} />
+              <View style={[styles.bottle, { backgroundColor: i % 2 ? '#FFFFFF' : '#EF9A9A', height: '55%' }]} />
+            </View>
+          ))
+        : null}
+    </View>
+  );
+}
+
 /** A built-in with a door: tap to open it onto its shelves, tap again to shut it. */
-function CupboardView({ cupboard: c, size, open, onPress }: { cupboard: Cupboard; size: HomeSize; open: boolean; onPress: () => void }) {
+function CupboardView({ cupboard: c, size, open, washing = false, onPress, onWash }: CupboardViewProps) {
   const box = fixtureBox(c, size);
   const { inner, band } = shelvesOf(c, size);
   const cold = c.kind === 'fridge' || c.kind === 'freezer' || c.kind === 'washer';
   const doorColor = cold ? '#F4F7F9' : c.kind === 'oven' ? '#5F6B73' : DOOR;
   const label = `${open ? 'Shut' : 'Open'} the ${c.name}`;
+  // Doors swing out from the side; drawers pull out and the oven and washer have their own.
+  const swings = c.kind !== 'drawers' && c.kind !== 'oven' && c.kind !== 'washer';
+  const port = box.height * 0.52;
   return (
-    <Pressable
-      onPress={onPress}
-      accessibilityRole="button"
-      accessibilityLabel={label}
-      style={[styles.cupboard, boxStyle(box), cold && styles.coldBox, c.kind === 'wardrobe' && styles.wardrobe]}
-    >
-      {open ? (
-        <View
-          style={[
-            styles.inside,
-            {
-              left: inner.left - box.left,
-              top: inner.top - box.top,
-              width: inner.width,
-              height: inner.height,
-              backgroundColor: INSIDE[c.kind],
-            },
-          ]}
-        >
-          {c.kind === 'wardrobe' ? <View style={styles.rail} /> : null}
-          {c.kind === 'oven' ? <View style={styles.ovenGlow} /> : null}
-          {cold ? <View style={styles.fridgeLight} /> : null}
-          {Array.from({ length: c.shelves }, (_, i) => (
-            <View
-              key={i}
-              style={[styles.board, { top: band * (i + 1) - 4 }, cold && styles.wire, c.kind === 'oven' && styles.rack]}
-            />
-          ))}
-          {/* The open door, seen edge-on at the hinge side. */}
-          <View style={[styles.openDoor, { left: 0, backgroundColor: doorColor, width: inner.width * OPEN_DOOR }]} />
-          {c.doors > 1 ? (
-            <View style={[styles.openDoor, { right: 0, backgroundColor: doorColor, width: inner.width * OPEN_DOOR }]} />
-          ) : null}
-        </View>
-      ) : c.kind === 'drawers' ? (
-        <View style={styles.drawers}>
-          {Array.from({ length: c.shelves }, (_, i) => (
-            <View key={i} style={[styles.cupboardDoor, { backgroundColor: doorColor }]}>
-              <View style={styles.drawerKnob} />
-            </View>
-          ))}
-        </View>
-      ) : c.kind === 'washer' ? (
-        <View style={styles.washer}>
-          <View style={styles.washerPanel}>
-            <View style={styles.dial} />
-            <View style={styles.dial} />
+    <Rumble active={washing && !open} style={[styles.cupboardSpot, boxStyle(box)]}>
+      <Pressable
+        onPress={onPress}
+        accessibilityRole="button"
+        accessibilityLabel={label}
+        style={[styles.cupboard, styles.fillAbs, cold && styles.coldBox, c.kind === 'wardrobe' && styles.wardrobe]}
+      >
+        {open ? (
+          <View
+            style={[
+              styles.inside,
+              {
+                left: inner.left - box.left,
+                top: inner.top - box.top,
+                width: inner.width,
+                height: inner.height,
+                backgroundColor: INSIDE[c.kind],
+              },
+            ]}
+          >
+            {c.kind === 'wardrobe' ? <View style={styles.rail} /> : null}
+            {c.kind === 'oven' ? <View style={styles.ovenGlow} /> : null}
+            {c.kind === 'fridge' || c.kind === 'freezer' ? <View style={styles.fridgeLight} /> : null}
+            {c.kind === 'washer' ? <View style={[styles.washerPanel, styles.washerPanelOpen]} /> : null}
+            {c.kind === 'washer' ? (
+              // The drum, open.
+              <View style={[styles.drum, { width: port, height: port, borderRadius: port, top: (inner.height - port) / 2 + band * 0.1 }]} />
+            ) : (
+              Array.from({ length: c.shelves }, (_, i) => (
+                <View
+                  key={i}
+                  style={[styles.board, { top: band * (i + 1) - 4 }, cold && styles.wire, c.kind === 'oven' && styles.rack]}
+                />
+              ))
+            )}
           </View>
-          <View style={[styles.washerDoor, { width: box.height * 0.5, height: box.height * 0.5, borderRadius: box.height }]} />
-        </View>
-      ) : (
-        <View style={styles.doors}>
-          {Array.from({ length: c.doors }, (_, i) => (
-            <View key={i} style={[styles.cupboardDoor, { backgroundColor: doorColor }, cold && styles.coldDoor]}>
-              {c.kind === 'oven' ? <View style={styles.ovenWindow} /> : null}
-              <View style={[styles.handle, cold ? styles.coldHandle : i % 2 ? styles.handleLeft : styles.handleRight]} />
+        ) : c.kind === 'drawers' ? (
+          <View style={styles.drawers}>
+            {Array.from({ length: c.shelves }, (_, i) => (
+              <View key={i} style={[styles.cupboardDoor, { backgroundColor: doorColor }]}>
+                <View style={styles.drawerKnob} />
+              </View>
+            ))}
+          </View>
+        ) : c.kind === 'washer' ? (
+          <View style={styles.washer}>
+            <View style={styles.washerPanel} />
+            <View style={[styles.washerDoor, { width: port, height: port, borderRadius: port }]}>
+              <View style={[styles.washerWater, washing && styles.washerWaterOn]}>
+                <Spin active={washing} style={styles.fillAbs}>
+                  {/* Socks and a shirt going round. */}
+                  <View style={[styles.sock, { left: '18%', top: '22%', backgroundColor: '#EF5350' }]} />
+                  <View style={[styles.sock, { right: '16%', top: '40%', backgroundColor: '#FFCA28', transform: [{ rotate: '70deg' }] }]} />
+                  <View style={[styles.sock, { left: '34%', bottom: '14%', width: '36%', backgroundColor: '#66BB6A' }]} />
+                </Spin>
+                {washing ? <View style={styles.suds} /> : null}
+              </View>
             </View>
-          ))}
-        </View>
-      )}
-    </Pressable>
+          </View>
+        ) : (
+          <View style={styles.doors}>
+            {Array.from({ length: c.doors }, (_, i) => (
+              <View key={i} style={[styles.cupboardDoor, { backgroundColor: doorColor }, cold && styles.coldDoor]}>
+                {c.kind === 'oven' ? <View style={styles.ovenWindow} /> : null}
+                <View style={[styles.handle, cold ? styles.coldHandle : i % 2 ? styles.handleLeft : styles.handleRight]} />
+              </View>
+            ))}
+          </View>
+        )}
+      </Pressable>
+      {open && swings ? <SwungDoor c={c} box={box} side="right" color={doorColor} /> : null}
+      {open && swings && c.doors > 1 ? <SwungDoor c={c} box={box} side="left" color={doorColor} /> : null}
+      {open && c.kind === 'washer' ? (
+        // The round door, swung open to the right.
+        <View
+          pointerEvents="none"
+          style={[
+            styles.washerDoor,
+            styles.washerDoorOpen,
+            { width: port, height: port, borderRadius: port, left: box.width / 2 + port * 0.35, top: box.height - port - (box.height - port) * 0.3, transform: [{ scaleX: 0.35 }] },
+          ]}
+        />
+      ) : null}
+      {c.kind === 'washer' && !open ? (
+        <Pressable
+          onPress={onWash}
+          accessibilityRole="button"
+          accessibilityLabel={washing ? 'Stop the washing machine' : 'Start the washing machine'}
+          style={[styles.washerButtons, { height: box.height * 0.26 }]}
+        >
+          <View style={[styles.dial, washing && styles.dialOn]} />
+          <View style={[styles.startButton, washing && styles.startOn]} />
+        </Pressable>
+      ) : null}
+    </Rumble>
   );
 }
+
+/**
+ * A buddy in the bathtub, on the toilet or in the ball pit: its bottom is hidden behind the front, with balls
+ * (or bubbles, while the water runs) around it. Anything else is drawn as it is.
+ */
+function Sunk({ piece, running, children }: { piece: Piece; running: boolean; children: ReactNode }) {
+  const sunk = piece.sunk ?? 0;
+  if (sunk <= 0) return <>{children}</>;
+  const { width: w, height: h } = piece;
+  const show = h - sunk;
+  const balls = piece.builtIn === 'inBallPit';
+  const bubbles = piece.builtIn === 'inTub' && running;
+  const dot = balls ? h * 0.15 : h * 0.16;
+  return (
+    <>
+      {/* Room above for hops and waves; cut off at the front's rim. */}
+      <View pointerEvents="none" style={{ position: 'absolute', left: -w, top: -h, width: w * 3, height: h + show, overflow: 'hidden' }}>
+        <View style={{ position: 'absolute', left: w, top: h, width: w, height: h }}>{children}</View>
+      </View>
+      {balls || bubbles
+        ? [-0.2, 0.0, 0.2, 0.4, 0.6, 0.8, 1.0].map((x, i) => (
+            <Bob
+              key={x}
+              seed={`${piece.key}-${i}`}
+              rise={h * 0.05}
+              active={false}
+              style={{ position: 'absolute', left: w * x - dot / 2, top: show - dot * (i % 2 ? 0.55 : 0.35), width: dot, height: dot }}
+            >
+              <View
+                style={[
+                  styles.frontDot,
+                  { borderRadius: dot, backgroundColor: balls ? FRONT_BALLS[i % FRONT_BALLS.length] : '#FFFFFF' },
+                  !balls && styles.bubble,
+                ]}
+              />
+            </Bob>
+          ))
+        : null}
+    </>
+  );
+}
+
+const FRONT_BALLS = ['#EF5350', '#FFCA28', '#42A5F5', '#66BB6A', '#AB47BC'];
 
 interface PieceViewProps {
   /** Where it is drawn, in pixels across the home. */
@@ -957,7 +1125,7 @@ interface GadgetViewProps {
 /** A built-in thing to tap: its emoji, or a light switch plate. */
 function GadgetView({ gadget: g, box, look, on, onPress }: GadgetViewProps) {
   // A disco ball glows with the lights off; a lamp glows while on.
-  const glowing = g.lightSwitch ? !on && !!look : g.glow && on;
+  const glowing = g.lightSwitch ? !on && !!look : g.glow && on && !g.lamp;
   return (
     <Pressable
       onPress={onPress}
@@ -973,7 +1141,9 @@ function GadgetView({ gadget: g, box, look, on, onPress }: GadgetViewProps) {
           ]}
         />
       ) : null}
-      {look ? (
+      {g.lamp ? (
+        <Lamp width={box.width} height={box.height} lit={on} desk />
+      ) : look ? (
         <Text style={{ fontSize: Math.round(box.height * 0.8), lineHeight: Math.round(box.height) }}>{look}</Text>
       ) : (
         <View style={styles.switchPlate}>
@@ -1163,10 +1333,34 @@ const styles = StyleSheet.create({
   coldHandle: { left: '10%', backgroundColor: '#8FA3B0', height: '30%', top: '30%' },
   drawers: { flex: 1, gap: 4, padding: 4 },
   drawerKnob: { width: 10, height: 10, borderRadius: 5, backgroundColor: '#F2C14E', borderWidth: 2, borderColor: OUTLINE },
-  washer: { flex: 1, alignItems: 'center', justifyContent: 'space-around' },
-  washerPanel: { alignSelf: 'stretch', flexDirection: 'row', justifyContent: 'flex-end', gap: 6, paddingHorizontal: 8, paddingVertical: 4, borderBottomWidth: 2, borderColor: OUTLINE },
-  dial: { width: 10, height: 10, borderRadius: 5, backgroundColor: '#90A4AE', borderWidth: 1.5, borderColor: OUTLINE },
-  washerDoor: { backgroundColor: '#B3E5FC', borderWidth: 4, borderColor: '#90A4AE' },
+  washer: { flex: 1, alignItems: 'center', justifyContent: 'space-between', paddingBottom: '8%' },
+  washerPanel: { alignSelf: 'stretch', height: '22%', borderBottomWidth: 2, borderColor: OUTLINE },
+  washerPanelOpen: { position: 'absolute', left: 0, right: 0, top: 0, height: '18%' },
+  washerButtons: {
+    position: 'absolute',
+    right: 4,
+    top: 3,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingHorizontal: 8,
+  },
+  dial: { width: 16, height: 16, borderRadius: 8, backgroundColor: '#90A4AE', borderWidth: 2, borderColor: OUTLINE },
+  dialOn: { transform: [{ rotate: '90deg' }], backgroundColor: '#4FC3F7' },
+  startButton: { width: 14, height: 14, borderRadius: 7, backgroundColor: '#E57373', borderWidth: 2, borderColor: OUTLINE },
+  startOn: { backgroundColor: '#81C784' },
+  washerDoor: { backgroundColor: '#B0BEC5', borderWidth: 4, borderColor: '#78909C', padding: 3, overflow: 'hidden' },
+  washerDoorOpen: { position: 'absolute', backgroundColor: 'rgba(179, 229, 252, 0.6)' },
+  washerWater: { flex: 1, borderRadius: 999, backgroundColor: '#ECEFF1', overflow: 'hidden' },
+  washerWaterOn: { backgroundColor: '#4FC3F7' },
+  sock: { position: 'absolute', width: '26%', height: '16%', borderRadius: 6, borderWidth: 1.5, borderColor: OUTLINE },
+  suds: { position: 'absolute', left: 0, right: 0, top: 0, height: '30%', backgroundColor: 'rgba(255,255,255,0.75)' },
+  drum: { position: 'absolute', alignSelf: 'center', backgroundColor: '#78909C', borderWidth: 4, borderColor: '#546E7A' },
+  cupboardSpot: { position: 'absolute' },
+  fillAbs: { position: 'absolute', left: 0, top: 0, right: 0, bottom: 0 },
+  swung: { position: 'absolute', top: -2, bottom: -2, borderWidth: 2, borderColor: OUTLINE, borderRadius: 4, padding: 4, gap: 4, justifyContent: 'space-around' },
+  doorShelf: { flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'center', gap: 3, height: '22%', borderBottomWidth: 3, borderColor: '#B0BEC5' },
+  bottle: { width: '26%', height: '80%', borderRadius: 3, borderWidth: 1.5, borderColor: OUTLINE },
   ovenWindow: { width: '70%', height: '45%', borderRadius: 3, backgroundColor: '#2B2F33' },
   inside: { position: 'absolute', borderWidth: 2, borderColor: OUTLINE },
   board: { position: 'absolute', left: 0, right: 0, height: 5, backgroundColor: TRIM },
@@ -1183,7 +1377,6 @@ const styles = StyleSheet.create({
     borderRadius: 4,
     backgroundColor: '#FFF59D',
   },
-  openDoor: { position: 'absolute', top: -2, bottom: -2, borderWidth: 2, borderColor: OUTLINE, borderRadius: 3 },
   piece: { position: 'absolute', alignItems: 'center', justifyContent: 'flex-end' },
   fill: { width: '100%', height: '100%', alignItems: 'center', justifyContent: 'flex-end' },
   layer: { position: 'absolute', left: 0, top: 0, right: 0, bottom: 0 },
@@ -1230,5 +1423,7 @@ const styles = StyleSheet.create({
   wobble: { transform: [{ rotate: '-6deg' }], opacity: 0.85 },
   glow: { position: 'absolute', borderRadius: 999, backgroundColor: 'rgba(255, 214, 102, 0.45)' },
   zzz: { position: 'absolute', right: -8, top: -12 },
+  frontDot: { flex: 1, borderWidth: 1.5, borderColor: OUTLINE },
+  bubble: { borderColor: '#B3E5FC' },
   pop: { position: 'absolute', zIndex: 20 },
 });

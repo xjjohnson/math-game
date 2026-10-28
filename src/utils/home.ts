@@ -1,6 +1,9 @@
 import {
   BUDDY_SIZE,
+  BUILT_IN_SEATS,
+  type BuiltInSeat,
   CUPBOARDS,
+  findBuiltInSeat,
   findCupboard,
   type Gadget,
   findRoomItem,
@@ -75,16 +78,13 @@ export interface Shelves {
   capacity: number;
 }
 
-/** The open door's width, as a share of the inside. */
-export const OPEN_DOOR = 0.1;
-
 export function shelvesOf(c: Cupboard, size: HomeSize): Shelves {
   const box = fixtureBox(c, size);
   const pad = Math.max(5, Math.round(size.unit * 0.014));
   const inner = { left: box.left + pad, top: box.top + pad, width: box.width - pad * 2, height: box.height - pad * 2 };
   const band = inner.height / c.shelves;
-  const door = inner.width * OPEN_DOOR;
-  const row = { left: inner.left + door, width: inner.width - door * (c.doors > 1 ? 2 : 1) };
+  // Open doors swing out past the sides, so the whole inside is shelf.
+  const row = { left: inner.left + band * 0.1, width: inner.width - band * 0.2 };
   return { inner, row, band, capacity: Math.max(1, Math.floor(row.width / (band * 0.85))) };
 }
 
@@ -92,6 +92,13 @@ export function shelvesOf(c: Cupboard, size: HomeSize): Shelves {
 export function surfaceLine(s: Surface, size: HomeSize): { y: number; left: number; right: number } {
   const left = areaIndex(s.area) * size.areaWidth + s.left * size.screen;
   return { y: size.floorY - s.bottom * size.unit, left, right: left + s.width * size.screen };
+}
+
+/** Where a buddy sits in a built-in seat, its left and right ends, and the rim it hides behind. */
+export function seatLine(s: BuiltInSeat, size: HomeSize): { y: number; left: number; right: number; rimY: number } {
+  const left = areaIndex(s.area) * size.areaWidth + s.left * size.screen;
+  const y = size.floorY - s.bottom * size.unit;
+  return { y, left, right: left + s.width * size.screen, rimY: size.floorY - (s.rim ?? s.bottom) * size.unit };
 }
 
 /** A built-in thing to tap, as a square box. */
@@ -127,6 +134,9 @@ export interface Piece {
   parent?: string;
   /** Kept in an open cupboard. */
   stored?: boolean;
+  /** Sitting in a built-in seat: its id, and how much of its bottom is hidden behind the seat's front. */
+  builtIn?: string;
+  sunk?: number;
   /** Draw order: the bottom of what it stands on, so a buddy on a couch draws with the couch. */
   rootY: number;
   depth: number;
@@ -174,7 +184,14 @@ export function layoutHome(room: Room, buddies: BuddyAt[], size: HomeSize, open:
       const px = BUDDY_SIZE * unit;
       let x = b.spot.x * W;
       let y = b.spot.y * H;
-      const seat = b.spot.on ? place(b.spot.on) : null;
+      const fixed = b.spot.on?.startsWith(FIXTURE_KEY) ? findBuiltInSeat(b.spot.on.slice(FIXTURE_KEY.length)) : undefined;
+      if (fixed) {
+        const line = seatLine(fixed, size);
+        x = clampAround(x, (line.left + line.right) / 2, (line.right - line.left) / 2);
+        const sunk = Math.max(0, line.y - line.rimY);
+        return { key, x, y: line.y, width: px, height: px, buddyId: b.id, builtIn: fixed.id, sunk, rootY: size.floorY, depth: 0 };
+      }
+      const seat = b.spot.on && !b.spot.on.startsWith(FIXTURE_KEY) ? place(b.spot.on) : null;
       const ledge = seat?.item?.seat !== undefined ? ledgeOf(seat) : null;
       if (seat && ledge !== null) {
         y = ledge;
@@ -255,8 +272,9 @@ function inside(x: number, y: number, box: Box): boolean {
   return x >= box.left && x <= box.left + box.width && y >= box.top && y <= box.top + box.height;
 }
 
+/** What can be touched of a piece: not the part hidden behind a bathtub's or toilet's front. */
 function boxOf(p: Piece): Box {
-  return { left: p.x - p.width / 2, top: p.y - p.height, width: p.width, height: p.height };
+  return { left: p.x - p.width / 2, top: p.y - p.height, width: p.width, height: p.height - (p.sunk ?? 0) };
 }
 
 /** Keys of everything resting on `key`, and on those, and so on. */
@@ -333,7 +351,10 @@ export function dropThing(
   return free;
 }
 
-/** Where a buddy lands after being dragged: on a seat if it is dropped on one, or standing. */
+/**
+ * Where a buddy lands after being dragged: on a seat if it is dropped on one, in a built-in
+ * (the bathtub, the toilet, the ball pit) if it is dropped over one, or standing.
+ */
 export function dropBuddy(pieces: Piece[], piece: Piece, dx: number, dy: number, size: HomeSize): Placement {
   const baseX = piece.x + dx;
   const baseY = piece.y + dy;
@@ -345,5 +366,12 @@ export function dropBuddy(pieces: Piece[], piece: Piece, dx: number, dy: number,
     })
     .pop();
   if (seat) return { x: baseX / size.width, y: (ledgeOf(seat) ?? baseY) / size.height, on: seat.key };
+  for (const s of BUILT_IN_SEATS) {
+    const line = seatLine(s, size);
+    if (baseX < line.left || baseX > line.right) continue;
+    if (baseY >= line.rimY - size.unit * 0.25 && baseY <= size.floorY + size.unit * 0.04) {
+      return { x: baseX / size.width, y: line.y / size.height, on: FIXTURE_KEY + s.id };
+    }
+  }
   return { x: baseX / size.width, y: baseY / size.height };
 }
