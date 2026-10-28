@@ -14,6 +14,7 @@ import { Screen } from '@/components/Screen';
 import { TimerBar } from '@/components/TimerBar';
 import { findBadge } from '@/constants/badges';
 import { DIFFICULTIES } from '@/constants/difficulty';
+import { difficultyConfigFor, isGrade } from '@/constants/grades';
 import { colors, fontSizes, radius, spacing } from '@/constants/theme';
 import { usePalette } from '@/hooks/useAccessibility';
 import { useColumnAnswer } from '@/hooks/useColumnAnswer';
@@ -53,6 +54,7 @@ function parseConfig(raw: string | undefined): GameConfig {
   try {
     const parsed = JSON.parse(raw) as GameConfig;
     if (!parsed.mode || !(parsed.difficulty in DIFFICULTIES)) return fallback;
+    if (parsed.grade !== undefined && !isGrade(parsed.grade)) return { ...parsed, grade: undefined };
     return parsed;
   } catch {
     return fallback;
@@ -132,7 +134,7 @@ function Round({ config, onPlayAgain }: { config: GameConfig; onPlayAgain: () =>
   }, [state, profile, config, recordRound]);
 
   const allowNegative =
-    DIFFICULTIES[state.difficulty].allowNegatives &&
+    difficultyConfigFor(state.difficulty, config.grade).allowNegatives &&
     state.problem.operation === 'subtract' &&
     !state.problem.story;
   const column = useColumnAnswer(state.problem, { allowNegative, teach: !!config.showWork });
@@ -156,10 +158,13 @@ function Round({ config, onPlayAgain }: { config: GameConfig; onPlayAgain: () =>
           {state.index + 1} / {config.questionCount}
         </Text>
         <Text style={styles.status}>🔥 {state.streak}</Text>
-        <Text style={styles.status}>⭐ {state.score}</Text>
+        {/* Points, not stars: stars are only handed out at the end of a round. */}
+        <Text style={styles.status} accessibilityLabel={`${state.score} points`}>
+          🎯 {state.score}
+        </Text>
       </View>
       {config.adaptive ? (
-        <Text style={styles.level}>Level: {DIFFICULTIES[state.difficulty].label}</Text>
+        <Text style={styles.level}>Level: {difficultyConfigFor(state.difficulty, config.grade).label}</Text>
       ) : null}
       {config.timer !== null && secondsLeft !== null ? (
         <TimerBar total={config.timer} left={secondsLeft} />
@@ -200,7 +205,7 @@ function Round({ config, onPlayAgain }: { config: GameConfig; onPlayAgain: () =>
       {showFeedback ? (
         <Text style={[styles.feedback, { color: last.correct ? palette.correct : palette.wrong }]}>
           {last.correct
-            ? `✓ Great job! +${last.points}`
+            ? `✓ Great job! +${last.points} points`
             : last.given === null
               ? "✗ Time's up!"
               : '✗ Not quite. Remember this one!'}
@@ -263,7 +268,14 @@ function Results({
               </PopIn>
             ))}
           </View>
-          <Text style={styles.coins}>+{outcome.coins} 🪙</Text>
+          <Text style={styles.coins}>
+            +{outcome.coins} 🪙   +{outcome.starsEarned} ⭐
+          </Text>
+          {outcome.starMultiplier > 1 && outcome.stars > 0 ? (
+            <Text style={styles.bonus}>
+              Harder levels pay more: each star counted {outcome.starMultiplier} times
+            </Text>
+          ) : null}
           {outcome.streakBonusCoins > 0 ? (
             <Text style={styles.bonus}>Includes +{outcome.streakBonusCoins} for streaks of {STREAK_MILESTONE}</Text>
           ) : null}
@@ -287,7 +299,7 @@ function Results({
         </View>
       ) : null}
       <View style={styles.summary}>
-        <Stat label="Score" value={String(state.score)} />
+        <Stat label="Points" value={String(state.score)} />
         <Stat label="Right" value={`${right} / ${total}`} />
         <Stat label="Best streak" value={String(state.bestStreak)} />
       </View>

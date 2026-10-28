@@ -4,6 +4,7 @@ import { StyleSheet, View } from 'react-native';
 
 import { Text } from '@/components/AppText';
 import { BigButton } from '@/components/BigButton';
+import { LevelRow } from '@/components/LevelPicker';
 import { MatchOptions } from '@/components/MatchOptions';
 import { MonsterBar } from '@/components/MonsterBar';
 import { QuestionPanel } from '@/components/QuestionPanel';
@@ -12,7 +13,8 @@ import { Sticker } from '@/components/Sticker';
 import { stickerText } from '@/constants/art';
 import { colors, fontSizes, radius, spacing } from '@/constants/theme';
 import { useProfiles } from '@/store/profiles';
-import type { Difficulty, Operation } from '@/types';
+import { DEFAULT_GRADE, levelShort } from '@/constants/grades';
+import type { Level, Operation } from '@/types';
 import { resolveInputStyle } from '@/utils/inputStyle';
 import {
   PASS_QUESTIONS,
@@ -33,7 +35,7 @@ import { multiplayerRound } from '@/utils/multiplayer/rounds';
 import { randomSeed } from '@/utils/seededRandom';
 import { playSound } from '@/utils/soundEffects';
 
-const GUESTS: Record<string, PassPlayer> = {
+const GUESTS: Record<string, Omit<PassPlayer, 'level'>> = {
   'guest-1': { name: 'Guest 1', avatar: '🙂' },
   'guest-2': { name: 'Guest 2', avatar: '😎' },
   'guest-3': { name: 'Guest 3', avatar: '🤠' },
@@ -41,6 +43,8 @@ const GUESTS: Record<string, PassPlayer> = {
   'guest-5': { name: 'Guest 5', avatar: '🤓' },
   'guest-6': { name: 'Guest 6', avatar: '😺' },
 };
+
+const GUEST_LEVEL: Level = { grade: DEFAULT_GRADE, difficulty: 'easy' };
 
 const MEDALS = ['🥇', '🥈', '🥉'];
 
@@ -58,15 +62,22 @@ function Setup({ team, onStart }: { team: boolean; onStart: (state: PassState) =
   // Seats in the order players were picked; that's the order they take turns.
   const [seats, setSeats] = useState<string[]>([activeProfileId ?? 'guest-1', others[0]?.id ?? 'guest-2']);
   const [operation, setOperation] = useState<Operation>('add');
-  const [difficulty, setDifficulty] = useState<Difficulty>('easy');
+  // Levels changed on this screen, by seat id; the rest come from each profile.
+  const [levels, setLevels] = useState<Record<string, Level>>({});
 
   const options = [
     ...profiles.map((p) => ({ id: p.id, label: `${stickerText(p.avatar)} ${p.name}` })),
     ...Object.entries(GUESTS).map(([id, g]) => ({ id, label: `${g.avatar} ${g.name}` })),
   ];
+  const levelOf = (id: string): Level => {
+    if (levels[id]) return levels[id];
+    const p = profiles.find((x) => x.id === id);
+    return p ? { grade: p.grade, difficulty: p.lastDifficulty } : GUEST_LEVEL;
+  };
   const player = (id: string): PassPlayer => {
     const p = profiles.find((x) => x.id === id);
-    return p ? { name: p.name, avatar: p.avatar, profileId: p.id } : GUESTS[id];
+    const level = levelOf(id);
+    return p ? { name: p.name, avatar: p.avatar, profileId: p.id, level } : { ...GUESTS[id], level };
   };
   const toggle = (id: string) =>
     setSeats((s) => (s.includes(id) ? s.filter((x) => x !== id) : s.length < MAX_PASS_PLAYERS ? [...s, id] : s));
@@ -99,20 +110,29 @@ function Setup({ team, onStart }: { team: boolean; onStart: (state: PassState) =
           })}
         </View>
       </View>
-      <MatchOptions
-        operation={operation}
-        difficulty={difficulty}
-        onChange={(c) => {
-          if (c.operation) setOperation(c.operation);
-          if (c.difficulty) setDifficulty(c.difficulty);
-        }}
-      />
+      <MatchOptions operation={operation} onChange={setOperation} />
+      {seats.length ? (
+        <View style={styles.group}>
+          <Text style={styles.label}>Each player's grade and difficulty</Text>
+          {seats.map((id) => {
+            const p = player(id);
+            return (
+              <LevelRow
+                key={id}
+                name={`${stickerText(p.avatar)} ${p.name}`}
+                level={p.level}
+                onChange={(level) => setLevels((l) => ({ ...l, [id]: level }))}
+              />
+            );
+          })}
+        </View>
+      ) : null}
       {seats.length < 2 ? <Text style={styles.note}>Pick at least two players.</Text> : null}
       <BigButton
         label="Start"
         color={colors.correct}
         disabled={seats.length < 2}
-        onPress={() => onStart(startPass(seats.map(player), operation, difficulty, randomSeed(), team))}
+        onPress={() => onStart(startPass(seats.map(player), operation, randomSeed(), team))}
       />
     </Screen>
   );
@@ -136,8 +156,8 @@ function Game({ start, onAgain }: { start: PassState; onAgain: () => void }) {
     playSound('reward');
     state.players.forEach((p, i) => {
       if (!p.profileId) return;
-      const key = `${state.team ? 'team' : 'pass'}:${state.operation}:${state.difficulty}`;
-      recordRound(p.profileId, multiplayerRound(key, state.histories[i], state.difficulty));
+      const key = `${state.team ? 'team' : 'pass'}:${state.operation}:g${p.level.grade}:${p.level.difficulty}`;
+      recordRound(p.profileId, multiplayerRound(key, state.histories[i], p.level.difficulty));
     });
   }, [state, recordRound]);
 
@@ -203,6 +223,7 @@ function Game({ start, onAgain }: { start: PassState; onAgain: () => void }) {
       <Screen title={state.turn === 0 ? 'First up' : 'Pass the phone!'}>
         <Sticker value={current.avatar} size={96} style={styles.handoffAvatar} />
         <Text style={styles.handoffName}>{current.name}, it's your turn</Text>
+        <Text style={styles.note}>{levelShort(current.level)}</Text>
         {state.team ? (
           <>
             <MonsterBar monster={monster} hits={teamHits(state)} health={teamTarget(state)} compact />
@@ -238,8 +259,9 @@ function Game({ start, onAgain }: { start: PassState; onAgain: () => void }) {
       <QuestionPanel
         key={`${state.turn}-${state.index}`}
         problem={passProblem(state)}
-        difficulty={state.difficulty}
-        inputStyle={resolveInputStyle(owner?.inputStyle, state.difficulty)}
+        difficulty={current.level.difficulty}
+        grade={current.level.grade}
+        inputStyle={resolveInputStyle(owner?.inputStyle, current.level.difficulty)}
         onAnswer={(given) => dispatch({ type: 'answer', given })}
         onNext={() => dispatch({ type: 'next' })}
       />

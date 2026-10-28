@@ -7,7 +7,8 @@ import { BuddyFace } from '@/components/BuddyFace';
 import { Screen } from '@/components/Screen';
 import { Sticker } from '@/components/Sticker';
 import { UpdateBanner } from '@/components/UpdateBanner';
-import { DIFFICULTIES, OPERATIONS } from '@/constants/difficulty';
+import { OPERATIONS } from '@/constants/difficulty';
+import { GRADES, levelName } from '@/constants/grades';
 import { colors, fontSizes, spacing } from '@/constants/theme';
 import { useActiveProfile } from '@/store/profiles';
 import { buddyGift } from '@/utils/buddy';
@@ -21,7 +22,9 @@ export function HomeScreen() {
   const profile = useActiveProfile();
   const today = dateKey();
 
-  const daily = profile ? dailyChallengeConfig(today, profile.lastDifficulty) : null;
+  const daily = profile
+    ? dailyChallengeConfig(today, { grade: profile.grade, difficulty: profile.lastDifficulty })
+    : null;
   const dailyDone = profile?.dailyChallengeDate === today;
   const dailyOperation = daily?.mode.kind === 'operation' ? daily.mode.operation : undefined;
   const dailyOp = OPERATIONS.find((o) => o.value === dailyOperation);
@@ -51,6 +54,7 @@ export function HomeScreen() {
             <Text style={styles.stats}>
               🪙 {profile.coins}   ⭐ {profile.stars}   📅 {days} {days === 1 ? 'day' : 'days'}
             </Text>
+            <Text style={styles.stats}>🎓 {GRADES[profile.grade].name}</Text>
           </>
         ) : (
           <Text style={styles.name}>Make a profile to start playing.</Text>
@@ -68,7 +72,7 @@ export function HomeScreen() {
           label={dailyDone ? '✓ Daily challenge done' : `⚡ Daily challenge: ${dailyOp.label}`}
           color={colors.primary}
           outline={dailyDone}
-          accessibilityHint={`${DIFFICULTIES[daily.difficulty].label}, 30 seconds a question. Get ${DAILY_PASS} right for ${DAILY_CHALLENGE_BONUS} bonus coins.`}
+          accessibilityHint={`${levelName({ grade: profile.grade, difficulty: daily.difficulty })}, 30 seconds a question. Get ${DAILY_PASS} right for ${DAILY_CHALLENGE_BONUS} bonus coins.`}
           onPress={() =>
             router.push({ pathname: '/play', params: { config: JSON.stringify(daily) } })
           }

@@ -41,11 +41,11 @@ export function problemAt(config: GameConfig, index: number, difficulty: Difficu
     const fact = mode.facts[index % mode.facts.length];
     return buildProblem(fact.operation, fact.a, fact.b, fact.answer, rng);
   }
-  const problem = generate(mode.operation, difficulty, rng);
+  const problem = generate(mode.operation, difficulty, rng, config.grade);
   return config.wordProblems ? toWordProblem(problem, rng) : problem;
 }
 
-/** Key for saving a best score, e.g. "multiply:easy:10", "tables-3-7:medium:none" or "daily:2026-10-22". */
+/** Key for saving a best score, e.g. "multiply:easy:10", "add:g3:hard:none", "tables-3-7:medium:none" or "daily:2026-10-22". */
 export function highScoreKey(config: GameConfig): string {
   if (config.dailyDate) return `daily:${config.dailyDate}`;
   const { mode } = config;
@@ -54,7 +54,8 @@ export function highScoreKey(config: GameConfig): string {
     mode.kind === 'operation'
       ? `${mode.operation}${config.wordProblems ? '-words' : ''}`
       : `tables-${[...mode.tables].sort((a, b) => a - b).join('-')}${mode.includeDivision ? '-div' : ''}`;
-  return `${name}:${config.difficulty}:${config.timer ?? 'none'}${config.adaptive ? ':adaptive' : ''}`;
+  const grade = config.grade === undefined ? '' : `g${config.grade}:`;
+  return `${name}:${grade}${config.difficulty}:${config.timer ?? 'none'}${config.adaptive ? ':adaptive' : ''}`;
 }
 
 export function startSession(config: GameConfig): SessionState {
@@ -74,7 +75,8 @@ export function startSession(config: GameConfig): SessionState {
 function record(state: SessionState, given: number | null, secondsLeft: number | null): SessionState {
   const correct = given === state.problem.answer;
   const streak = correct ? state.streak + 1 : 0;
-  const points = correct ? pointsFor(state.difficulty, streak, state.config.timer, secondsLeft) : 0;
+  const question = { operation: state.problem.operation, difficulty: state.difficulty, grade: state.config.grade };
+  const points = correct ? pointsFor(question, streak, state.config.timer, secondsLeft) : 0;
   return {
     ...state,
     phase: 'feedback',
@@ -83,7 +85,7 @@ function record(state: SessionState, given: number | null, secondsLeft: number |
     score: state.score + points,
     history: [
       ...state.history,
-      { problem: state.problem, difficulty: state.difficulty, given, correct, points },
+      { problem: state.problem, difficulty: state.difficulty, grade: state.config.grade, given, correct, points },
     ],
   };
 }

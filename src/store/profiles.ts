@@ -1,9 +1,11 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 
+import { DEFAULT_GRADE } from '@/constants/grades';
 import { DEFAULT_EQUIPPED } from '@/constants/shop';
+import { useSettings } from '@/store/settings';
 import { persistStorage } from '@/store/storage';
-import type { InputStyle, Profile, RoomSpot } from '@/types';
+import type { Difficulty, Grade, InputStyle, Profile, RoomSpot } from '@/types';
 import { dateKey } from '@/utils/dates';
 import { applyRound, type RoundOutcome, type RoundResult } from '@/utils/progress';
 import { careForBuddy as applyCare, heartForRound, type CareAction, type CareResult } from '@/utils/buddy';
@@ -23,7 +25,12 @@ function newId(): string {
   return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
 }
 
-export function createProfile(name: string, avatar: string, inputStyle: InputStyle = 'auto'): Profile {
+export function createProfile(
+  name: string,
+  avatar: string,
+  inputStyle: InputStyle = 'auto',
+  grade: Grade = DEFAULT_GRADE,
+): Profile {
   return {
     id: newId(),
     name: name.trim(),
@@ -40,6 +47,7 @@ export function createProfile(name: string, avatar: string, inputStyle: InputSty
     playDates: [],
     dailyChallengeDate: null,
     lastDifficulty: 'easy',
+    grade,
     equipped: { ...DEFAULT_EQUIPPED },
     badges: [],
     week: null,
@@ -53,7 +61,7 @@ export function createProfile(name: string, avatar: string, inputStyle: InputSty
 interface ProfilesState {
   profiles: Profile[];
   activeProfileId: string | null;
-  addProfile: (name: string, avatar: string) => string;
+  addProfile: (name: string, avatar: string, grade?: Grade) => string;
   removeProfile: (id: string) => void;
   setActiveProfile: (id: string) => void;
   updateProfile: (id: string, changes: Partial<Omit<Profile, 'id'>>) => void;
@@ -63,6 +71,8 @@ interface ProfilesState {
   equip: (id: string, itemId: string) => void;
   /** Switches to a free avatar: the first pick or one of the defaults. */
   setAvatar: (id: string, avatar: string) => void;
+  /** Parent area: adds (or with a minus, takes away) coins and stars, never below zero. */
+  adjustBalance: (id: string, change: { coins?: number; stars?: number }) => void;
   /** Pets, feeds or plays with the buddy in use. */
   careForBuddy: (id: string, action: CareAction) => CareResult;
   buyRoomItem: (id: string, itemId: string) => RoomBuyResult;
@@ -77,8 +87,8 @@ export const useProfiles = create<ProfilesState>()(
     (set, get) => ({
       profiles: [],
       activeProfileId: null,
-      addProfile: (name, avatar) => {
-        const profile = createProfile(name, avatar);
+      addProfile: (name, avatar, grade) => {
+        const profile = createProfile(name, avatar, 'auto', grade);
         set((s) => ({ profiles: [...s.profiles, profile], activeProfileId: profile.id }));
         return profile.id;
       },
@@ -97,7 +107,7 @@ export const useProfiles = create<ProfilesState>()(
       recordRound: (id, round) => {
         const current = get().profiles.find((p) => p.id === id);
         if (!current) return null;
-        const { profile, outcome } = applyRound(current, round, dateKey());
+        const { profile, outcome } = applyRound(current, round, dateKey(), useSettings.getState().coinPayout);
         const withHeart = heartForRound(profile);
         set((s) => ({ profiles: s.profiles.map((p) => (p.id === id ? withHeart : p)) }));
         return outcome;
@@ -117,6 +127,14 @@ export const useProfiles = create<ProfilesState>()(
         set((s) => ({
           profiles: s.profiles.map((p) =>
             p.id === id && freeAvatars(p).includes(avatar) ? { ...p, avatar } : p,
+          ),
+        })),
+      adjustBalance: (id, { coins = 0, stars = 0 }) =>
+        set((s) => ({
+          profiles: s.profiles.map((p) =>
+            p.id === id
+              ? { ...p, coins: Math.max(0, p.coins + coins), stars: Math.max(0, p.stars + stars) }
+              : p,
           ),
         })),
       careForBuddy: (id, action) => {
@@ -150,7 +168,7 @@ export const useProfiles = create<ProfilesState>()(
     }),
     {
       name: 'math-game.profiles',
-      version: 6,
+      version: 7,
       storage: persistStorage,
       migrate: (persisted, version) => {
         const state = persisted as Pick<ProfilesState, 'profiles' | 'activeProfileId'>;
@@ -188,6 +206,11 @@ export const useProfiles = create<ProfilesState>()(
             buddyCare: p.buddyCare ?? null,
             room: p.room ?? emptyRoom(),
           }));
+        }
+        if (version < 7) {
+          // Version 7 added grade levels. Start near the classic level they last played.
+          const nearest: Record<Difficulty, Grade> = { easy: 1, medium: 3, hard: 5 };
+          state.profiles = state.profiles.map((p) => ({ ...p, grade: p.grade ?? nearest[p.lastDifficulty] ?? DEFAULT_GRADE }));
         }
         return state as ProfilesState;
       },

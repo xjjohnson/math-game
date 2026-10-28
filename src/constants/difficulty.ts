@@ -20,6 +20,8 @@ export interface DifficultyConfig {
   allowNegatives: boolean;
   /** Optional cap on the dividend; the quotient is limited to fit under it. */
   maxDividend?: number;
+  /** Optional cap on an addition answer, e.g. 10 for "adding within 10". */
+  maxSum?: number;
 }
 
 const r = (min: number, max: number): Range => ({ min, max });

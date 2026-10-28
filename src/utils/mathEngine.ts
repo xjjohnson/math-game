@@ -1,5 +1,6 @@
-import { DIFFICULTIES, OPERATIONS } from '@/constants/difficulty';
-import type { Difficulty, Operation, Problem, Rng } from '@/types';
+import { OPERATIONS } from '@/constants/difficulty';
+import { difficultyConfigFor } from '@/constants/grades';
+import type { Difficulty, Grade, Operation, Problem, Rng } from '@/types';
 import { createRng, pick, randInt, shuffle } from '@/utils/seededRandom';
 
 export const CHOICE_COUNT = 4;
@@ -30,15 +31,20 @@ export function buildProblem(
 /**
  * Generates one problem. Every answer is a whole number:
  * division picks the divisor and quotient first, then multiplies for the dividend.
+ * With a grade, the numbers come from that grade's level; without one, from the
+ * classic 1-, 2- and 3-digit levels.
  */
-export function generate(operation: Operation, difficulty: Difficulty, rng: Rng): Problem {
-  const config = DIFFICULTIES[difficulty];
+export function generate(operation: Operation, difficulty: Difficulty, rng: Rng, grade?: Grade): Problem {
+  const config = difficultyConfigFor(difficulty, grade);
   const { a: ra, b: rb } = config.ranges[operation];
   let a = randInt(rng, ra.min, ra.max);
   let b = randInt(rng, rb.min, rb.max);
 
   switch (operation) {
     case 'add':
+      if (config.maxSum !== undefined) {
+        b = randInt(rng, rb.min, Math.max(rb.min, Math.min(rb.max, config.maxSum - a)));
+      }
       return buildProblem(operation, a, b, a + b, rng);
     case 'subtract':
       if (!config.allowNegatives && b > a) [a, b] = [b, a];

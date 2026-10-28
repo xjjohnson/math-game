@@ -2,6 +2,15 @@ export type Operation = 'add' | 'subtract' | 'multiply' | 'divide';
 
 export type Difficulty = 'easy' | 'medium' | 'hard';
 
+/** School grade: 0 is kindergarten, 6 is "6th and up". */
+export type Grade = 0 | 1 | 2 | 3 | 4 | 5 | 6;
+
+/** A grade plus easy, medium or hard inside it. */
+export interface Level {
+  grade: Grade;
+  difficulty: Difficulty;
+}
+
 /** Seconds per question, or null for untimed practice. */
 export type TimerSetting = 10 | 30 | null;
 
@@ -62,6 +71,8 @@ export interface Profile {
   dailyChallengeDate: string | null;
   /** Difficulty of the last round; the daily challenge uses it. */
   lastDifficulty: Difficulty;
+  /** School grade the questions are pitched at. */
+  grade: Grade;
   /** Shop item ids in use (the avatar is stored as `avatar` itself). */
   equipped: Equipped;
   /** Earned badge ids, in the order they were earned. */
@@ -135,6 +146,8 @@ export type GameMode =
 export interface GameConfig {
   mode: GameMode;
   difficulty: Difficulty;
+  /** School grade; without one, the classic 1-, 2- and 3-digit levels are used. */
+  grade?: Grade;
   timer: TimerSetting;
   /** Step difficulty up or down from recent accuracy (operation mode only). */
   adaptive: boolean;
@@ -151,6 +164,8 @@ export interface GameConfig {
 export interface AnswerRecord {
   problem: Problem;
   difficulty: Difficulty;
+  /** Grade the question was pitched at, when the round had one. */
+  grade?: Grade;
   /** null when the timer ran out. */
   given: number | null;
   correct: boolean;

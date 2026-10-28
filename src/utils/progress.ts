@@ -26,12 +26,13 @@ export interface RoundOutcome extends RoundRewards {
 /**
  * Applies a finished round to a profile: stats, best streak, high score, coins,
  * stars, the day's play date, the daily challenge, weekly goals and badges.
- * Pure, so it can be tested.
+ * `coinPayout` is the parent's coins-per-answer setting. Pure, so it can be tested.
  */
 export function applyRound(
   profile: Profile,
   round: RoundResult,
   today: string,
+  coinPayout = 1,
 ): { profile: Profile; outcome: RoundOutcome } {
   const stats = { ...profile.stats };
   for (const r of round.history) {
@@ -44,7 +45,7 @@ export function applyRound(
 
   const previous = profile.highScores[round.highScoreKey] ?? 0;
   const isDaily = round.dailyDate === today;
-  const rewards = roundRewards(round.history, isDaily, profile.dailyChallengeDate === today);
+  const rewards = roundRewards(round.history, isDaily, profile.dailyChallengeDate === today, coinPayout);
   const playDates = profile.playDates.includes(today)
     ? profile.playDates
     : [...profile.playDates, today];
@@ -59,7 +60,7 @@ export function applyRound(
     bestStreak: Math.max(profile.bestStreak, round.bestStreak),
     highScores: { ...profile.highScores, [round.highScoreKey]: Math.max(previous, round.score) },
     coins: profile.coins + rewards.coins + weeklyBonusCoins,
-    stars: profile.stars + rewards.stars,
+    stars: profile.stars + rewards.starsEarned,
     playDates,
     dailyChallengeDate: rewards.dailyBonusCoins > 0 ? today : profile.dailyChallengeDate,
     // The daily challenge shouldn't change what the next one is based on.

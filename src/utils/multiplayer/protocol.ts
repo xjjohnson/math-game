@@ -1,7 +1,8 @@
-import type { Difficulty, Operation } from '@/types';
+import { isGrade } from '@/constants/grades';
+import type { Difficulty, Grade, Operation } from '@/types';
 
 /** Bump when messages change shape, so phones on different builds say so instead of misbehaving. */
-export const PROTOCOL_VERSION = 3;
+export const PROTOCOL_VERSION = 4;
 
 /** The host phone plus up to 7 friends. */
 export const MAX_PLAYERS = 8;
@@ -15,7 +16,9 @@ export type MatchMode = 'race' | 'coop' | 'monster' | 'relay';
 export interface MatchSetup {
   mode: MatchMode;
   operation: Operation;
+  /** The host's own level. Each player plays at their own, except in Relay, where everyone shares the host's cards. */
   difficulty: Difficulty;
+  grade?: Grade;
   seed: number;
 }
 
@@ -107,6 +110,7 @@ export function parseMessage(text: string): GameMessage | null {
         operation: s.operation as Operation,
         difficulty: s.difficulty as Difficulty,
         seed: s.seed,
+        ...(isGrade(s.grade) ? { grade: s.grade } : {}),
       };
       return { type: 'start', setup, players };
     }

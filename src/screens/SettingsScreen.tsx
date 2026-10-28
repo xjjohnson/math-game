@@ -10,7 +10,7 @@ import { colors, fontSizes, spacing, TAP_TARGET } from '@/constants/theme';
 import { useAppUpdate, type UpdateStatus } from '@/hooks/useAppUpdate';
 import { useSettings, type ReduceMotion, type Settings } from '@/store/settings';
 
-type ToggleKey = Exclude<keyof Settings, 'reduceMotion' | 'parentPin'>;
+type ToggleKey = Exclude<keyof Settings, 'reduceMotion' | 'parentPin' | 'coinPayout'>;
 
 const TOGGLES: { key: ToggleKey; label: string }[] = [
   { key: 'sound', label: 'Sound effects' },

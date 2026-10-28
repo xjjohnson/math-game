@@ -5,6 +5,7 @@ import {
   COOP_WAVES,
   isOver,
   matchProblem,
+  setupLevel,
   MONSTER,
   monsterFor,
   outcomeFor,
@@ -88,6 +89,7 @@ describe('protocol', () => {
       { type: 'start', setup: race, players },
       { type: 'start', setup: monster, players },
       { type: 'start', setup: relay, players },
+      { type: 'start', setup: { ...relay, grade: 3 }, players },
       { type: 'answer', correct: true, playerId: 'x1' },
       { type: 'wave', wave: 1 },
       { type: 'left', playerId: 'x1' },
@@ -112,6 +114,11 @@ describe('protocol', () => {
 describe('matches', () => {
   it('gives racers the same cards and each co-op player their own', () => {
     expect(matchProblem(race, 0, 4)).toEqual(matchProblem(race, 3, 4));
+    // Each phone plays at its own level; the host's level rides along for Relay.
+    const big = { grade: 5, difficulty: 'hard' } as const;
+    expect(matchProblem(race, 0, 4, big).answer).toBeGreaterThanOrEqual(20000);
+    expect(setupLevel({ ...relay, grade: 2 })).toEqual({ grade: 2, difficulty: 'easy' });
+    expect(setupLevel(relay)).toBeUndefined();
     const coopCards = (seat: number) => [0, 1, 2, 3, 4].map((i) => matchProblem(coop, seat, i).prompt).join();
     expect(new Set([0, 1, 2, 3].map(coopCards)).size).toBe(4);
   });
@@ -268,10 +275,14 @@ describe('pass-and-play', () => {
     }
     return s;
   };
-  const players: PassPlayer[] = ['Ava', 'Leo', 'Mia', 'Sam'].map((name) => ({ name, avatar: '🙂' }));
+  const players: PassPlayer[] = ['Ava', 'Leo', 'Mia', 'Sam'].map((name) => ({
+    name,
+    avatar: '🙂',
+    level: { grade: 3, difficulty: 'medium' },
+  }));
 
   it('hands the phone round all 4 players, then picks the winner', () => {
-    const start = startPass(players, 'multiply', 'medium', 7);
+    const start = startPass(players, 'multiply', 7);
     let s = passReducer(start, { type: 'begin' });
     for (let i = 0; i < PASS_QUESTIONS; i++) {
       s = passReducer(s, { type: 'answer', given: passProblem(s).answer });
@@ -287,14 +298,32 @@ describe('pass-and-play', () => {
   });
 
   it('gives every player different questions', () => {
-    const s = passReducer(startPass(players, 'add', 'easy', 7), { type: 'begin' });
+    const s = passReducer(startPass(players, 'add', 7), { type: 'begin' });
     const cards = (turn: number) => [0, 1, 2, 3].map((index) => passProblem({ ...s, turn, index }).prompt).join();
     expect(new Set([0, 1, 2, 3].map(cards)).size).toBe(4);
+  });
+
+  it("asks each player at their own grade and difficulty", () => {
+    const mixed: PassPlayer[] = [
+      { name: 'Little', avatar: '🙂', level: { grade: 0, difficulty: 'easy' } },
+      { name: 'Big', avatar: '😎', level: { grade: 5, difficulty: 'hard' } },
+    ];
+    let s = passReducer(startPass(mixed, 'add', 7), { type: 'begin' });
+    for (let index = 0; index < PASS_QUESTIONS; index++) {
+      expect(passProblem({ ...s, turn: 0, index }).answer).toBeLessThanOrEqual(5);
+      expect(passProblem({ ...s, turn: 1, index }).answer).toBeGreaterThanOrEqual(20000);
+    }
+    s = passReducer(s, { type: 'answer', given: passProblem(s).answer });
+    expect(s.histories[0][0]).toMatchObject({ difficulty: 'easy', grade: 0, correct: true });
   });
 });
 
 describe('team up on one phone', () => {
-  const players: PassPlayer[] = ['Ava', 'Leo', 'Mia'].map((name) => ({ name, avatar: '🙂' }));
+  const players: PassPlayer[] = ['Ava', 'Leo', 'Mia'].map((name) => ({
+    name,
+    avatar: '🙂',
+    level: { grade: 1, difficulty: 'easy' },
+  }));
   const play = (state: PassState, right: number[]) => {
     let s = state;
     while (s.phase !== 'finished') {
@@ -307,7 +336,7 @@ describe('team up on one phone', () => {
   };
 
   it("adds everyone's right answers against one monster", () => {
-    const start = startPass(players, 'add', 'easy', 7, true);
+    const start = startPass(players, 'add', 7, true);
     expect(teamTarget(start)).toBe(TEAM_UP_PER_PLAYER * 3);
     // A strong player can carry a teammate who is still learning.
     const carried = play(start, [10, 9, 2]);
@@ -317,6 +346,6 @@ describe('team up on one phone', () => {
   });
 
   it('take turns stays a competition', () => {
-    expect(startPass(players, 'add', 'easy', 7).team).toBe(false);
+    expect(startPass(players, 'add', 7).team).toBe(false);
   });
 });
