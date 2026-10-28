@@ -4,6 +4,7 @@ import { StyleSheet, View } from 'react-native';
 
 import { Text } from '@/components/AppText';
 import { BigButton } from '@/components/BigButton';
+import { Confetti } from '@/components/Motion';
 import { PopIn } from '@/components/PopIn';
 import { Screen } from '@/components/Screen';
 import { findBadge } from '@/constants/badges';
@@ -55,6 +56,7 @@ export function RoundResults({
     <Screen title={cheer}>
       {outcome ? (
         <View style={styles.rewards}>
+          <Confetti burst={isNotable(outcome) ? 1 : 0} fall={380} style={styles.confetti} />
           <View style={styles.starRow} accessible accessibilityLabel={`${outcome.stars} out of 3 stars`}>
             {[0, 1, 2].map((i) => (
               <PopIn key={i} delay={250 * i} damping={9}>
@@ -128,6 +130,7 @@ function Stat({ label, value }: { label: string; value: string }) {
 const styles = StyleSheet.create({
   highScore: { fontSize: fontSizes.button, fontWeight: '900', color: colors.accent, textAlign: 'center' },
   rewards: { alignItems: 'center', gap: spacing.xs },
+  confetti: { top: -40, bottom: undefined, height: 420 },
   starRow: { flexDirection: 'row', gap: spacing.md },
   stars: { fontSize: 56, color: colors.accent },
   starEmpty: { opacity: 0.5 },

@@ -1,6 +1,8 @@
 import { StyleSheet, View, type ViewStyle } from 'react-native';
+import Animated, { useAnimatedStyle } from 'react-native-reanimated';
 
 import { Text } from '@/components/AppText';
+import { useArmWave, useBlink } from '@/components/Motion';
 import {
   HAIR_COLORS,
   SKIN_TONES,
@@ -34,6 +36,12 @@ interface Props {
   size: number;
   dressed: PersonDressed;
   gift?: string | null;
+  /** Blinks now and then, for people living in the home. */
+  alive?: boolean;
+  /** Eyes shut, for sleeping on a bed. */
+  asleep?: boolean;
+  /** Change this number to wave once. */
+  wave?: number;
 }
 
 const LINE = '#3B2B25';
@@ -46,7 +54,7 @@ const SHOES = '#4E342E';
  * small body. Hair is its own piece, and every top and bottom can come off, leaving a
  * plain undershirt and shorts underneath.
  */
-export function PersonFigure({ look, size, dressed, gift }: Props) {
+export function PersonFigure({ look, size, dressed, gift, alive = false, asleep = false, wave }: Props) {
   const u = size * look.height;
   const skin = SKIN_TONES[look.skin] ?? SKIN_TONES[0];
   const hair = HAIR_COLORS[look.hairColor] ?? HAIR_COLORS[0];
@@ -71,6 +79,10 @@ export function PersonFigure({ look, size, dressed, gift }: Props) {
   const legs = dressed.legs;
   const dress = top?.cut === 'dress';
   const sleeve = top ? (top.cut === 'tee' || !top.cut ? 0.42 : 0.85) : 0;
+
+  const lids = useBlink(alive, asleep, `${look.skin}${look.hair}${look.hairColor}`);
+  const blink = useAnimatedStyle(() => ({ transform: [{ scaleY: lids.value }] }));
+  const waving = useArmWave(wave, -12, armH, -1);
 
   const box = (left: number, t: number, width: number, height: number): ViewStyle => ({
     position: 'absolute',
@@ -155,17 +167,18 @@ export function PersonFigure({ look, size, dressed, gift }: Props) {
         {[-1, 1].map((side) => {
           const left = side < 0 ? cx - torsoW / 2 - armW + u * 0.012 : cx + torsoW / 2 - u * 0.012;
           return (
-            <View
+            <Animated.View
               key={`arm${side}`}
               style={[
                 box(left, armTop, armW, armH),
                 edge,
                 styles.clip,
-                { backgroundColor: skin, borderRadius: armW / 2, transform: [{ rotate: side < 0 ? '12deg' : '-12deg' }] },
+                { backgroundColor: skin, borderRadius: armW / 2 },
+                side < 0 ? { transform: [{ rotate: '12deg' }] } : waving,
               ]}
             >
               <View style={{ height: `${sleeve * 100}%`, backgroundColor: top?.color ?? UNDERSHIRT }} />
-            </View>
+            </Animated.View>
           );
         })}
 
@@ -227,8 +240,8 @@ export function PersonFigure({ look, size, dressed, gift }: Props) {
         <HairFront look={look} color={hair} cx={cx} u={u} headD={headD} headTop={headTop} edge={edge} />
         {[-1, 1].map((side) => (
           <View key={`eye${side}`}>
-            <View
-              style={[box(cx + side * headD * 0.17 - u * 0.022, eyeY - u * 0.022, u * 0.044, u * 0.044), styles.eye]}
+            <Animated.View
+              style={[box(cx + side * headD * 0.17 - u * 0.022, eyeY - u * 0.022, u * 0.044, u * 0.044), styles.eye, blink]}
             />
             <View
               style={[

@@ -16,6 +16,8 @@ interface Props {
   /** Lower is bouncier. */
   damping?: number;
   style?: StyleProp<ViewStyle>;
+  /** Show it still from the start, as for things already there when a screen opens. */
+  skip?: boolean;
   accessible?: boolean;
   accessibilityLabel?: string;
 }
@@ -24,8 +26,9 @@ interface Props {
  * Springs its content in from small when it first appears, and shows it still
  * when motion is reduced. Re-renders don't replay it; remount with a new `key` to.
  */
-export function PopIn({ children, delay = 0, damping = 14, style, ...a11y }: Props) {
-  const { animate, reduceMotion } = useMotion();
+export function PopIn({ children, delay = 0, damping = 14, style, skip = false, ...a11y }: Props) {
+  const { animate: motion, reduceMotion } = useMotion();
+  const animate = motion && !skip;
   const progress = useSharedValue(animate ? 0 : 1);
 
   useEffect(() => {

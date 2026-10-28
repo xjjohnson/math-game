@@ -2,6 +2,7 @@ import { StyleSheet, View } from 'react-native';
 
 import { Text } from '@/components/AppText';
 import { BuddyFace } from '@/components/BuddyFace';
+import { Lively } from '@/components/Motion';
 import type { Companion } from '@/constants/shop';
 import { colors, fontSizes, radius, spacing } from '@/constants/theme';
 
@@ -21,9 +22,10 @@ export function CompanionBubble({ companion, correct, turn, gift }: Props) {
   const line = lines ? lines[turn % lines.length] : null;
   return (
     <View style={styles.row} accessibilityLiveRegion="polite">
-      <View style={correct === true && styles.bounce}>
+      {/* Hops for a right answer and shakes its head gently after a miss. */}
+      <Lively height={44} bounce={correct === null ? undefined : turn} bounceKind={correct ? 'hop' : 'shake'}>
         <BuddyFace value={companion.emoji} size={44} gift={gift} />
-      </View>
+      </Lively>
       {line ? (
         <View style={styles.bubble}>
           <Text style={styles.text}>{line}</Text>
@@ -35,7 +37,6 @@ export function CompanionBubble({ companion, correct, turn, gift }: Props) {
 
 const styles = StyleSheet.create({
   row: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, minHeight: 56 },
-  bounce: { transform: [{ translateY: -6 }] },
   bubble: {
     flexShrink: 1,
     backgroundColor: colors.surface,

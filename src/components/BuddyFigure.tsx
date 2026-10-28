@@ -1,6 +1,8 @@
 import { StyleSheet, View } from 'react-native';
+import Animated from 'react-native-reanimated';
 
 import { Text } from '@/components/AppText';
+import { useArmWave } from '@/components/Motion';
 import { Sticker } from '@/components/Sticker';
 
 /** What a buddy has on, ready to draw. */
@@ -23,12 +25,14 @@ interface Props {
   dressed: Dressed;
   /** What the buddy wears for its level, perched by its head. */
   gift?: string | null;
+  /** Change this number to wave once. */
+  wave?: number;
 }
 
 const LINE = '#3E2C23';
 
 /** A buddy with a body: its face as the head, a round body, arms, feet and its clothes. */
-export function BuddyFigure({ value, size, fur, belly, dressed, gift }: Props) {
+export function BuddyFigure({ value, size, fur, belly, dressed, gift, wave }: Props) {
   const shirt = dressed.shirt;
   const s = size;
   const line = Math.max(2, Math.round(s * 0.015));
@@ -42,6 +46,7 @@ export function BuddyFigure({ value, size, fur, belly, dressed, gift }: Props) {
   const armW = s * 0.12;
   const armH = s * 0.24;
   const armTop = s - bodyBottom - bodyH + s * 0.06;
+  const waving = useArmWave(wave, -20, armH, -1);
   return (
     <View style={{ width: s, height: s }} accessibilityElementsHidden importantForAccessibility="no">
       {/* Arms behind the body. */}
@@ -52,11 +57,12 @@ export function BuddyFigure({ value, size, fur, belly, dressed, gift }: Props) {
           { backgroundColor: shirt ?? fur, width: armW, height: armH, top: armTop, left: s / 2 - bodyW / 2 - armW * 0.55, borderRadius: armW, transform: [{ rotate: '20deg' }] },
         ]}
       />
-      <View
+      <Animated.View
         style={[
           styles.part,
           edge,
-          { backgroundColor: shirt ?? fur, width: armW, height: armH, top: armTop, left: s / 2 + bodyW / 2 - armW * 0.45, borderRadius: armW, transform: [{ rotate: '-20deg' }] },
+          { backgroundColor: shirt ?? fur, width: armW, height: armH, top: armTop, left: s / 2 + bodyW / 2 - armW * 0.45, borderRadius: armW },
+          waving,
         ]}
       />
       {/* Feet. */}
