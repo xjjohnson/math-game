@@ -1,26 +1,34 @@
-import { router } from 'expo-router';
+import { router, Stack } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
-import { Pressable, StyleSheet, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Text } from '@/components/AppText';
 import { BigButton } from '@/components/BigButton';
 import { BuddyRoom, type HomeBuddy } from '@/components/BuddyRoom';
 import { ChoiceButtons } from '@/components/ChoiceButtons';
+import { Furniture } from '@/components/Furniture';
 import { Screen } from '@/components/Screen';
 import { Sticker } from '@/components/Sticker';
 import {
+  findCupboard,
   findRoomItem,
+  FLOOR_COLORS,
   HOME_AREAS,
   inSeason,
   MAX_ROOM_THINGS,
+  MONTH_NAMES,
   ROOM_ITEM_GROUPS,
   ROOM_ITEMS,
+  seasonOf,
+  WALL_COLORS,
+  type RoomItem,
   type RoomItemGroup,
 } from '@/constants/room';
 import { itemsIn, type ShopItem } from '@/constants/shop';
-import { colors, fontSizes, radius, spacing, TAP_TARGET } from '@/constants/theme';
+import { colors, fontSizes, radius, spacing } from '@/constants/theme';
 import { useActiveProfile, useProfiles } from '@/store/profiles';
-import type { Operation, Problem, RoomThing } from '@/types';
+import type { Operation, Problem, Profile, RoomThing } from '@/types';
 import {
   buddyCompanion,
   buddyHearts,
@@ -38,19 +46,29 @@ import {
 } from '@/utils/buddy';
 import { dateKey } from '@/utils/dates';
 import { generate } from '@/utils/mathEngine';
-import { createRng, pick, randomSeed } from '@/utils/seededRandom';
 import { BUDDY_KEY, buddiesHome } from '@/utils/room';
+import { createRng, pick, randomSeed } from '@/utils/seededRandom';
 import { owns } from '@/utils/shop';
 import { playSound } from '@/utils/soundEffects';
 
-type Panel = 'none' | 'shop' | 'tidy' | 'buddies';
+/** The tabs along the bottom; each opens a drawer over the home. */
+type Tab = 'care' | 'shop' | 'toys' | 'buddies' | 'paint';
 
-/** Halloween things and the spooky window are October only. */
-const OCTOBER = 9;
+const TABS: { id: Tab; emoji: string; name: string }[] = [
+  { id: 'care', emoji: '❤️', name: 'Care' },
+  { id: 'shop', emoji: '🛒', name: 'Shop' },
+  { id: 'toys', emoji: '🧺', name: 'Toy box' },
+  { id: 'buddies', emoji: '🐾', name: 'Buddies' },
+  { id: 'paint', emoji: '🎨', name: 'Paint' },
+];
 
 /** Questions in one game of fetch. */
 const GAME_LENGTH = 5;
 const GAME_OPERATIONS: Operation[] = ['add', 'subtract', 'multiply'];
+/** How long the buddy's speech bubble stays up. */
+const LINE_MS = 5000;
+
+const FOOD_GROUPS: RoomItemGroup[] = ['kitchen', 'thanksgiving'];
 
 interface Game {
   problem: Problem;
@@ -59,12 +77,18 @@ interface Game {
   selected: number | null;
 }
 
-/** The buddy's home: pet it, give it treats and play a quick game to earn hearts and level up. */
+/**
+ * The buddies' home, filling the screen. Tabs along the bottom open drawers to care for
+ * the buddy, buy things, use the toy box, invite buddies over and paint.
+ */
 export function BuddyScreen() {
   const profile = useActiveProfile();
   const { careForBuddy, equip, buyRoomItem, moveInRoom, setPlaced, paintRoom, setBuddyHome } = useProfiles();
-  const [line, setLine] = useState<string | null>(null);
-  const [panel, setPanel] = useState<Panel>('none');
+  const insets = useSafeAreaInsets();
+  const [line, setLine] = useState<string | null>(
+    'Tap doors to open them. Drag small things onto shelves, tables or a buddy to hold!',
+  );
+  const [tab, setTab] = useState<Tab | null>(profile?.equipped.companion ? null : 'buddies');
   const [area, setArea] = useState(0);
   const [game, setGame] = useState<Game | null>(null);
   const rng = useRef(createRng(randomSeed()));
@@ -77,6 +101,12 @@ export function BuddyScreen() {
     [],
   );
 
+  useEffect(() => {
+    if (!line) return;
+    const hide = setTimeout(() => setLine(null), LINE_MS);
+    return () => clearTimeout(hide);
+  }, [line]);
+
   if (!profile) {
     return (
       <Screen title="My buddy">
@@ -86,9 +116,6 @@ export function BuddyScreen() {
   }
 
   const owned = itemsIn('companion').filter((item) => owns(profile, item));
-  const buddyId = profile.equipped.companion;
-  const companion = buddyCompanion(profile);
-  const name = owned.find((item) => item.id === buddyId)?.name ?? 'Buddy';
 
   if (owned.length === 0) {
     return (
@@ -107,20 +134,16 @@ export function BuddyScreen() {
     );
   }
 
+  const buddyId = profile.equipped.companion;
+  const companion = buddyCompanion(profile);
+  const nameOf = (id: string) => owned.find((item) => item.id === id)?.name ?? 'Buddy';
+  const name = buddyId ? nameOf(buddyId) : 'Buddy';
   const hearts = buddyHearts(profile, buddyId);
   const level = buddyLevel(hearts);
-  const toNext = heartsToNextLevel(hearts);
-  const nextGift = giftForLevel(level + 1);
-  const care = careToday(profile, dateKey());
-  const petsLeft = DAILY_PETS - care.pets;
-  const treatsLeft = DAILY_TREATS - care.treats;
-  const playHeartsLeft = DAILY_PLAY_HEARTS - care.playHearts;
-
-  const say = (text: string) => setLine(text);
   const month = new Date().getMonth();
   const areaName = HOME_AREAS[area]?.name.toLowerCase() ?? 'room';
 
-  const nameOf = (id: string) => owned.find((item) => item.id === id)?.name ?? 'Buddy';
+  const say = (text: string) => setLine(text);
   const home = buddiesHome(profile);
   const homeBuddies: HomeBuddy[] = home.flatMap(({ id, spot }) => {
     const item = owned.find((o) => o.id === id);
@@ -136,7 +159,7 @@ export function BuddyScreen() {
     if (before) moveInRoom(profile.id, BUDDY_KEY + before.id, before.spot);
     equip(profile.id, id);
     setBuddyHome(profile.id, id, true, area);
-    setLine(`${nameOf(id)} is with you now!`);
+    say(`${nameOf(id)} is with you now!`);
   };
 
   const doCare = (action: CareAction, happy: string) => {
@@ -144,8 +167,8 @@ export function BuddyScreen() {
     if (result.ok) {
       if (result.levelUp) {
         playSound('reward');
-        const gift = giftForLevel(buddyLevel(result.hearts));
         const reached = buddyLevel(result.hearts);
+        const gift = giftForLevel(reached);
         say(`🎉 ${name} reached Level ${reached}!${gift ? ` Look, a new ${gift}!` : ''}`);
       } else {
         say(happy);
@@ -184,216 +207,614 @@ export function BuddyScreen() {
     }, 1100);
   };
 
+  const tapThing = (key: string) => {
+    const thing = profile.room.things.find((t) => t.key === key);
+    const item = thing && findRoomItem(thing.itemId);
+    if (!thing || !item) return;
+    const what = item.name.toLowerCase();
+    if (tab === 'toys') {
+      setPlaced(profile.id, key, false, area);
+      say(`The ${what} went in the toy box.`);
+      return;
+    }
+    const holder = thing.on?.startsWith(BUDDY_KEY) ? nameOf(thing.on.slice(BUDDY_KEY.length)) : null;
+    if (holder && FOOD_GROUPS.includes(item.group) && !item.says) say(`${holder} takes a bite of the ${what}. Yum! 😋`);
+    else if (item.light) say(`Click! ${item.emoji}`);
+    else if (item.says) say(`${holder ?? name} ${item.says}! ${item.fx ?? ''}`);
+    else if (holder) say(`${holder} holds the ${what} tight.`);
+    else say(`${name} likes the ${what}! ${item.emoji}`);
+  };
+
+  const tapBuddy = (id: string) => {
+    if (id !== buddyId) return switchTo(id);
+    if (careToday(profile, dateKey()).pets < DAILY_PETS) doCare('pet', `❤️ ${name} loves that!`);
+    else say(`${name} waves at you! 👋`);
+  };
+
+  const buy = (itemId: string) => {
+    const item = findRoomItem(itemId);
+    const result = buyRoomItem(profile.id, itemId, area);
+    if (result.ok) {
+      playSound('reward');
+      say(`${item?.emoji} New ${item?.name.toLowerCase()} in the ${areaName}! Drag it where you like.`);
+    } else if (result.reason === 'coins' && item) {
+      say(`You need ${item.price - profile.coins} more coins for the ${item.name.toLowerCase()}.`);
+    } else if (result.reason === 'full') {
+      say('The house is full! Put something in the toy box first.');
+    } else if (result.reason === 'season' && item?.month !== undefined) {
+      say(`That one is only in the shop in ${MONTH_NAMES[item.month]}.`);
+    }
+  };
+
+  const back = () => (router.canGoBack() ? router.back() : router.replace('/'));
+
   return (
-    <Screen title="My buddy">
-      {companion ? (
-        <>
-          <BuddyRoom
-            room={profile.room}
-            buddies={homeBuddies}
-            area={area}
-            onAreaChange={setArea}
-            spooky={month === OCTOBER}
-            tidying={panel === 'tidy'}
-            onMove={(key, spot) => moveInRoom(profile.id, key, spot)}
-            onTapBuddy={(id) => {
-              if (id !== buddyId) switchTo(id);
-              else if (petsLeft > 0) doCare('pet', `❤️ ${name} loves that!`);
-              else say(`${name} waves at you! 👋`);
-            }}
-            onTapThing={(key) => {
-              const thing = profile.room.things.find((t) => t.key === key);
-              const item = thing && findRoomItem(thing.itemId);
-              if (panel === 'tidy') {
-                setPlaced(profile.id, key, false, area);
-                say(`${item?.name ?? 'That'} went in the toy box.`);
-              } else if (item) {
-                say(`${name} likes the ${item.name.toLowerCase()}! ${item.emoji}`);
-              }
-            }}
-          />
-          {!game ? (
-            <RoomTools
-              panel={panel}
-              setPanel={setPanel}
-              coins={profile.coins}
-              month={month}
-              area={area}
-              onArea={setArea}
-              stored={profile.room.things.filter((t) => !t.placed)}
-              full={profile.room.things.length >= MAX_ROOM_THINGS}
-              buddies={owned.filter((item) => item.category === 'companion')}
-              isHome={(id) => home.some((b) => b.id === id)}
-              using={buddyId}
-              onBuddyHome={(id, atHome) => {
-                setBuddyHome(profile.id, id, atHome, area);
-                say(atHome ? `${nameOf(id)} came over to play!` : `${nameOf(id)} went off for a nap. 💤`);
-              }}
-              onBuy={(itemId) => {
-                const item = findRoomItem(itemId);
-                const result = buyRoomItem(profile.id, itemId, area);
-                if (result.ok) {
-                  playSound('reward');
-                  say(`${item?.emoji} New ${item?.name.toLowerCase()} in the ${areaName}! Drag it where you like.`);
-                } else if (result.reason === 'coins' && item) {
-                  const short = item.price - profile.coins;
-                  say(`You need ${short} more coins for the ${item.name.toLowerCase()}.`);
-                } else if (result.reason === 'full') {
-                  say('The house is full! Put something in the toy box first.');
-                } else if (result.reason === 'season') {
-                  say('That one is only in the shop in October.');
-                }
-              }}
-              onTakeOut={(key) => setPlaced(profile.id, key, true, area)}
-              onPaint={(part) => paintRoom(profile.id, part, area)}
-            />
-          ) : null}
-          <Text style={styles.name}>{name}</Text>
-          <Text style={styles.level}>
-            Level {level} · ❤️ {hearts}
-          </Text>
-          <View
-            style={styles.bar}
-            accessible
-            accessibilityRole="progressbar"
-            accessibilityLabel={toNext === null ? 'Top level' : `${toNext} hearts to Level ${level + 1}`}
-          >
-            <View
-              style={[
-                styles.fill,
-                { width: `${toNext === null ? 100 : (100 * (HEARTS_PER_LEVEL - toNext)) / HEARTS_PER_LEVEL}%` },
-              ]}
-            />
+    <View style={styles.full}>
+      <Stack.Screen options={{ headerShown: false }} />
+      <View style={styles.roomWrap}>
+        <BuddyRoom
+          room={profile.room}
+          buddies={homeBuddies}
+          area={area}
+          onAreaChange={setArea}
+          season={seasonOf(month)}
+          tidying={tab === 'toys'}
+          onPlaceThing={(key, place) => {
+            moveInRoom(profile.id, key, place);
+            const item = findRoomItem(profile.room.things.find((t) => t.key === key)?.itemId ?? '');
+            const what = item?.name.toLowerCase() ?? 'thing';
+            if (place.in) say(`The ${what} is in the ${findCupboard(place.in)?.name ?? 'cupboard'}.`);
+            else if (place.on?.startsWith(BUDDY_KEY)) say(`${nameOf(place.on.slice(BUDDY_KEY.length))} is holding the ${what}!`);
+          }}
+          onPlaceBuddy={(id, place) => {
+            moveInRoom(profile.id, BUDDY_KEY + id, place);
+            const seat = place.on && findRoomItem(profile.room.things.find((t) => t.key === place.on)?.itemId ?? '');
+            if (seat) say(seat.sleep ? `${nameOf(id)} is having a nap. 💤` : `${nameOf(id)} sits on the ${seat.name.toLowerCase()}.`);
+          }}
+          onTapThing={tapThing}
+          onTapBuddy={tapBuddy}
+          onToggle={(what, open) => {
+            if (!open) return;
+            if (what === 'fridge' || what === 'freezer') say(`Brrr, the ${what} is cold! Drag food onto the shelves.`);
+            else if (what === 'oven') say('The oven is warm. Bake something in it!');
+            else if (what === 'cupboard' || what === 'wardrobe') say(`Drag small things onto the ${what} shelves.`);
+            else if (what === 'door') say(`${name} peeks outside. Hello, world!`);
+          }}
+        />
+
+        <View style={[styles.top, { paddingTop: insets.top + spacing.sm }]} pointerEvents="box-none">
+          <View style={styles.topRow} pointerEvents="box-none">
+            <Pressable
+              onPress={back}
+              accessibilityRole="button"
+              accessibilityLabel="Back"
+              style={({ pressed }) => [styles.round, pressed && styles.pressed]}
+            >
+              <Text style={styles.roundText}>⬅️</Text>
+            </Pressable>
+            <View style={styles.rooms}>
+              {HOME_AREAS.map((a, i) => (
+                <Pressable
+                  key={a.id}
+                  onPress={() => setArea(i)}
+                  accessibilityRole="button"
+                  accessibilityLabel={a.name}
+                  accessibilityState={{ selected: area === i }}
+                  style={({ pressed }) => [styles.round, area === i && styles.roundOn, pressed && styles.pressed]}
+                >
+                  <Text style={styles.roundText}>{a.emoji}</Text>
+                </Pressable>
+              ))}
+            </View>
+            <View style={styles.coins} accessible accessibilityLabel={`${profile.coins} coins`}>
+              <Text style={styles.coinText}>🪙 {profile.coins}</Text>
+            </View>
           </View>
-          <Text style={styles.hint}>
-            {toNext === null
-              ? `Level ${MAX_BUDDY_LEVEL}: best friends forever!`
-              : `${toNext} more ${toNext === 1 ? 'heart' : 'hearts'} to Level ${level + 1}` +
-                (nextGift ? ` (gets a ${nextGift})` : '')}
-          </Text>
+          {buddyId ? (
+            <View style={styles.tag}>
+              <Text style={styles.tagText}>
+                {name} · Lv {level} · ❤️ {hearts}
+              </Text>
+            </View>
+          ) : null}
           {line ? (
             <View style={styles.bubble} accessibilityLiveRegion="polite">
               <Text style={styles.bubbleText}>{line}</Text>
             </View>
           ) : null}
+        </View>
 
-          {game ? (
-            <View style={styles.game}>
-              <Text style={styles.hint}>
-                Fetch! Question {game.number + 1} of {GAME_LENGTH}
-              </Text>
-              <Text style={styles.problem}>{game.problem.prompt} = ?</Text>
-              <ChoiceButtons
-                choices={game.problem.choices}
-                selected={game.selected}
-                answer={game.problem.answer}
-                onSelect={answer}
-              />
-            </View>
-          ) : (
-            <>
-              <BigButton
-                label={`🤚 Pet ${name}${petsLeft > 0 ? ` (${petsLeft} left today)` : ''}`}
-                color={colors.operations.add}
-                disabled={petsLeft <= 0}
-                onPress={() => doCare('pet', `❤️ ${name} loves that!`)}
-              />
-              <BigButton
-                label={
-                  `${companion.treat} Give a treat · 🪙 ${TREAT_PRICE}` +
-                  (treatsLeft > 0 ? ` (${treatsLeft} left)` : '')
-                }
-                color={colors.accent}
-                disabled={treatsLeft <= 0}
-                accessibilityHint={`Costs ${TREAT_PRICE} coins. You have ${profile.coins}.`}
-                onPress={() => doCare('treat', `❤️❤️ Yum! ${companion.treat} ${name} says thank you!`)}
-              />
-              <BigButton
-                label="🎾 Play fetch"
-                color={colors.operations.multiply}
-                accessibilityHint={
-                  playHeartsLeft > 0
-                    ? `${GAME_LENGTH} quick questions. Each right answer gives ${name} a heart.`
-                    : `${GAME_LENGTH} quick questions, just for fun. Hearts from games are full for today.`
-                }
-                onPress={() => {
+        {game || tab ? (
+          <View style={styles.drawer}>
+            {game ? (
+              <View style={styles.game}>
+                <Text style={styles.hint}>
+                  Fetch! Question {game.number + 1} of {GAME_LENGTH}
+                </Text>
+                <Text style={styles.problem}>{game.problem.prompt} = ?</Text>
+                <ChoiceButtons
+                  choices={game.problem.choices}
+                  selected={game.selected}
+                  answer={game.problem.answer}
+                  onSelect={answer}
+                />
+              </View>
+            ) : null}
+            {!game && tab === 'care' ? (
+              <CareDrawer
+                profile={profile}
+                name={name}
+                treat={companion?.treat ?? '🍪'}
+                hasBuddy={!!companion}
+                onPet={() => doCare('pet', `❤️ ${name} loves that!`)}
+                onTreat={() => doCare('treat', `❤️❤️ Yum! ${companion?.treat ?? ''} ${name} says thank you!`)}
+                onFetch={() => {
                   say(`${name} wants to play! Answer to throw the ball.`);
                   setGame({ problem: newProblem(), number: 0, right: 0, selected: null });
                 }}
               />
-              <Text style={styles.hint}>Finishing a round with {name} along also gives a heart.</Text>
-            </>
-          )}
-        </>
-      ) : (
-        <Text style={styles.line}>Your buddies are napping. Pick one to wake up!</Text>
-      )}
-
-      {!game ? (
-        <>
-          <Text style={styles.heading}>{owned.length > 1 ? 'Switch buddy' : 'Your buddy'}</Text>
-          <View style={styles.row}>
-            {owned.map((item) => {
-              if (item.category !== 'companion') return null;
-              const using = item.id === buddyId;
-              const itemLevel = buddyLevel(buddyHearts(profile, item.id));
-              return (
-                <Pressable
-                  key={item.id}
-                  onPress={() => switchTo(item.id)}
-                  accessibilityRole="button"
-                  accessibilityLabel={`${item.name}, Level ${itemLevel}${using ? ', with you' : ''}`}
-                  accessibilityState={{ selected: using }}
-                  style={({ pressed }) => [
-                    styles.choice,
-                    using && styles.using,
-                    pressed && styles.pressed,
-                  ]}
-                >
-                  <Sticker value={item.companion.emoji} size={36} />
-                  <Text style={styles.choiceLevel}>Lv {itemLevel}</Text>
-                </Pressable>
-              );
-            })}
+            ) : null}
+            {!game && tab === 'shop' ? (
+              <ShopDrawer
+                coins={profile.coins}
+                month={month}
+                area={area}
+                full={profile.room.things.length >= MAX_ROOM_THINGS}
+                onBuy={buy}
+              />
+            ) : null}
+            {!game && tab === 'toys' ? (
+              <ToyDrawer
+                stored={profile.room.things.filter((t) => !t.placed)}
+                areaName={areaName}
+                onTakeOut={(key) => setPlaced(profile.id, key, true, area)}
+              />
+            ) : null}
+            {!game && tab === 'buddies' ? (
+              <BuddiesDrawer
+                profile={profile}
+                buddies={owned}
+                isHome={(id) => home.some((b) => b.id === id)}
+                using={buddyId}
+                onPick={switchTo}
+                onHome={(id, atHome) => {
+                  setBuddyHome(profile.id, id, atHome, area);
+                  say(atHome ? `${nameOf(id)} came over to play!` : `${nameOf(id)} went off for a nap. 💤`);
+                }}
+              />
+            ) : null}
+            {!game && tab === 'paint' ? (
+              <PaintDrawer
+                paint={profile.room.paint[area] ?? { wall: 0, floor: 0 }}
+                areaName={areaName}
+                onPaint={(part, color) => paintRoom(profile.id, part, color, area)}
+              />
+            ) : null}
           </View>
-        </>
-      ) : null}
-    </Screen>
+        ) : null}
+      </View>
+
+      <View style={[styles.tabs, { paddingBottom: Math.max(insets.bottom, spacing.xs) }]}>
+        {TABS.map((t) => {
+          const on = tab === t.id && !game;
+          return (
+            <Pressable
+              key={t.id}
+              onPress={() => {
+                if (game) return;
+                setTab(on ? null : t.id);
+              }}
+              accessibilityRole="tab"
+              accessibilityState={{ selected: on, disabled: !!game }}
+              style={({ pressed }) => [styles.tab, on && styles.tabOn, pressed && styles.pressed]}
+            >
+              <Text style={styles.tabEmoji}>{t.emoji}</Text>
+              <Text style={[styles.tabName, on && styles.tabNameOn]} numberOfLines={1}>
+                {t.name}
+              </Text>
+            </Pressable>
+          );
+        })}
+      </View>
+    </View>
+  );
+}
+
+interface CareDrawerProps {
+  profile: Profile;
+  name: string;
+  treat: string;
+  hasBuddy: boolean;
+  onPet: () => void;
+  onTreat: () => void;
+  onFetch: () => void;
+}
+
+function CareDrawer({ profile, name, treat, hasBuddy, onPet, onTreat, onFetch }: CareDrawerProps) {
+  if (!hasBuddy) return <Text style={styles.hint}>Pick a buddy in 🐾 Buddies first.</Text>;
+  const hearts = buddyHearts(profile, profile.equipped.companion);
+  const level = buddyLevel(hearts);
+  const toNext = heartsToNextLevel(hearts);
+  const nextGift = giftForLevel(level + 1);
+  const care = careToday(profile, dateKey());
+  const petsLeft = DAILY_PETS - care.pets;
+  const treatsLeft = DAILY_TREATS - care.treats;
+  const playHeartsLeft = DAILY_PLAY_HEARTS - care.playHearts;
+  return (
+    <>
+      <View
+        style={styles.bar}
+        accessible
+        accessibilityRole="progressbar"
+        accessibilityLabel={toNext === null ? 'Top level' : `${toNext} hearts to Level ${level + 1}`}
+      >
+        <View
+          style={[
+            styles.fill,
+            { width: `${toNext === null ? 100 : (100 * (HEARTS_PER_LEVEL - toNext)) / HEARTS_PER_LEVEL}%` },
+          ]}
+        />
+      </View>
+      <Text style={styles.hint}>
+        {toNext === null
+          ? `Level ${MAX_BUDDY_LEVEL}: best friends forever!`
+          : `${toNext} more ${toNext === 1 ? 'heart' : 'hearts'} to Level ${level + 1}` +
+            (nextGift ? ` (gets a ${nextGift})` : '')}
+      </Text>
+      <View style={styles.row}>
+        <DrawerButton
+          emoji="🤚"
+          label={`Pet (${Math.max(0, petsLeft)})`}
+          disabled={petsLeft <= 0}
+          onPress={onPet}
+          hint={`Pet ${name}`}
+        />
+        <DrawerButton
+          emoji={treat}
+          label={`Treat 🪙${TREAT_PRICE}`}
+          disabled={treatsLeft <= 0}
+          onPress={onTreat}
+          hint={`Costs ${TREAT_PRICE} coins. You have ${profile.coins}. ${treatsLeft} left today.`}
+        />
+        <DrawerButton
+          emoji="🎾"
+          label="Fetch"
+          onPress={onFetch}
+          hint={
+            playHeartsLeft > 0
+              ? `${GAME_LENGTH} quick questions. Each right answer gives ${name} a heart.`
+              : `${GAME_LENGTH} quick questions, just for fun. Hearts from games are full for today.`
+          }
+        />
+      </View>
+    </>
+  );
+}
+
+interface ShopDrawerProps {
+  coins: number;
+  /** This month, 0 = January; holiday things only show in their month. */
+  month: number;
+  area: number;
+  full: boolean;
+  onBuy: (itemId: string) => void;
+}
+
+function ShopDrawer({ coins, month, area, full, onBuy }: ShopDrawerProps) {
+  // Shop shelves with something on sale this month; the shelf starts on the room in view.
+  const groups = ROOM_ITEM_GROUPS.filter((g) => ROOM_ITEMS.some((i) => i.group === g.id && inSeason(i, month)));
+  const [picked, setShelf] = useState<RoomItemGroup | null>(null);
+  const holiday = groups.find((g) => ROOM_ITEMS.some((i) => i.group === g.id && i.month === month));
+  const shelf = picked ?? holiday?.id ?? HOME_AREAS[area]?.id ?? 'living';
+  const areaName = HOME_AREAS[area]?.name.toLowerCase() ?? 'room';
+  return (
+    <>
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chips}>
+        {groups.map((g) => (
+          <Chip key={g.id} label={g.name} on={shelf === g.id} onPress={() => setShelf(g.id)} />
+        ))}
+      </ScrollView>
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chips}>
+        {ROOM_ITEMS.filter((item) => item.group === shelf && inSeason(item, month)).map((item) => (
+          <Pressable
+            key={item.id}
+            onPress={() => onBuy(item.id)}
+            accessibilityRole="button"
+            accessibilityLabel={`${item.name}, ${item.price} coins`}
+            accessibilityState={{ disabled: full || coins < item.price }}
+            style={({ pressed }) => [
+              styles.thing,
+              item.month !== undefined && styles.seasonal,
+              (full || coins < item.price) && styles.locked,
+              pressed && styles.pressed,
+            ]}
+          >
+            <ItemPicture item={item} />
+            <Text style={styles.thingPrice}>🪙 {item.price}</Text>
+          </Pressable>
+        ))}
+      </ScrollView>
+      <Text style={styles.hint}>New things go in the {areaName}.</Text>
+    </>
+  );
+}
+
+/** An emoji, or a small drawing for furniture without one. */
+function ItemPicture({ item }: { item: RoomItem }) {
+  if (!item.draw) return <Text style={styles.thingEmoji}>{item.emoji}</Text>;
+  const height = 30;
+  const width = Math.min(52, height * (item.wide ?? 1));
+  return <Furniture shape={item.draw} width={width} height={Math.min(height, width / (item.wide ?? 1))} />;
+}
+
+function ToyDrawer({ stored, areaName, onTakeOut }: { stored: RoomThing[]; areaName: string; onTakeOut: (key: string) => void }) {
+  return (
+    <>
+      <Text style={styles.hint}>Tap things in the house to put them away. Tap one here to set it out in the {areaName}.</Text>
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chips}>
+        {stored.length === 0 ? <Text style={styles.hint}>The toy box is empty.</Text> : null}
+        {stored.map((thing) => {
+          const item = findRoomItem(thing.itemId);
+          if (!item) return null;
+          return (
+            <Pressable
+              key={thing.key}
+              onPress={() => onTakeOut(thing.key)}
+              accessibilityRole="button"
+              accessibilityLabel={`Take out the ${item.name}`}
+              style={({ pressed }) => [styles.thing, pressed && styles.pressed]}
+            >
+              <ItemPicture item={item} />
+            </Pressable>
+          );
+        })}
+      </ScrollView>
+    </>
+  );
+}
+
+interface BuddiesDrawerProps {
+  profile: Profile;
+  buddies: ShopItem[];
+  isHome: (id: string) => boolean;
+  using: string | null;
+  onPick: (id: string) => void;
+  onHome: (id: string, home: boolean) => void;
+}
+
+function BuddiesDrawer({ profile, buddies, isHome, using, onPick, onHome }: BuddiesDrawerProps) {
+  return (
+    <>
+      <Text style={styles.hint}>Tap a buddy to be with it. Invite others over, or send them for a nap.</Text>
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chips}>
+        {buddies.map((item) => {
+          if (item.category !== 'companion') return null;
+          const withYou = item.id === using;
+          const here = isHome(item.id);
+          const level = buddyLevel(buddyHearts(profile, item.id));
+          return (
+            <View key={item.id} style={styles.buddyCol}>
+              <Pressable
+                onPress={() => onPick(item.id)}
+                accessibilityRole="button"
+                accessibilityLabel={`${item.name}, Level ${level}${withYou ? ', with you' : ''}`}
+                accessibilityState={{ selected: withYou }}
+                style={({ pressed }) => [styles.choice, withYou && styles.using, pressed && styles.pressed]}
+              >
+                <Sticker value={item.companion.emoji} size={34} />
+                <Text style={styles.small}>Lv {level}</Text>
+              </Pressable>
+              {withYou ? (
+                <Text style={styles.small}>⭐ With you</Text>
+              ) : (
+                <Pressable
+                  onPress={() => onHome(item.id, !here)}
+                  accessibilityRole="button"
+                  accessibilityLabel={here ? `Send ${item.name} for a nap` : `Invite ${item.name} over`}
+                  style={({ pressed }) => [styles.mini, pressed && styles.pressed]}
+                >
+                  <Text style={styles.small}>{here ? '💤 Nap' : '🏠 Invite'}</Text>
+                </Pressable>
+              )}
+            </View>
+          );
+        })}
+      </ScrollView>
+    </>
+  );
+}
+
+interface PaintDrawerProps {
+  paint: { wall: number; floor: number };
+  areaName: string;
+  onPaint: (part: 'wall' | 'floor', color: number) => void;
+}
+
+function PaintDrawer({ paint, areaName, onPaint }: PaintDrawerProps) {
+  const swatches = (part: 'wall' | 'floor', list: string[]) => (
+    <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chips}>
+      <Text style={styles.paintLabel}>{part === 'wall' ? '🎨 Walls' : '🟫 Floor'}</Text>
+      {list.map((color, i) => (
+        <Pressable
+          key={color}
+          onPress={() => onPaint(part, i)}
+          accessibilityRole="button"
+          accessibilityLabel={`${part === 'wall' ? 'Wall' : 'Floor'} color ${i + 1}`}
+          accessibilityState={{ selected: paint[part] === i }}
+          style={({ pressed }) => [
+            styles.swatch,
+            { backgroundColor: color },
+            paint[part] === i && styles.swatchOn,
+            pressed && styles.pressed,
+          ]}
+        />
+      ))}
+    </ScrollView>
+  );
+  return (
+    <>
+      <Text style={styles.hint}>Free paint for the {areaName}.</Text>
+      {swatches('wall', WALL_COLORS)}
+      {swatches('floor', FLOOR_COLORS)}
+    </>
+  );
+}
+
+function Chip({ label, on, onPress }: { label: string; on: boolean; onPress: () => void }) {
+  return (
+    <Pressable
+      onPress={onPress}
+      accessibilityRole="button"
+      accessibilityState={{ selected: on }}
+      style={({ pressed }) => [styles.chip, on && styles.chipOn, pressed && styles.pressed]}
+    >
+      <Text style={[styles.chipText, on && styles.chipTextOn]}>{label}</Text>
+    </Pressable>
+  );
+}
+
+interface DrawerButtonProps {
+  emoji: string;
+  label: string;
+  disabled?: boolean;
+  hint?: string;
+  onPress: () => void;
+}
+
+function DrawerButton({ emoji, label, disabled = false, hint, onPress }: DrawerButtonProps) {
+  return (
+    <Pressable
+      onPress={disabled ? undefined : onPress}
+      accessibilityRole="button"
+      accessibilityLabel={label}
+      accessibilityHint={hint}
+      accessibilityState={{ disabled }}
+      style={({ pressed }) => [styles.action, disabled && styles.locked, pressed && styles.pressed]}
+    >
+      <Text style={styles.actionEmoji}>{emoji}</Text>
+      <Text style={styles.actionText}>{label}</Text>
+    </Pressable>
   );
 }
 
 const styles = StyleSheet.create({
+  full: { flex: 1, backgroundColor: colors.background },
+  roomWrap: { flex: 1 },
   big: { fontSize: 72, textAlign: 'center' },
   line: { fontSize: fontSizes.body, fontWeight: '700', color: colors.text, textAlign: 'center' },
-  name: { fontSize: fontSizes.button, fontWeight: '900', color: colors.text, textAlign: 'center' },
-  level: { fontSize: fontSizes.body, fontWeight: '800', color: colors.primary, textAlign: 'center' },
+  top: { position: 'absolute', left: 0, right: 0, top: 0, paddingHorizontal: spacing.sm, gap: spacing.xs, alignItems: 'center' },
+  topRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', alignSelf: 'stretch' },
+  rooms: { flexDirection: 'row', gap: spacing.xs },
+  round: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: colors.surface,
+    borderWidth: 3,
+    borderColor: colors.border,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  roundOn: { backgroundColor: '#FFE082' },
+  roundText: { fontSize: 22 },
+  coins: {
+    minHeight: 48,
+    paddingHorizontal: spacing.sm,
+    borderRadius: 24,
+    backgroundColor: colors.surface,
+    borderWidth: 3,
+    borderColor: colors.border,
+    justifyContent: 'center',
+  },
+  coinText: { fontSize: 18, fontWeight: '900', color: colors.text },
+  tag: {
+    backgroundColor: 'rgba(255,255,255,0.85)',
+    borderRadius: radius.md,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 2,
+  },
+  tagText: { fontSize: 16, fontWeight: '900', color: colors.text },
+  bubble: {
+    maxWidth: 520,
+    backgroundColor: colors.surface,
+    borderRadius: radius.md,
+    borderWidth: 2,
+    borderColor: colors.border,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.xs,
+  },
+  bubbleText: { fontSize: 17, fontWeight: '800', color: colors.text, textAlign: 'center' },
+  drawer: {
+    maxHeight: '60%',
+    backgroundColor: colors.surface,
+    borderTopLeftRadius: radius.lg,
+    borderTopRightRadius: radius.lg,
+    borderWidth: 3,
+    borderBottomWidth: 0,
+    borderColor: colors.border,
+    padding: spacing.sm,
+    gap: spacing.sm,
+  },
+  tabs: {
+    flexDirection: 'row',
+    backgroundColor: colors.surface,
+    borderTopWidth: 3,
+    borderColor: colors.border,
+    paddingTop: spacing.xs,
+    paddingHorizontal: spacing.xs,
+    gap: spacing.xs,
+  },
+  tab: { flex: 1, minHeight: 60, borderRadius: radius.md, alignItems: 'center', justifyContent: 'center' },
+  tabOn: { backgroundColor: colors.primary },
+  tabEmoji: { fontSize: 24 },
+  tabName: { fontSize: 13, fontWeight: '800', color: colors.text },
+  tabNameOn: { color: colors.primaryText },
   bar: {
-    height: 18,
-    borderRadius: 9,
+    height: 16,
+    borderRadius: 8,
     borderWidth: 2,
     borderColor: colors.border,
     backgroundColor: colors.surface,
     overflow: 'hidden',
   },
   fill: { height: '100%', backgroundColor: '#F06292' },
-  hint: { fontSize: 16, fontWeight: '700', color: colors.textMuted, textAlign: 'center' },
-  bubble: {
-    alignSelf: 'center',
+  hint: { fontSize: 15, fontWeight: '700', color: colors.textMuted, textAlign: 'center' },
+  game: { gap: spacing.sm },
+  problem: { fontSize: 40, fontWeight: '900', color: colors.text, textAlign: 'center' },
+  row: { flexDirection: 'row', gap: spacing.sm, justifyContent: 'center' },
+  chips: { gap: spacing.sm, paddingHorizontal: spacing.xs, alignItems: 'center' },
+  chip: {
+    minHeight: 44,
+    paddingHorizontal: spacing.md,
+    justifyContent: 'center',
+    borderRadius: 22,
+    borderWidth: 2,
+    borderColor: colors.border,
+    backgroundColor: colors.surface,
+  },
+  chipOn: { backgroundColor: colors.primary, borderColor: colors.primary },
+  chipText: { fontSize: 16, fontWeight: '800', color: colors.text },
+  chipTextOn: { color: colors.primaryText },
+  thing: {
+    width: 68,
+    height: 76,
     backgroundColor: colors.surface,
     borderRadius: radius.md,
     borderWidth: 2,
     borderColor: colors.border,
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 2,
   },
-  bubbleText: { fontSize: fontSizes.body, fontWeight: '800', color: colors.text, textAlign: 'center' },
-  game: { gap: spacing.sm },
-  problem: { fontSize: 48, fontWeight: '900', color: colors.text, textAlign: 'center' },
-  heading: { fontSize: fontSizes.body, fontWeight: '900', color: colors.text },
-  row: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm, justifyContent: 'center' },
+  thingEmoji: { fontSize: 32 },
+  thingPrice: { fontSize: 13, fontWeight: '800', color: colors.textMuted },
+  locked: { opacity: 0.45 },
+  seasonal: { backgroundColor: '#FFE0B2', borderColor: '#F57C00' },
+  pressed: { transform: [{ scale: 0.96 }] },
+  buddyCol: { alignItems: 'center', gap: 4 },
   choice: {
-    width: TAP_TARGET + 16,
-    height: TAP_TARGET + 24,
+    width: 72,
+    height: 80,
     backgroundColor: colors.surface,
     borderRadius: radius.lg,
     borderWidth: 3,
@@ -402,188 +823,29 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   using: { borderColor: colors.correct, borderWidth: 5 },
-  pressed: { transform: [{ scale: 0.97 }] },
-  tools: { gap: spacing.sm },
-  toolRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm, justifyContent: 'center' },
-  tool: {
-    minHeight: 52,
-    paddingHorizontal: spacing.md,
+  small: { fontSize: 13, fontWeight: '800', color: colors.textMuted },
+  mini: {
+    minHeight: 36,
+    paddingHorizontal: spacing.sm,
+    borderRadius: 18,
+    borderWidth: 2,
+    borderColor: colors.border,
     justifyContent: 'center',
-    backgroundColor: colors.surface,
+  },
+  paintLabel: { fontSize: 16, fontWeight: '900', color: colors.text, width: 76 },
+  swatch: { width: 44, height: 44, borderRadius: 22, borderWidth: 2, borderColor: colors.border },
+  swatchOn: { borderWidth: 5, borderColor: colors.primary },
+  action: {
+    flex: 1,
+    maxWidth: 160,
+    minHeight: 76,
     borderRadius: radius.md,
     borderWidth: 3,
     borderColor: colors.border,
-  },
-  toolActive: { backgroundColor: colors.primary, borderColor: colors.primary },
-  toolText: { fontSize: 18, fontWeight: '800', color: colors.text },
-  toolTextActive: { color: colors.primaryText },
-  thing: {
-    width: TAP_TARGET,
-    height: TAP_TARGET + 12,
-    backgroundColor: colors.surface,
-    borderRadius: radius.md,
-    borderWidth: 2,
-    borderColor: colors.border,
+    backgroundColor: '#FFF3E0',
     alignItems: 'center',
     justifyContent: 'center',
   },
-  thingEmoji: { fontSize: 32 },
-  thingPrice: { fontSize: 13, fontWeight: '800', color: colors.textMuted },
-  locked: { opacity: 0.5 },
-  seasonal: { backgroundColor: '#FFE0B2', borderColor: '#F57C00' },
-  choiceLevel: { fontSize: 14, fontWeight: '800', color: colors.textMuted },
+  actionEmoji: { fontSize: 28 },
+  actionText: { fontSize: 15, fontWeight: '800', color: colors.text },
 });
-
-interface RoomToolsProps {
-  panel: Panel;
-  setPanel: (panel: Panel) => void;
-  coins: number;
-  /** This month, 0 = January; seasonal things only show in their month. */
-  month: number;
-  area: number;
-  onArea: (area: number) => void;
-  stored: RoomThing[];
-  full: boolean;
-  buddies: ShopItem[];
-  isHome: (id: string) => boolean;
-  using: string | null;
-  onBuddyHome: (id: string, home: boolean) => void;
-  onBuy: (itemId: string) => void;
-  onTakeOut: (key: string) => void;
-  onPaint: (part: 'wall' | 'floor') => void;
-}
-
-/** Buttons under the home: pick a room, add things, put things away, invite buddies and paint. */
-function RoomTools(props: RoomToolsProps) {
-  const { panel, setPanel, coins, month, area, onArea, stored, full, buddies } = props;
-  const { isHome, using, onBuddyHome, onBuy, onTakeOut, onPaint } = props;
-  const toggle = (next: Exclude<Panel, 'none'>) => setPanel(panel === next ? 'none' : next);
-  const areaName = HOME_AREAS[area]?.name.toLowerCase() ?? 'room';
-  // Shop shelves with something on sale this month; the shelf starts on the room in view.
-  const groups = ROOM_ITEM_GROUPS.filter((g) => ROOM_ITEMS.some((i) => i.group === g.id && inSeason(i, month)));
-  const [picked, setShelf] = useState<RoomItemGroup | null>(null);
-  const shelf = picked ?? HOME_AREAS[area]?.id ?? 'living';
-  return (
-    <View style={styles.tools}>
-      <View style={styles.toolRow}>
-        {HOME_AREAS.map((a, i) => (
-          <ToolButton key={a.id} label={`${a.emoji} ${a.name}`} active={area === i} onPress={() => onArea(i)} />
-        ))}
-      </View>
-      <Text style={styles.hint}>
-        Swipe the house to see every room. Drag things to move them, even to another room.
-      </Text>
-      <View style={styles.toolRow}>
-        <ToolButton label="🛒 Add things" active={panel === 'shop'} onPress={() => toggle('shop')} />
-        <ToolButton
-          label={`🧺 Toy box${stored.length ? ` (${stored.length})` : ''}`}
-          active={panel === 'tidy'}
-          onPress={() => toggle('tidy')}
-        />
-        {buddies.length > 1 ? (
-          <ToolButton label="🐾 Buddies" active={panel === 'buddies'} onPress={() => toggle('buddies')} />
-        ) : null}
-        <ToolButton label="🎨 Wall" onPress={() => onPaint('wall')} />
-        <ToolButton label="🟫 Floor" onPress={() => onPaint('floor')} />
-      </View>
-      {panel === 'shop' ? (
-        <>
-          <View style={styles.toolRow}>
-            {groups.map((g) => (
-              <ToolButton key={g.id} label={g.name} active={shelf === g.id} onPress={() => setShelf(g.id)} />
-            ))}
-          </View>
-          <Text style={styles.hint}>New things go in the {areaName}.</Text>
-          <View style={styles.row}>
-            {ROOM_ITEMS.filter((item) => item.group === shelf && inSeason(item, month)).map((item) => (
-              <Pressable
-                key={item.id}
-                onPress={() => onBuy(item.id)}
-                accessibilityRole="button"
-                accessibilityLabel={`${item.name}, ${item.price} coins`}
-                accessibilityState={{ disabled: full || coins < item.price }}
-                style={({ pressed }) => [
-                  styles.thing,
-                  item.month !== undefined && styles.seasonal,
-                  (full || coins < item.price) && styles.locked,
-                  pressed && styles.pressed,
-                ]}
-              >
-                <Text style={styles.thingEmoji}>{item.emoji}</Text>
-                <Text style={styles.thingPrice}>🪙 {item.price}</Text>
-              </Pressable>
-            ))}
-          </View>
-        </>
-      ) : null}
-      {panel === 'tidy' ? (
-        <>
-          <Text style={styles.hint}>
-            Tap a thing in the house to put it away. Tap one here to set it out in the {areaName}.
-          </Text>
-          <View style={styles.row}>
-            {stored.length === 0 ? <Text style={styles.hint}>The toy box is empty.</Text> : null}
-            {stored.map((thing) => {
-              const item = findRoomItem(thing.itemId);
-              return (
-                <Pressable
-                  key={thing.key}
-                  onPress={() => onTakeOut(thing.key)}
-                  accessibilityRole="button"
-                  accessibilityLabel={`Take out the ${item?.name ?? 'thing'}`}
-                  style={({ pressed }) => [styles.thing, pressed && styles.pressed]}
-                >
-                  <Text style={styles.thingEmoji}>{item?.emoji}</Text>
-                </Pressable>
-              );
-            })}
-          </View>
-        </>
-      ) : null}
-      {panel === 'buddies' ? (
-        <>
-          <Text style={styles.hint}>Tap a buddy to invite it over, or to send it off for a nap.</Text>
-          <View style={styles.row}>
-            {buddies.map((item) => {
-              if (item.category !== 'companion') return null;
-              const withYou = item.id === using;
-              const here = isHome(item.id);
-              return (
-                <Pressable
-                  key={item.id}
-                  onPress={() => (withYou ? undefined : onBuddyHome(item.id, !here))}
-                  accessibilityRole="button"
-                  accessibilityLabel={`${item.name}, ${withYou ? 'with you' : here ? 'at home' : 'napping'}`}
-                  accessibilityState={{ selected: here, disabled: withYou }}
-                  style={({ pressed }) => [styles.choice, here && styles.using, pressed && styles.pressed]}
-                >
-                  <Sticker value={item.companion.emoji} size={32} />
-                  <Text style={styles.choiceLevel}>{withYou ? '⭐ You' : here ? '🏠 Home' : '💤 Nap'}</Text>
-                </Pressable>
-              );
-            })}
-          </View>
-        </>
-      ) : null}
-    </View>
-  );
-}
-
-interface ToolButtonProps {
-  label: string;
-  active?: boolean;
-  onPress: () => void;
-}
-
-function ToolButton({ label, active = false, onPress }: ToolButtonProps) {
-  return (
-    <Pressable
-      onPress={onPress}
-      accessibilityRole="button"
-      accessibilityState={{ selected: active }}
-      style={({ pressed }) => [styles.tool, active && styles.toolActive, pressed && styles.pressed]}
-    >
-      <Text style={[styles.toolText, active && styles.toolTextActive]}>{label}</Text>
-    </Pressable>
-  );
-}

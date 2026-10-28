@@ -5,7 +5,7 @@ import { DEFAULT_GRADE } from '@/constants/grades';
 import { DEFAULT_EQUIPPED } from '@/constants/shop';
 import { useSettings } from '@/store/settings';
 import { persistStorage } from '@/store/storage';
-import type { Difficulty, Grade, InputStyle, Profile, RoomSpot } from '@/types';
+import type { Difficulty, Grade, InputStyle, Profile } from '@/types';
 import { dateKey } from '@/utils/dates';
 import { applyRound, type RoundOutcome, type RoundResult } from '@/utils/progress';
 import { careForBuddy as applyCare, heartForRound, type CareAction, type CareResult } from '@/utils/buddy';
@@ -13,10 +13,11 @@ import {
   buyRoomItem,
   emptyRoom,
   moveInRoom,
-  nextPaint,
   setBuddyHome,
   setPlaced,
+  setPaint,
   upgradeRoom,
+  type Placement,
   type RoomBuyResult,
 } from '@/utils/room';
 import { buyItem, equipItem, freeAvatars, type BuyResult } from '@/utils/shop';
@@ -87,9 +88,9 @@ interface ProfilesState {
   /** Buys a thing for the buddies' home and sets it down in `area` (an index into HOME_AREAS). */
   buyRoomItem: (id: string, itemId: string, area: number) => RoomBuyResult;
   /** Moves a thing in the home, or a buddy when `key` is BUDDY_KEY plus its id. */
-  moveInRoom: (id: string, key: string, spot: RoomSpot) => void;
+  moveInRoom: (id: string, key: string, place: Placement) => void;
   setPlaced: (id: string, key: string, placed: boolean, area: number) => void;
-  paintRoom: (id: string, part: 'wall' | 'floor', area: number) => void;
+  paintRoom: (id: string, part: 'wall' | 'floor', color: number, area: number) => void;
   /** Invites a buddy into the home, or sends it off for a nap. */
   setBuddyHome: (id: string, buddyId: string, home: boolean, area: number) => void;
 }
@@ -175,8 +176,8 @@ export const useProfiles = create<ProfilesState>()(
         set((s) => ({
           profiles: s.profiles.map((p) => (p.id === id ? setPlaced(p, key, placed, area) : p)),
         })),
-      paintRoom: (id, part, area) =>
-        set((s) => ({ profiles: s.profiles.map((p) => (p.id === id ? nextPaint(p, part, area) : p)) })),
+      paintRoom: (id, part, color, area) =>
+        set((s) => ({ profiles: s.profiles.map((p) => (p.id === id ? setPaint(p, part, color, area) : p)) })),
       setBuddyHome: (id, buddyId, home, area) =>
         set((s) => ({
           profiles: s.profiles.map((p) => (p.id === id ? setBuddyHome(p, buddyId, home, area) : p)),

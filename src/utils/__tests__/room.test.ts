@@ -7,8 +7,8 @@ import {
   buyRoomItem,
   clampSpot,
   moveInRoom,
-  nextPaint,
   setBuddyHome,
+  setPaint,
   setPlaced,
   upgradeRoom,
 } from '@/utils/room';
@@ -71,10 +71,10 @@ describe('buddy home', () => {
 
   it('paints each area on its own', () => {
     const p = makeProfile();
-    const kitchen = nextPaint(p, 'wall', 1).room.paint;
-    expect(kitchen[1].wall).toBe(1);
+    const kitchen = setPaint(p, 'wall', 3, 1).room.paint;
+    expect(kitchen[1].wall).toBe(3);
     expect(kitchen[0].wall).toBe(0);
-    expect(nextPaint(p, 'floor', 2).room.paint[2].floor).toBe(1);
+    expect(setPaint(p, 'floor', 99, 2).room.paint[2].floor).toBe(7);
   });
 
   it('has several buddies home, always including the one in use', () => {
