@@ -306,8 +306,8 @@ export const SURFACES: Surface[] = [
 ];
 
 /**
- * A built-in thing to tap: it shows a little picture and the buddy says what it does.
- * Drawn as its emoji, `size` tall (in size units), centered `x` screens from the left wall.
+ * A built-in light to tap: a switch that turns its room's lights off and on, or a lamp.
+ * Drawn as its emoji (or a switch plate), `size` tall (in size units), centered `x` screens from the left wall.
  */
 export interface Gadget {
   id: string;
@@ -327,35 +327,12 @@ export interface Gadget {
 }
 
 export const GADGETS: Gadget[] = [
-  // Living room
   { id: 'livingSwitch', name: 'light switch', area: 'living', x: 0.32, bottom: 0.3, size: 0.06, looks: [], lightSwitch: true },
-  { id: 'clock', name: 'grandfather clock', area: 'living', x: 1.08, bottom: 0, size: 0.42, looks: ['🕰️'], fx: '🔔', says: 'hears bong, bong' },
-  { id: 'painting', name: 'painting', area: 'living', x: 1.5, bottom: 0.3, size: 0.2, looks: ['🖼️', '🌄', '🌅', '🏞️', '🌌'], says: 'changes the picture' },
-  { id: 'bigPlant', name: 'big plant', area: 'living', x: 2.3, bottom: 0, size: 0.3, looks: ['🪴'], fx: '💧', says: 'waters the plant' },
-  // Kitchen
   { id: 'kitchenSwitch', name: 'light switch', area: 'kitchen', x: 1.0, bottom: 0.3, size: 0.06, looks: [], lightSwitch: true },
-  { id: 'coffee', name: 'cocoa maker', area: 'kitchen', x: 0.5, bottom: 0.26, size: 0.09, looks: ['☕'], fx: '♨️', says: 'makes hot cocoa' },
-  { id: 'popcorn', name: 'popcorn maker', area: 'kitchen', x: 1.6, bottom: 0.2, size: 0.1, looks: ['🍿'], fx: '💥', says: 'pops popcorn' },
-  { id: 'bin', name: 'trash can', area: 'kitchen', x: 2.38, bottom: 0, size: 0.14, looks: ['🗑️'], fx: '💨', says: 'takes out the trash' },
-  // Bedroom
   { id: 'bedSwitch', name: 'light switch', area: 'bedroom', x: 1.05, bottom: 0.3, size: 0.06, looks: [], lightSwitch: true },
   { id: 'deskLamp', name: 'desk lamp', area: 'bedroom', x: 1.35, bottom: 0.2, size: 0.12, looks: ['🪔'], glow: true },
-  { id: 'globe', name: 'globe', area: 'bedroom', x: 1.6, bottom: 0.2, size: 0.11, looks: ['🌍', '🌎', '🌏'], says: 'spins the globe' },
-  { id: 'alarm', name: 'alarm clock', area: 'bedroom', x: 0.5, bottom: 0.44, size: 0.08, looks: ['⏰'], fx: '🔔', says: 'hears ring, ring' },
-  // Bathroom
   { id: 'bathSwitch', name: 'light switch', area: 'bathroom', x: 0.1, bottom: 0.3, size: 0.06, looks: [], lightSwitch: true },
-  { id: 'tub', name: 'bathtub', area: 'bathroom', x: 0.55, bottom: 0, size: 0.3, looks: ['🛁'], fx: '🫧', says: 'takes a bubble bath' },
-  { id: 'shower', name: 'shower', area: 'bathroom', x: 1.1, bottom: 0.38, size: 0.16, looks: ['🚿'], fx: '💦', says: 'turns on the shower' },
-  { id: 'toilet', name: 'toilet', area: 'bathroom', x: 1.45, bottom: 0, size: 0.24, looks: ['🚽'], fx: '🌀', says: 'flushes the toilet' },
-  { id: 'tap2', name: 'sink', area: 'bathroom', x: 1.93, bottom: 0.22, size: 0.08, looks: ['🚰'], fx: '💧', says: 'washes hands' },
-  { id: 'towel', name: 'towel', area: 'bathroom', x: 2.35, bottom: 0.3, size: 0.14, looks: ['🧣'], fx: '✨', says: 'dries off' },
-  // Playroom
-  { id: 'playSwitch', name: 'disco ball', area: 'playroom', x: 0.95, bottom: 0.58, size: 0.11, looks: ['🪩'], lightSwitch: true, fx: '🕺' },
-  { id: 'slide', name: 'slide', area: 'playroom', x: 0.75, bottom: 0, size: 0.34, looks: ['🛝'], fx: '💨', says: 'zooms down the slide' },
-  { id: 'easel', name: 'easel', area: 'playroom', x: 1.6, bottom: 0, size: 0.28, looks: ['🎨', '🖍️', '🌈'], says: 'paints a picture' },
-  { id: 'tent', name: 'play tent', area: 'playroom', x: 1.2, bottom: 0, size: 0.26, looks: ['⛺'], fx: '🔦', says: 'hides in the tent' },
-  { id: 'rocket', name: 'rocket', area: 'playroom', x: 1.95, bottom: 0, size: 0.28, looks: ['🚀'], fx: '🔥', says: 'blasts off' },
-  { id: 'pinata', name: 'piñata', area: 'playroom', x: 1.6, bottom: 0.55, size: 0.12, looks: ['🪅'], fx: '🍬', says: 'hits the piñata' },
+  { id: 'playSwitch', name: 'light switch', area: 'playroom', x: 0.6, bottom: 0.3, size: 0.06, looks: [], lightSwitch: true },
 ];
 
 export function findCupboard(id: string): Cupboard | undefined {
