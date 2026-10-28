@@ -1,11 +1,12 @@
 import { router, Stack } from 'expo-router';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Text } from '@/components/AppText';
 import { BigButton } from '@/components/BigButton';
 import type { Dressed } from '@/components/BuddyFigure';
+import type { Cloth } from '@/components/PersonFigure';
 import { BuddyRoom, type HomeBuddy } from '@/components/BuddyRoom';
 import { ChoiceButtons } from '@/components/ChoiceButtons';
 import { Furniture } from '@/components/Furniture';
@@ -31,8 +32,13 @@ import {
   BODY_COLORS,
   DEFAULT_BODY,
   findWearable,
+  HAIR_COLOR_NAMES,
+  HAIR_COLORS,
+  HAIR_STYLES,
+  SKIN_TONES,
   WEAR_SLOTS,
   WEARABLES,
+  type PersonLook,
   type WearSlot,
 } from '@/constants/wardrobe';
 import { colors, fontSizes, radius, spacing } from '@/constants/theme';
@@ -58,7 +64,7 @@ import { generate } from '@/utils/mathEngine';
 import { BUDDY_KEY, buddiesHome } from '@/utils/room';
 import { createRng, pick, randomSeed } from '@/utils/seededRandom';
 import { owns } from '@/utils/shop';
-import { outfitOf } from '@/utils/wardrobe';
+import { canWear, lookOf, outfitOf } from '@/utils/wardrobe';
 import { playSound } from '@/utils/soundEffects';
 
 /** The tabs along the bottom; each opens a drawer over the home. */
@@ -94,7 +100,7 @@ interface Game {
  */
 export function BuddyScreen() {
   const profile = useActiveProfile();
-  const { careForBuddy, equip, buyRoomItem, moveInRoom, setPlaced, paintRoom, setBuddyHome, wear, undress } =
+  const { careForBuddy, equip, buyRoomItem, moveInRoom, setPlaced, paintRoom, setBuddyHome, wear, undress, setLook } =
     useProfiles();
   const insets = useSafeAreaInsets();
   const [line, setLine] = useState<string | null>(
@@ -162,7 +168,18 @@ export function BuddyScreen() {
     if (!item || item.category !== 'companion') return [];
     const gift = giftForLevel(buddyLevel(buddyHearts(profile, id)));
     const body = BODY_COLORS[id] ?? DEFAULT_BODY;
-    return [{ id, emoji: item.companion.emoji, gift, name: item.name, spot, ...body, dressed: dressedOf(profile, id) }];
+    return [
+      {
+        id,
+        emoji: item.companion.emoji,
+        gift,
+        name: item.name,
+        spot,
+        ...body,
+        dressed: dressedOf(profile, id),
+        person: personOf(profile, id),
+      },
+    ];
   });
 
   /** Makes another buddy the one you're with. The one before stays home where it stood. */
@@ -388,6 +405,7 @@ export function BuddyScreen() {
                     say(`You need ${item.price - profile.coins} more coins for the ${item.name.toLowerCase()}.`);
                   }
                 }}
+                onLook={(change) => buddyId && setLook(profile.id, buddyId, change)}
                 onUndress={() => {
                   if (!buddyId) return;
                   undress(profile.id, buddyId);
@@ -545,64 +563,148 @@ function dressedOf(profile: Profile, buddyId: string): Dressed {
   };
 }
 
+/** A person buddy's looks and clothes, ready to draw; null for animals. */
+function personOf(profile: Profile, buddyId: string): HomeBuddy['person'] {
+  const look = lookOf(profile, buddyId);
+  if (!look) return undefined;
+  const outfit = outfitOf(profile, buddyId);
+  const cloth = (id?: string): Cloth | undefined => {
+    const w = id ? findWearable(id) : undefined;
+    return w?.color ? { color: w.color, cut: w.cut, pattern: w.pattern, patternColor: w.patternColor } : undefined;
+  };
+  const { hat, face, neck, feet } = dressedOf(profile, buddyId);
+  return { look, dressed: { hat, face, neck, feet, top: cloth(outfit.shirt), legs: cloth(outfit.legs) } };
+}
+
+/** Dress up tabs: clothes spots, plus hair, beard and skin for people. */
+type DressTab = WearSlot | 'hair' | 'hairColor' | 'beard' | 'skin';
+
+const LOOK_TABS: { id: DressTab; name: string }[] = [
+  { id: 'hair', name: '💇 Hair' },
+  { id: 'hairColor', name: '🎨 Hair color' },
+  { id: 'beard', name: '🧔 Beard' },
+  { id: 'skin', name: '✋ Skin' },
+];
+
 interface DressDrawerProps {
   profile: Profile;
   name: string;
   buddyId: string | null;
   onWear: (wearableId: string) => void;
   onUndress: () => void;
+  onLook: (change: Partial<PersonLook>) => void;
 }
 
-/** Clothes and accessories for the buddy you're with: tap to buy and put on, tap again to take off. */
-function DressDrawer({ profile, name, buddyId, onWear, onUndress }: DressDrawerProps) {
-  const [slot, setSlot] = useState<WearSlot>('hat');
+/**
+ * Clothes and accessories for the buddy you're with: tap to buy and put on, tap again to
+ * take off. People also get free hair, beard and skin choices.
+ */
+function DressDrawer({ profile, name, buddyId, onWear, onUndress, onLook }: DressDrawerProps) {
+  const [picked, setTab] = useState<DressTab>('shirt');
   if (!buddyId) return <Text style={styles.hint}>Pick a buddy in 🐾 Buddies first.</Text>;
   const outfit = outfitOf(profile, buddyId);
+  const look = lookOf(profile, buddyId);
+  const tabs = [
+    ...WEAR_SLOTS.filter((w) => look || !w.peopleOnly),
+    ...(look ? LOOK_TABS : []),
+  ];
+  const tab = tabs.some((t) => t.id === picked) ? picked : 'shirt';
+  const swatch = (key: string, label: string, selected: boolean, onPress: () => void, child: ReactNode) => (
+    <Pressable
+      key={key}
+      onPress={onPress}
+      accessibilityRole="button"
+      accessibilityLabel={label}
+      accessibilityState={{ selected }}
+      style={({ pressed }) => [styles.thing, selected && styles.using, pressed && styles.pressed]}
+    >
+      {child}
+    </Pressable>
+  );
+  let row: ReactNode;
+  if (look && tab === 'hair') {
+    row = HAIR_STYLES.map((h) =>
+      swatch(h.id, h.name, look.hair === h.id, () => onLook({ hair: h.id }), <Text style={styles.small}>{h.name}</Text>),
+    );
+  } else if (look && tab === 'hairColor') {
+    row = HAIR_COLORS.map((c, i) =>
+      swatch(c, HAIR_COLOR_NAMES[i] ?? 'Color', look.hairColor === i, () => onLook({ hairColor: i }), (
+        <View style={[styles.colorDot, { backgroundColor: c }]} />
+      )),
+    );
+  } else if (look && tab === 'beard') {
+    row = [
+      swatch('none', 'No beard', look.beard === null, () => onLook({ beard: null }), <Text style={styles.small}>None</Text>),
+      ...HAIR_COLORS.map((c, i) =>
+        swatch(c, `${HAIR_COLOR_NAMES[i] ?? ''} beard`, look.beard === i, () => onLook({ beard: i }), (
+          <View style={[styles.colorDot, { backgroundColor: c }]} />
+        )),
+      ),
+    ];
+  } else if (look && tab === 'skin') {
+    row = SKIN_TONES.map((c, i) =>
+      swatch(c, `Skin tone ${i + 1}`, look.skin === i, () => onLook({ skin: i }), (
+        <View style={[styles.colorDot, { backgroundColor: c }]} />
+      )),
+    );
+  } else {
+    row = [
+      ...WEARABLES.filter((w) => w.slot === tab).map((w) => {
+        const free = canWear(profile, buddyId, w.id);
+        const on = outfit[w.slot] === w.id;
+        return (
+          <Pressable
+            key={w.id}
+            onPress={() => onWear(w.id)}
+            accessibilityRole="button"
+            accessibilityLabel={`${w.name}${free ? '' : `, ${w.price} coins`}${on ? ', wearing' : ''}`}
+            accessibilityState={{ selected: on }}
+            style={({ pressed }) => [
+              styles.thing,
+              on && styles.using,
+              !free && profile.coins < w.price && styles.locked,
+              pressed && styles.pressed,
+            ]}
+          >
+            {w.color ? (
+              <View style={[styles.shirtSwatch, { backgroundColor: w.color }]}>
+                <Text style={styles.swatchEmoji}>{w.emoji}</Text>
+              </View>
+            ) : (
+              <Text style={styles.thingEmoji}>{w.emoji}</Text>
+            )}
+            <Text style={styles.thingPrice}>{on ? '✓ On' : free ? 'Yours' : `🪙 ${w.price}`}</Text>
+          </Pressable>
+        );
+      }),
+      <Pressable
+        key="alloff"
+        onPress={onUndress}
+        accessibilityRole="button"
+        accessibilityLabel={`Take everything off ${name}`}
+        style={({ pressed }) => [styles.thing, pressed && styles.pressed]}
+      >
+        <Text style={styles.thingEmoji}>🧺</Text>
+        <Text style={styles.thingPrice}>All off</Text>
+      </Pressable>,
+    ];
+  }
+  const lookTab = LOOK_TABS.some((t) => t.id === tab);
   return (
     <>
       <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chips}>
-        {WEAR_SLOTS.map((w) => (
-          <Chip key={w.id} label={w.name} on={slot === w.id} onPress={() => setSlot(w.id)} />
+        {tabs.map((t) => (
+          <Chip key={t.id} label={t.name} on={tab === t.id} onPress={() => setTab(t.id)} />
         ))}
       </ScrollView>
       <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chips}>
-        {WEARABLES.filter((w) => w.slot === slot).map((w) => {
-          const have = profile.wardrobe.includes(w.id);
-          const on = outfit[w.slot] === w.id;
-          return (
-            <Pressable
-              key={w.id}
-              onPress={() => onWear(w.id)}
-              accessibilityRole="button"
-              accessibilityLabel={`${w.name}${have ? '' : `, ${w.price} coins`}${on ? ', wearing' : ''}`}
-              accessibilityState={{ selected: on }}
-              style={({ pressed }) => [
-                styles.thing,
-                on && styles.using,
-                !have && profile.coins < w.price && styles.locked,
-                pressed && styles.pressed,
-              ]}
-            >
-              {w.color ? (
-                <View style={[styles.shirtSwatch, { backgroundColor: w.color }]} />
-              ) : (
-                <Text style={styles.thingEmoji}>{w.emoji}</Text>
-              )}
-              <Text style={styles.thingPrice}>{on ? '✓ On' : have ? 'Yours' : `🪙 ${w.price}`}</Text>
-            </Pressable>
-          );
-        })}
-        <Pressable
-          onPress={onUndress}
-          accessibilityRole="button"
-          accessibilityLabel={`Take everything off ${name}`}
-          style={({ pressed }) => [styles.thing, pressed && styles.pressed]}
-        >
-          <Text style={styles.thingEmoji}>🚿</Text>
-          <Text style={styles.thingPrice}>All off</Text>
-        </Pressable>
+        {row}
       </ScrollView>
-      <Text style={styles.hint}>Buy once, then any buddy can wear it. Tap again to take it off.</Text>
+      <Text style={styles.hint}>
+        {lookTab
+          ? `Free! Make ${name} look just right.`
+          : 'Buy once, then any buddy can wear it. Tap again to take it off.'}
+      </Text>
     </>
   );
 }
@@ -950,7 +1052,17 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   paintLabel: { fontSize: 16, fontWeight: '900', color: colors.text, width: 76 },
-  shirtSwatch: { width: 34, height: 30, borderRadius: 8, borderWidth: 2, borderColor: colors.border },
+  shirtSwatch: {
+    width: 40,
+    height: 36,
+    borderRadius: 8,
+    borderWidth: 2,
+    borderColor: colors.border,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  swatchEmoji: { fontSize: 18 },
+  colorDot: { width: 40, height: 40, borderRadius: 20, borderWidth: 2, borderColor: colors.border },
   swatch: { width: 44, height: 44, borderRadius: 22, borderWidth: 2, borderColor: colors.border },
   swatchOn: { borderWidth: 5, borderColor: colors.primary },
   action: {

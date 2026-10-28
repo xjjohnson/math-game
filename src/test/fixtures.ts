@@ -45,6 +45,7 @@ export const makeProfile = (overrides: Partial<Profile> = {}): Profile => ({
   room: emptyRoom(),
   wardrobe: [],
   outfits: {},
+  looks: {},
   missed: {},
   ...overrides,
 });

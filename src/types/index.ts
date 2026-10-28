@@ -1,3 +1,5 @@
+import type { PersonLook } from '@/constants/wardrobe';
+
 export type Operation = 'add' | 'subtract' | 'multiply' | 'divide';
 
 export type Difficulty = 'easy' | 'medium' | 'hard';
@@ -91,10 +93,12 @@ export interface Profile {
   wardrobe: string[];
   /** What each buddy has on, keyed by the buddy's shop item id. */
   outfits: Record<string, Outfit>;
+  /** How each person buddy looks (hair, skin, beard), once changed from its start. */
+  looks: Record<string, PersonLook>;
 }
 
 /** Wearable ids a buddy has on, one per spot. */
-export type Outfit = Partial<Record<'hat' | 'face' | 'neck' | 'shirt' | 'feet', string>>;
+export type Outfit = Partial<Record<'hat' | 'face' | 'neck' | 'shirt' | 'legs' | 'feet', string>>;
 
 /**
  * Spots are shares of the whole home's width (x, so 0 to 1 spans every area) and of its

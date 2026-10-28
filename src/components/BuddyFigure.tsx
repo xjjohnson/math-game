@@ -20,9 +20,6 @@ interface Props {
   size: number;
   fur: string;
   belly: string;
-  /** Everyday clothes (people), shown when Dress up has nothing on in their place. */
-  shirt?: string;
-  shoes?: string;
   dressed: Dressed;
   /** What the buddy wears for its level, perched by its head. */
   gift?: string | null;
@@ -31,8 +28,8 @@ interface Props {
 const LINE = '#3E2C23';
 
 /** A buddy with a body: its face as the head, a round body, arms, feet and its clothes. */
-export function BuddyFigure({ value, size, fur, belly, shirt: everyday, shoes, dressed, gift }: Props) {
-  const shirt = dressed.shirt ?? everyday;
+export function BuddyFigure({ value, size, fur, belly, dressed, gift }: Props) {
+  const shirt = dressed.shirt;
   const s = size;
   const line = Math.max(2, Math.round(s * 0.015));
   const edge = { borderWidth: line, borderColor: LINE };
@@ -69,7 +66,7 @@ export function BuddyFigure({ value, size, fur, belly, shirt: everyday, shoes, d
           style={[
             styles.part,
             edge,
-            { backgroundColor: shoes ?? fur, width: footW, height: footH, bottom: 0, left: s / 2 + side * s * 0.12 - footW / 2, borderRadius: footH },
+            { backgroundColor: fur, width: footW, height: footH, bottom: 0, left: s / 2 + side * s * 0.12 - footW / 2, borderRadius: footH },
           ]}
         />
       ))}
