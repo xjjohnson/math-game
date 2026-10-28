@@ -127,6 +127,8 @@ const TABLES: FixtureSpot[] = [
 ];
 const PLAY_SHELF: FixtureSpot = { area: 'playroom', left: 1.1, width: 0.4, bottom: 0.395, height: 0.025 };
 const DARK = 'rgba(16, 18, 52, 0.55)';
+/** Sizes of the rings in a pool of light, as shares of how far it reaches. */
+const POOL_RINGS = [1, 0.9, 0.8, 0.7, 0.6, 0.5, 0.42, 0.34, 0.26, 0.18];
 
 /** A finger dragging a piece, and what rides along with it. */
 interface Track {
@@ -331,6 +333,28 @@ export function BuddyRoom(props: Props) {
     // A switch's picture (a disco ball's dance) shows when the lights go off.
     if (g.fx && (g.lightSwitch ? !on : on)) pop(box.left + box.width / 2, box.top, g.fx);
     onTapGadget?.(g, on);
+  };
+
+  /** Where light shines in a dark room: lit fires, candles and lamps, with how far it reaches. */
+  const lightPools = () => {
+    const inDark = (x: number) => dark.has(HOME_AREAS[Math.min(AREA_COUNT - 1, Math.floor(x / size.areaWidth))]?.id);
+    const pools: { key: string; x: number; y: number; r: number }[] = [];
+    for (const p of pieces) {
+      if (p.item?.light && lit.has(p.key)) pools.push({ key: p.key, x: p.x, y: p.y - p.height * 0.6, r: size.unit * 0.3 });
+    }
+    for (const g of GADGETS) {
+      if (g.glow && lit.has(g.id)) {
+        const b = gadgetBox(g, size);
+        pools.push({ key: g.id, x: b.left + b.width / 2, y: b.top + b.height * 0.4, r: size.unit * 0.3 });
+      }
+    }
+    for (const a of APPLIANCES) {
+      if (a.kind === 'fireplace' && running.has(a.id)) {
+        const b = fixtureBox(a, size);
+        pools.push({ key: a.id, x: b.left + b.width / 2, y: b.top + b.height * 0.75, r: size.unit * 0.55 });
+      }
+    }
+    return pools.filter((l) => inDark(l.x));
   };
 
   const tapAppliance = (a: Appliance) => {
@@ -662,6 +686,17 @@ export function BuddyRoom(props: Props) {
               style={[styles.dark, { left: i * size.areaWidth, width: size.areaWidth }]}
             />
           ) : null,
+        )}
+        {/* Fires, candles and lamps light up the dark around them. */}
+        {lightPools().flatMap((l) =>
+          // Rings of warm light, brightest where they overlap in the middle.
+          POOL_RINGS.map((k) => (
+            <View
+              key={`${l.key}-${k}`}
+              pointerEvents="none"
+              style={[styles.pool, { left: l.x - l.r * k, top: l.y - l.r * k, width: l.r * k * 2, height: l.r * k * 2, borderRadius: l.r * k }]}
+            />
+          )),
         )}
 
         {pops.map((p) => (
@@ -1145,6 +1180,7 @@ const styles = StyleSheet.create({
   fill: { width: '100%', height: '100%', alignItems: 'center', justifyContent: 'flex-end' },
   layer: { position: 'absolute', left: 0, top: 0, right: 0, bottom: 0 },
   dark: { position: 'absolute', top: 0, bottom: 0, backgroundColor: DARK },
+  pool: { position: 'absolute', backgroundColor: 'rgba(255, 205, 120, 0.075)' },
   gadget: { position: 'absolute', alignItems: 'center', justifyContent: 'flex-end' },
   switchPlate: {
     width: '70%',
