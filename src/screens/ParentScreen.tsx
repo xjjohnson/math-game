@@ -3,6 +3,7 @@ import { Pressable, StyleSheet, View } from 'react-native';
 
 import { Text } from '@/components/AppText';
 import { BigButton } from '@/components/BigButton';
+import { LevelPicker } from '@/components/LevelPicker';
 import { OptionGroup } from '@/components/OptionGroup';
 import { Screen } from '@/components/Screen';
 import { stickerText } from '@/constants/art';
@@ -183,6 +184,7 @@ function Adjust({ label, steps, onPress }: { label: string; steps: number[]; onP
 
 function PlayerReport({ profile }: { profile: Profile }) {
   const adjustBalance = useProfiles((s) => s.adjustBalance);
+  const updateProfile = useProfiles((s) => s.updateProfile);
   const today = dateKey();
   const tricky = trickiest(profile.missed, 5);
   const badges = profile.badges.map(findBadge).filter((b) => b !== undefined);
@@ -201,6 +203,13 @@ function PlayerReport({ profile }: { profile: Profile }) {
       <Text style={styles.line}>
         Best answer streak: {profile.bestStreak} · {GRADES[profile.grade].name}
       </Text>
+
+      <Text style={styles.heading}>🎓 Grade level</Text>
+      <LevelPicker
+        label={`${profile.name}'s grade`}
+        level={{ grade: profile.grade, difficulty: profile.lastDifficulty }}
+        onChange={(level) => updateProfile(profile.id, { grade: level.grade, lastDifficulty: level.difficulty })}
+      />
 
       <Text style={styles.heading}>
         🪙 {profile.coins} coins · ⭐ {profile.stars} stars
