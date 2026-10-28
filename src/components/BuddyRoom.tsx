@@ -137,8 +137,9 @@ const DARK = 'rgba(16, 18, 52, 0.55)';
 const POOL_RINGS = Array.from({ length: 16 }, (_, i) => 1 - i * 0.055);
 
 /** A finger dragging a piece, and what rides along with it. */
+/** A finger on the home: carrying a piece, or (with no piece) sliding the home along while another carries one. */
 interface Track {
-  piece: Piece;
+  piece: Piece | null;
   keys: Set<string>;
   /** Where the finger went down, across the whole home. */
   startX: number;
@@ -421,7 +422,7 @@ export function BuddyRoom(props: Props) {
   const showMoving = () => {
     const next: Record<string, { dx: number; dy: number }> = {};
     for (const t of tracks.current.values()) {
-      if (!t.moved) continue;
+      if (!t.moved || !t.piece) continue;
       const at = toHome(t.pageX, t.pageY);
       for (const key of t.keys) next[key] = { dx: at.x - t.startX, dy: at.y - t.startY };
     }
@@ -441,11 +442,12 @@ export function BuddyRoom(props: Props) {
   const startTouch = (id: number, pageX: number, pageY: number) => {
     if (tracks.current.has(id)) return;
     const piece = pieceUnder(pageX, pageY);
-    if (!piece) return;
+    // Another finger is carrying something: this one slides the home along under it.
+    if (!piece && tracks.current.size === 0) return;
     const at = toHome(pageX, pageY);
     tracks.current.set(id, {
       piece,
-      keys: ridersOf(latestPieces.current, piece.key),
+      keys: piece ? ridersOf(latestPieces.current, piece.key) : new Set(),
       startX: at.x,
       startY: at.y,
       pageX,
@@ -462,7 +464,7 @@ export function BuddyRoom(props: Props) {
   /** Which way to scroll while a dragged piece is held at the side of the screen. */
   const edgeDir = () => {
     for (const t of tracks.current.values()) {
-      if (!t.moved) continue;
+      if (!t.moved || !t.piece) continue;
       const x = t.pageX - frame.current.x;
       if (x < EDGE) return -1;
       if (x > view.width - EDGE) return 1;
@@ -475,6 +477,15 @@ export function BuddyRoom(props: Props) {
     for (const touch of touches) {
       const t = tracks.current.get(Number(touch.identifier));
       if (!t) continue;
+      if (!t.piece) {
+        // Sliding the home: what's being carried rides along under its finger.
+        scrollBy(t.pageX - touch.pageX);
+        t.pageX = touch.pageX;
+        t.pageY = touch.pageY;
+        for (const other of tracks.current.values()) if (other.piece) other.moved = true;
+        changed = true;
+        continue;
+      }
       t.pageX = touch.pageX;
       t.pageY = touch.pageY;
       if (!t.moved) {
@@ -502,6 +513,7 @@ export function BuddyRoom(props: Props) {
     tracks.current.delete(id);
     if (tracks.current.size === 0) stopEdge();
     showMoving();
+    if (!t.piece) return;
     if (!t.moved) return tapPiece(t.piece);
     const at = toHome(t.pageX, t.pageY);
     dropPiece(t.piece, at.x - t.startX, at.y - t.startY);
