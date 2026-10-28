@@ -5,6 +5,7 @@ import { Text } from '@/components/AppText';
 import { BigButton } from '@/components/BigButton';
 import { OptionGroup } from '@/components/OptionGroup';
 import { Screen } from '@/components/Screen';
+import { stickerText } from '@/constants/art';
 import { findBadge } from '@/constants/badges';
 import { OPERATIONS } from '@/constants/difficulty';
 import { GRADES } from '@/constants/grades';
@@ -229,7 +230,7 @@ function PlayerReport({ profile }: { profile: Profile }) {
   return (
     <View style={styles.card}>
       <Text style={styles.player}>
-        {profile.avatar} {profile.name}
+        {stickerText(profile.avatar)} {profile.name}
       </Text>
       <Text style={styles.line}>
         Played on {days} {days === 1 ? 'day' : 'days'}

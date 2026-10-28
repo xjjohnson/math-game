@@ -5,10 +5,17 @@ import {
   COOP_WAVES,
   isOver,
   matchProblem,
+  setupLevel,
+  MONSTER,
+  monsterFor,
   outcomeFor,
   playerLeft,
   RACE_TARGET,
   receive,
+  RELAY,
+  relayLap,
+  runner,
+  stageSeconds,
   standings,
   startMatch,
   waveTarget,
@@ -23,6 +30,10 @@ import {
   passScores,
   passWinners,
   startPass,
+  TEAM_UP_PER_PLAYER,
+  teamHits,
+  teamTarget,
+  teamWon,
   type PassPlayer,
   type PassState,
 } from '@/utils/multiplayer/passAndPlay';
@@ -36,6 +47,8 @@ import {
 
 const race: MatchSetup = { mode: 'race', operation: 'add', difficulty: 'easy', seed: 42 };
 const coop: MatchSetup = { ...race, mode: 'coop' };
+const monster: MatchSetup = { ...race, mode: 'monster' };
+const relay: MatchSetup = { ...race, mode: 'relay' };
 
 /**
  * A host and `count - 1` guests over the mock network, each phone keeping its
@@ -74,6 +87,9 @@ describe('protocol', () => {
       { type: 'welcome', version: 2, you: 'x1' },
       { type: 'lobby', players },
       { type: 'start', setup: race, players },
+      { type: 'start', setup: monster, players },
+      { type: 'start', setup: relay, players },
+      { type: 'start', setup: { ...relay, grade: 3 }, players },
       { type: 'answer', correct: true, playerId: 'x1' },
       { type: 'wave', wave: 1 },
       { type: 'left', playerId: 'x1' },
@@ -98,6 +114,11 @@ describe('protocol', () => {
 describe('matches', () => {
   it('gives racers the same cards and each co-op player their own', () => {
     expect(matchProblem(race, 0, 4)).toEqual(matchProblem(race, 3, 4));
+    // Each phone plays at its own level; the host's level rides along for Relay.
+    const big = { grade: 5, difficulty: 'hard' } as const;
+    expect(matchProblem(race, 0, 4, big).answer).toBeGreaterThanOrEqual(20000);
+    expect(setupLevel({ ...relay, grade: 2 })).toEqual({ grade: 2, difficulty: 'easy' });
+    expect(setupLevel(relay)).toBeUndefined();
     const coopCards = (seat: number) => [0, 1, 2, 3, 4].map((i) => matchProblem(coop, seat, i).prompt).join();
     expect(new Set([0, 1, 2, 3].map(coopCards)).size).toBe(4);
   });
@@ -154,6 +175,85 @@ describe('matches', () => {
     expect(game.state(1).left).toEqual([game.ids[2]]);
     game.answer(1, true);
     expect(game.state(1).wave).toBe(1);
+  });
+
+  it('monster battle with 3 players: everyone hits one monster and wins together', async () => {
+    const game = await phones(monster, 3);
+    expect(waveTarget(game.state(1))).toBe(MONSTER.perPlayer * 3);
+    // Teammates get their own cards, like co-op.
+    expect(matchProblem(monster, 1, 0)).toEqual(matchProblem(coop, 1, 0));
+    for (let i = 0; i < MONSTER.perPlayer * 3 - 1; i++) game.answer(i % 3, true);
+    game.answer(2, false);
+    expect(isOver(game.state(0))).toBe(false);
+    expect(game.state(2).waveCorrect).toBe(MONSTER.perPlayer * 3 - 1);
+    game.answer(1, true);
+    for (const p of [0, 1, 2]) expect(outcomeFor(game.state(p))).toBe('won');
+  });
+
+  it('monster battle: the monster gets away if the clock runs out, and shrinks when someone leaves', async () => {
+    const lost = await phones(monster, 2);
+    lost.answer(1, true);
+    lost.timeUp();
+    expect(outcomeFor(lost.state(1))).toBe('lost');
+
+    const game = await phones(monster, 3);
+    for (let i = 0; i < MONSTER.perPlayer * 2 - 1; i++) game.answer(i % 2, true);
+    game.leave(2);
+    expect(waveTarget(game.state(0))).toBe(MONSTER.perPlayer * 2);
+    game.answer(0, true);
+    expect(outcomeFor(game.state(1))).toBe('won');
+  });
+
+  it('every phone shows the same monster', () => {
+    expect(monsterFor(monster.seed)).toBe(monsterFor(42));
+    expect(new Set([0, 1, 2, 3, 4, 5, 6].map(monsterFor)).size).toBe(7);
+  });
+
+  it('relay with 3 players: the baton goes round, every phone on the same card', async () => {
+    const game = await phones(relay, 3);
+    expect(waveTarget(game.state(0))).toBe(RELAY.laps * 3);
+    expect(stageSeconds(game.state(2))).toBe(RELAY.secondsPerLeg * RELAY.laps * 3);
+    expect(runner(game.state(1))).toBe(game.ids[0]);
+
+    // Only the runner can answer; anyone else is ignored everywhere.
+    game.answer(2, true);
+    for (const p of [0, 1, 2]) expect(game.state(p).cards).toBe(0);
+
+    // A wrong answer keeps the baton but moves everyone to a fresh card.
+    game.answer(0, false);
+    for (const p of [0, 1, 2]) {
+      expect(game.state(p).cards).toBe(1);
+      expect(runner(game.state(p))).toBe(game.ids[0]);
+    }
+    game.answer(0, true);
+    for (const p of [0, 1, 2]) expect(runner(game.state(p))).toBe(game.ids[1]);
+    game.answer(1, true);
+    expect(game.state(0).last).toEqual({ playerId: game.ids[1], correct: true });
+    game.answer(2, true);
+    expect(relayLap(game.state(1))).toBe(2);
+
+    for (let leg = 3; leg < RELAY.laps * 3 - 1; leg++) game.answer(leg % 3, true);
+    expect(isOver(game.state(0))).toBe(false);
+    game.answer(2, true);
+    for (const p of [0, 1, 2]) expect(outcomeFor(game.state(p))).toBe('won');
+  });
+
+  it('relay: a player leaving drops out of the baton order', async () => {
+    const game = await phones(relay, 3);
+    game.answer(0, true);
+    expect(runner(game.state(0))).toBe(game.ids[1]);
+    game.leave(1);
+    // 2 players now need 6; the host's 1 counts, and the baton skips the empty seat.
+    expect(waveTarget(game.state(2))).toBe(RELAY.laps * 2);
+    expect(runner(game.state(2))).toBe(game.ids[2]);
+    expect(runner(game.state(0))).toBe(game.ids[2]);
+  });
+
+  it('relay: the clock can still win', async () => {
+    const game = await phones(relay, 2);
+    game.answer(0, true);
+    game.timeUp();
+    expect(outcomeFor(game.state(1))).toBe('lost');
   });
 
   it('only the host referees', () => {
@@ -215,5 +315,37 @@ describe('pass-and-play', () => {
     }
     s = passReducer(s, { type: 'answer', given: passProblem(s).answer });
     expect(s.histories[0][0]).toMatchObject({ difficulty: 'easy', grade: 0, correct: true });
+  });
+});
+
+describe('team up on one phone', () => {
+  const players: PassPlayer[] = ['Ava', 'Leo', 'Mia'].map((name) => ({
+    name,
+    avatar: '🙂',
+    level: { grade: 1, difficulty: 'easy' },
+  }));
+  const play = (state: PassState, right: number[]) => {
+    let s = state;
+    while (s.phase !== 'finished') {
+      if (s.phase === 'handoff') s = passReducer(s, { type: 'begin' });
+      const p = passProblem(s);
+      s = passReducer(s, { type: 'answer', given: s.index < right[s.turn] ? p.answer : p.answer + 1 });
+      s = passReducer(s, { type: 'next' });
+    }
+    return s;
+  };
+
+  it("adds everyone's right answers against one monster", () => {
+    const start = startPass(players, 'add', 7, true);
+    expect(teamTarget(start)).toBe(TEAM_UP_PER_PLAYER * 3);
+    // A strong player can carry a teammate who is still learning.
+    const carried = play(start, [10, 9, 2]);
+    expect(teamHits(carried)).toBe(21);
+    expect(teamWon(carried)).toBe(true);
+    expect(teamWon(play(start, [10, 8, 2]))).toBe(false);
+  });
+
+  it('take turns stays a competition', () => {
+    expect(startPass(players, 'add', 7).team).toBe(false);
   });
 });

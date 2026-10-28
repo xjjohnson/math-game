@@ -3,6 +3,7 @@ import { StyleSheet, View } from 'react-native';
 import { Text } from '@/components/AppText';
 import { Screen } from '@/components/Screen';
 import { StreakCalendar } from '@/components/StreakCalendar';
+import { stickerText } from '@/constants/art';
 import { BADGES } from '@/constants/badges';
 import { OPERATIONS } from '@/constants/difficulty';
 import { colors, fontSizes, radius, spacing } from '@/constants/theme';
@@ -27,7 +28,7 @@ export function ProgressScreen() {
     profile.week && profile.week.week === weekKey(today) ? profile.week : emptyWeek(today);
 
   return (
-    <Screen title={`${profile.avatar} ${profile.name}`}>
+    <Screen title={`${stickerText(profile.avatar)} ${profile.name}`}>
       <View style={styles.tiles}>
         <Tile value={String(profile.coins)} label="🪙 Coins" />
         <Tile value={String(profile.stars)} label="⭐ Stars" />

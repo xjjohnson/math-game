@@ -22,6 +22,7 @@ import { useGameSession } from '@/hooks/useGameSession';
 import { useTimer } from '@/hooks/useTimer';
 import { useActiveProfile, useProfiles } from '@/store/profiles';
 import type { GameConfig } from '@/types';
+import { buddyGift } from '@/utils/buddy';
 import { speakProblem, stopSpeaking, vibrate } from '@/utils/feedback';
 import {
   correctCount,
@@ -197,6 +198,7 @@ function Round({ config, onPlayAgain }: { config: GameConfig; onPlayAgain: () =>
           companion={companion}
           correct={showFeedback ? last.correct : null}
           turn={state.index}
+          gift={buddyGift(profile)}
         />
       ) : null}
 

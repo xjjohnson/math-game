@@ -85,6 +85,12 @@ export function backgroundColor(profile: Profile | undefined): string {
   return item?.category === 'background' ? item.color : colors.background;
 }
 
+/** Faint pictures for a themed background; empty for plain colors. */
+export function backgroundDecor(profile: Profile | undefined): string[] {
+  const item = findItem(profile?.equipped.background);
+  return item?.category === 'background' ? (item.decor ?? []) : [];
+}
+
 export function cardStyleFor(profile: Profile | undefined): CardStyle | undefined {
   const item = findItem(profile?.equipped.cardStyle);
   return item?.category === 'cardStyle' ? item.style : undefined;

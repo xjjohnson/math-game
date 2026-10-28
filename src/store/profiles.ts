@@ -5,9 +5,11 @@ import { DEFAULT_GRADE } from '@/constants/grades';
 import { DEFAULT_EQUIPPED } from '@/constants/shop';
 import { useSettings } from '@/store/settings';
 import { persistStorage } from '@/store/storage';
-import type { Difficulty, Grade, InputStyle, Profile } from '@/types';
+import type { Difficulty, Grade, InputStyle, Profile, RoomSpot } from '@/types';
 import { dateKey } from '@/utils/dates';
 import { applyRound, type RoundOutcome, type RoundResult } from '@/utils/progress';
+import { careForBuddy as applyCare, heartForRound, type CareAction, type CareResult } from '@/utils/buddy';
+import { buyRoomItem, emptyRoom, moveInRoom, nextPaint, setPlaced, type RoomBuyResult } from '@/utils/room';
 import { buyItem, equipItem, freeAvatars, type BuyResult } from '@/utils/shop';
 
 function emptyStats(): Profile['stats'] {
@@ -50,6 +52,9 @@ export function createProfile(
     badges: [],
     week: null,
     missed: {},
+    buddyHearts: {},
+    buddyCare: null,
+    room: emptyRoom(),
   };
 }
 
@@ -68,6 +73,13 @@ interface ProfilesState {
   setAvatar: (id: string, avatar: string) => void;
   /** Parent area: adds (or with a minus, takes away) coins and stars, never below zero. */
   adjustBalance: (id: string, change: { coins?: number; stars?: number }) => void;
+  /** Pets, feeds or plays with the buddy in use. */
+  careForBuddy: (id: string, action: CareAction) => CareResult;
+  buyRoomItem: (id: string, itemId: string) => RoomBuyResult;
+  /** Moves a thing in the buddy's room, or the buddy itself when `key` is "buddy". */
+  moveInRoom: (id: string, key: string, spot: RoomSpot) => void;
+  setPlaced: (id: string, key: string, placed: boolean) => void;
+  paintRoom: (id: string, part: 'wall' | 'floor') => void;
 }
 
 export const useProfiles = create<ProfilesState>()(
@@ -96,7 +108,8 @@ export const useProfiles = create<ProfilesState>()(
         const current = get().profiles.find((p) => p.id === id);
         if (!current) return null;
         const { profile, outcome } = applyRound(current, round, dateKey(), useSettings.getState().coinPayout);
-        set((s) => ({ profiles: s.profiles.map((p) => (p.id === id ? profile : p)) }));
+        const withHeart = heartForRound(profile);
+        set((s) => ({ profiles: s.profiles.map((p) => (p.id === id ? withHeart : p)) }));
         return outcome;
       },
       buy: (id, itemId) => {
@@ -124,10 +137,38 @@ export const useProfiles = create<ProfilesState>()(
               : p,
           ),
         })),
+      careForBuddy: (id, action) => {
+        const current = get().profiles.find((p) => p.id === id);
+        if (!current) return { ok: false, reason: 'noBuddy' };
+        const result = applyCare(current, action, dateKey());
+        if (result.ok) {
+          set((s) => ({ profiles: s.profiles.map((p) => (p.id === id ? result.profile : p)) }));
+        }
+        return result;
+      },
+      buyRoomItem: (id, itemId) => {
+        const current = get().profiles.find((p) => p.id === id);
+        if (!current) return { ok: false, reason: 'unknown' };
+        const result = buyRoomItem(current, itemId, newId());
+        if (result.ok) {
+          set((s) => ({ profiles: s.profiles.map((p) => (p.id === id ? result.profile : p)) }));
+        }
+        return result;
+      },
+      moveInRoom: (id, key, spot) =>
+        set((s) => ({
+          profiles: s.profiles.map((p) => (p.id === id ? moveInRoom(p, key, spot) : p)),
+        })),
+      setPlaced: (id, key, placed) =>
+        set((s) => ({
+          profiles: s.profiles.map((p) => (p.id === id ? setPlaced(p, key, placed) : p)),
+        })),
+      paintRoom: (id, part) =>
+        set((s) => ({ profiles: s.profiles.map((p) => (p.id === id ? nextPaint(p, part) : p)) })),
     }),
     {
       name: 'math-game.profiles',
-      version: 6,
+      version: 7,
       storage: persistStorage,
       migrate: (persisted, version) => {
         const state = persisted as Pick<ProfilesState, 'profiles' | 'activeProfileId'>;
@@ -158,7 +199,16 @@ export const useProfiles = create<ProfilesState>()(
           state.profiles = state.profiles.map((p) => ({ ...p, startAvatar: p.startAvatar ?? p.avatar }));
         }
         if (version < 6) {
-          // Version 6 added grade levels. Start near the classic level they last played.
+          // Version 6 added buddy hearts, daily buddy care and the buddy's room.
+          state.profiles = state.profiles.map((p) => ({
+            ...p,
+            buddyHearts: p.buddyHearts ?? {},
+            buddyCare: p.buddyCare ?? null,
+            room: p.room ?? emptyRoom(),
+          }));
+        }
+        if (version < 7) {
+          // Version 7 added grade levels. Start near the classic level they last played.
           const nearest: Record<Difficulty, Grade> = { easy: 1, medium: 3, hard: 5 };
           state.profiles = state.profiles.map((p) => ({ ...p, grade: p.grade ?? nearest[p.lastDifficulty] ?? DEFAULT_GRADE }));
         }

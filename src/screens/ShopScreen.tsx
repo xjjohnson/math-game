@@ -4,6 +4,8 @@ import { Pressable, StyleSheet, View } from 'react-native';
 import { Text } from '@/components/AppText';
 import { OptionGroup } from '@/components/OptionGroup';
 import { Screen } from '@/components/Screen';
+import { Sticker } from '@/components/Sticker';
+import { stickerText } from '@/constants/art';
 import { findBadge } from '@/constants/badges';
 import { itemsIn, SHOP_CATEGORIES, type ShopCategory, type ShopItem } from '@/constants/shop';
 import { colors, fontSizes, radius, spacing, TAP_TARGET } from '@/constants/theme';
@@ -68,10 +70,10 @@ export function ShopScreen() {
                   key={emoji}
                   onPress={() => {
                     setAvatar(profile.id, emoji);
-                    setMessage(first ? 'Back to your first avatar!' : `Now using ${emoji}.`);
+                    setMessage(first ? 'Back to your first avatar!' : `Now using ${stickerText(emoji)}.`);
                   }}
                   accessibilityRole="button"
-                  accessibilityLabel={`Avatar ${emoji}${first ? ', your first pick' : ''}${using ? ', using' : ''}`}
+                  accessibilityLabel={`Avatar ${stickerText(emoji)}${first ? ', your first pick' : ''}${using ? ', using' : ''}`}
                   accessibilityState={{ selected: using }}
                   style={({ pressed }) => [
                     styles.freeChoice,
@@ -79,7 +81,7 @@ export function ShopScreen() {
                     pressed && styles.pressed,
                   ]}
                 >
-                  <Text style={styles.freeEmoji}>{emoji}</Text>
+                  <Sticker value={emoji} size={36} />
                   {first ? <Text style={styles.firstTag}>First</Text> : null}
                 </Pressable>
               );
@@ -128,11 +130,19 @@ export function ShopScreen() {
 function Preview({ item }: { item: ShopItem }) {
   switch (item.category) {
     case 'avatar':
-      return <Text style={styles.emoji}>{item.emoji}</Text>;
+      return <Sticker value={item.emoji} size={48} />;
     case 'companion':
-      return <Text style={styles.emoji}>{item.companion.emoji}</Text>;
+      return <Sticker value={item.companion.emoji} size={48} />;
     case 'background':
-      return <View style={[styles.swatch, { backgroundColor: item.color }]} />;
+      return (
+        <View style={[styles.swatch, styles.scene, { backgroundColor: item.color }]}>
+          {item.decor?.slice(0, 3).map((d) => (
+            <Text key={d} style={styles.sceneEmoji}>
+              {d}
+            </Text>
+          ))}
+        </View>
+      );
     case 'cardStyle':
       return (
         <View
@@ -167,7 +177,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  freeEmoji: { fontSize: 36 },
   firstTag: { fontSize: 12, fontWeight: '800', color: colors.primary },
   grid: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
   item: {
@@ -186,7 +195,6 @@ const styles = StyleSheet.create({
   using: { borderColor: colors.correct, borderWidth: 5 },
   locked: { opacity: 0.55 },
   pressed: { transform: [{ scale: 0.97 }] },
-  emoji: { fontSize: 48 },
   swatch: {
     width: 72,
     height: 52,
@@ -194,6 +202,8 @@ const styles = StyleSheet.create({
     borderWidth: 2,
     borderColor: colors.border,
   },
+  scene: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 2 },
+  sceneEmoji: { fontSize: 18 },
   miniCard: { borderWidth: 4, alignItems: 'center', justifyContent: 'center' },
   miniText: { fontWeight: '900', fontSize: 18 },
   name: { fontSize: fontSizes.body, fontWeight: '800', color: colors.text },

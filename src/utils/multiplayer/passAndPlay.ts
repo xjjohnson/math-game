@@ -7,6 +7,9 @@ export const PASS_QUESTIONS = 10;
 /** How many can share one phone. */
 export const MAX_PASS_PLAYERS = 6;
 
+/** Team Up: the monster has this much health for each player, out of their 10 questions. */
+export const TEAM_UP_PER_PLAYER = 7;
+
 export interface PassPlayer {
   name: string;
   avatar: string;
@@ -21,6 +24,8 @@ export type PassPhase = 'handoff' | 'question' | 'feedback' | 'finished';
 export interface PassState {
   operation: Operation;
   seed: number;
+  /** Team Up: everyone's right answers hit one shared monster instead of picking a winner. */
+  team: boolean;
   players: PassPlayer[];
   /** Whose turn, by seat. Each player answers all their questions, then hands over. */
   turn: number;
@@ -57,8 +62,8 @@ export function passProblem(state: PassState): Problem {
   return problemAt(config(state, state.turn), state.index, passPlayer(state).level.difficulty);
 }
 
-export function startPass(players: PassPlayer[], operation: Operation, seed: number): PassState {
-  return { operation, seed, players, turn: 0, index: 0, phase: 'handoff', histories: players.map(() => []) };
+export function startPass(players: PassPlayer[], operation: Operation, seed: number, team = false): PassState {
+  return { operation, seed, team, players, turn: 0, index: 0, phase: 'handoff', histories: players.map(() => []) };
 }
 
 export function passReducer(state: PassState, action: PassAction): PassState {
@@ -100,3 +105,12 @@ export function passWinners(state: PassState): number[] {
   const best = Math.max(...scores);
   return scores.flatMap((score, seat) => (score === best ? [seat] : []));
 }
+
+/** Team Up: the monster's full health. */
+export const teamTarget = (state: PassState) => TEAM_UP_PER_PLAYER * state.players.length;
+
+/** Team Up: hits so far, from everyone. */
+export const teamHits = (state: PassState) => passScores(state).reduce((sum, n) => sum + n, 0);
+
+/** Team Up: the monster is beaten once the team's hits reach its health. */
+export const teamWon = (state: PassState) => teamHits(state) >= teamTarget(state);

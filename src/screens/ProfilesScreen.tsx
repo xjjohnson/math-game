@@ -6,6 +6,7 @@ import { Text } from '@/components/AppText';
 import { BigButton } from '@/components/BigButton';
 import { OptionGroup } from '@/components/OptionGroup';
 import { Screen } from '@/components/Screen';
+import { Sticker } from '@/components/Sticker';
 import { DEFAULT_GRADE, GRADE_LIST, GRADES } from '@/constants/grades';
 import { AVATARS, colors, fontSizes, radius, spacing, TAP_TARGET } from '@/constants/theme';
 import { useProfiles } from '@/store/profiles';
@@ -40,7 +41,7 @@ export function ProfilesScreen() {
                 router.back();
               }}
             >
-              <Text style={styles.rowAvatar}>{p.avatar}</Text>
+              <Sticker value={p.avatar} size={40} />
               <Text style={styles.rowName}>{p.name}</Text>
               <Text style={styles.rowGrade}>{GRADES[p.grade].short}</Text>
             </Pressable>
@@ -104,7 +105,6 @@ const styles = StyleSheet.create({
   },
   activeRow: { borderColor: colors.primary },
   rowMain: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: spacing.md, minHeight: TAP_TARGET, paddingHorizontal: spacing.md },
-  rowAvatar: { fontSize: 40 },
   rowName: { flex: 1, fontSize: fontSizes.button, fontWeight: '700', color: colors.text },
   rowGrade: { fontSize: fontSizes.body, fontWeight: '700', color: colors.textMuted },
   remove: { width: TAP_TARGET, height: TAP_TARGET, alignItems: 'center', justifyContent: 'center' },
