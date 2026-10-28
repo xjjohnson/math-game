@@ -18,6 +18,8 @@ export interface Settings {
   /** 4-digit code guarding the parent area; null until a parent sets one. */
   parentPin: string | null;
   coinPayout: CoinPayout;
+  /** The buddy's name and the tips along the top of the buddy's home. */
+  homeTips: boolean;
 }
 
 export const DEFAULT_SETTINGS: Settings = {
@@ -29,6 +31,7 @@ export const DEFAULT_SETTINGS: Settings = {
   colorblindPalette: false,
   parentPin: null,
   coinPayout: 1,
+  homeTips: true,
 };
 
 interface SettingsState extends Settings {

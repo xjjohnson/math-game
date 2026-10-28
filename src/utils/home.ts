@@ -2,9 +2,11 @@ import {
   BUDDY_SIZE,
   CUPBOARDS,
   findCupboard,
+  type Gadget,
   findRoomItem,
   HOME_AREAS,
   isSmall,
+  ROOM_SPAN,
   SURFACES,
   type Cupboard,
   type FixtureSpot,
@@ -19,7 +21,9 @@ export interface HomeSize {
   /** All the areas side by side. */
   width: number;
   height: number;
-  /** One area; at least the screen's width, so a tall phone scrolls a little inside each room. */
+  /** One screen's worth of home; at least the screen's width, so a tall phone scrolls a little more. */
+  screen: number;
+  /** One area: ROOM_SPAN screens. */
   areaWidth: number;
   /** Things are sized by this, so they keep their shape on tall and wide screens alike. */
   unit: number;
@@ -29,10 +33,12 @@ export interface HomeSize {
 
 export function homeSize(viewWidth: number, viewHeight: number): HomeSize {
   const unit = Math.round(Math.min(viewHeight, viewWidth * 1.15));
-  const areaWidth = Math.max(Math.round(viewWidth), Math.round(unit * 1.05));
+  const screen = Math.max(Math.round(viewWidth), Math.round(unit * 1.05));
+  const areaWidth = Math.round(screen * ROOM_SPAN);
   return {
     width: areaWidth * AREA_COUNT,
     height: Math.round(viewHeight),
+    screen,
     areaWidth,
     unit,
     floorY: Math.round(viewHeight * FLOOR_LINE),
@@ -53,8 +59,8 @@ function areaIndex(id: string): number {
 /** A built-in's box across the whole home. */
 export function fixtureBox(f: FixtureSpot, size: HomeSize): Box {
   return {
-    left: (areaIndex(f.area) + f.left) * size.areaWidth,
-    width: f.width * size.areaWidth,
+    left: areaIndex(f.area) * size.areaWidth + f.left * size.screen,
+    width: f.width * size.screen,
     top: size.floorY - (f.bottom + f.height) * size.unit,
     height: f.height * size.unit,
   };
@@ -84,8 +90,27 @@ export function shelvesOf(c: Cupboard, size: HomeSize): Shelves {
 
 /** A ledge's height and its left and right ends. */
 export function surfaceLine(s: Surface, size: HomeSize): { y: number; left: number; right: number } {
-  const left = (areaIndex(s.area) + s.left) * size.areaWidth;
-  return { y: size.floorY - s.bottom * size.unit, left, right: left + s.width * size.areaWidth };
+  const left = areaIndex(s.area) * size.areaWidth + s.left * size.screen;
+  return { y: size.floorY - s.bottom * size.unit, left, right: left + s.width * size.screen };
+}
+
+/** A built-in thing to tap, as a square box. */
+export function gadgetBox(g: Gadget, size: HomeSize): Box {
+  const side = g.size * size.unit;
+  return {
+    left: areaIndex(g.area) * size.areaWidth + g.x * size.screen - side / 2,
+    top: size.floorY - g.bottom * size.unit - side,
+    width: side,
+    height: side,
+  };
+}
+
+/** Which piece, if any, is under a point in the home; the one drawn on top wins. */
+export function pieceAt(pieces: Piece[], x: number, y: number): Piece | null {
+  for (let i = pieces.length - 1; i >= 0; i--) {
+    if (inside(x, y, boxOf(pieces[i]))) return pieces[i];
+  }
+  return null;
 }
 
 /** Something drawn in the home. `x`, `y` is the middle of its bottom edge, in pixels. */

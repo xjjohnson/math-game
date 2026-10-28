@@ -1,4 +1,4 @@
-import { findRoomItem, FLOOR_COLORS, HOME_AREAS, inSeason, MAX_ROOM_THINGS, WALL_COLORS } from '@/constants/room';
+import { findRoomItem, FLOOR_COLORS, HOME_AREAS, inSeason, MAX_ROOM_THINGS, ROOM_SPAN, WALL_COLORS } from '@/constants/room';
 import type { AreaPaint, BuddySpot, Profile, Room, RoomSpot, RoomThing } from '@/types';
 
 /** Where the floor starts, as a share of the room's height. */
@@ -13,7 +13,12 @@ export const BUDDY_KEY = 'buddy:';
 export const FIXTURE_KEY = 'fixture:';
 
 export function emptyRoom(): Room {
-  return { paint: HOME_AREAS.map(() => ({ wall: 0, floor: 0 })), buddies: {}, things: [] };
+  return { paint: HOME_AREAS.map((a) => ({ ...a.paint })), buddies: {}, things: [] };
+}
+
+/** An area's paint, or what it starts with. */
+export function paintOf(room: Room, area: number): AreaPaint {
+  return room.paint[area] ?? HOME_AREAS[area]?.paint ?? { wall: 0, floor: 0 };
 }
 
 /** The middle of an area, as a share of the whole home's width. */
@@ -34,19 +39,40 @@ interface OneRoom {
   things: Room['things'];
 }
 
+/** Versions 8 to 10 had three areas, each one screen wide. */
+const OLD_AREAS = 3;
+
 /**
- * Turns a one-room layout into the home: it becomes the living room (the first area),
- * keeping its paint, its things and where the buddy stood.
+ * Turns a one-room layout into the three-area home of version 8: it becomes the living
+ * room (the first area), keeping its paint, its things and where the buddy stood.
  */
 export function upgradeRoom(room: Room | OneRoom | undefined, buddyId: string | null): Room {
   if (!room) return emptyRoom();
   if ('paint' in room) return room;
-  const toHome = (x: number) => x / AREA_COUNT;
-  const home = emptyRoom();
+  const toHome = (x: number) => x / OLD_AREAS;
+  const home: Room = { paint: [0, 1, 2].map(() => ({ wall: 0, floor: 0 })), buddies: {}, things: [] };
   home.paint[0] = { wall: room.wall ?? 0, floor: room.floor ?? 0 };
   if (buddyId && room.buddy) home.buddies[buddyId] = { x: toHome(room.buddy.x), y: room.buddy.y };
   home.things = (room.things ?? []).map((t) => ({ ...t, x: toHome(t.x) }));
   return home;
+}
+
+/**
+ * Version 11 made each area ROOM_SPAN screens wide and added more areas. Everything keeps
+ * its spot in the first screen of its area, next to the built-ins it was by.
+ */
+export function widenHome(room: Room): Room {
+  const widen = (x: number) => {
+    const area = Math.min(OLD_AREAS - 1, Math.max(0, Math.floor(x * OLD_AREAS)));
+    return (area + (x * OLD_AREAS - area) / ROOM_SPAN) / AREA_COUNT;
+  };
+  const buddies: Room['buddies'] = {};
+  for (const [id, spot] of Object.entries(room.buddies)) buddies[id] = { ...spot, x: widen(spot.x) };
+  return {
+    paint: HOME_AREAS.map((a, i) => room.paint[i] ?? { ...a.paint }),
+    buddies,
+    things: room.things.map((t) => (t.in ? t : { ...t, x: widen(t.x) })),
+  };
 }
 
 export type RoomBuyResult =
@@ -66,9 +92,13 @@ function withRoom(profile: Profile, room: Partial<Room>): Profile {
   return { ...profile, room: { ...profile.room, ...room } };
 }
 
-/** A spot near the middle of an area's floor, nudged by `n` so new things don't stack exactly. */
-function floorSpot(area: number, n: number): RoomSpot {
-  return { x: areaCenter(area) + (((n * 0.17) % 0.4) - 0.2) / AREA_COUNT, y: 0.88 };
+/**
+ * A spot on the floor, nudged by `n` so new things don't stack exactly: by `at` (a share
+ * of the home's width, like the middle of the screen) or else the middle of the area.
+ */
+function floorSpot(area: number, n: number, at?: number): RoomSpot {
+  const nudge = (((n * 0.17) % 0.4) - 0.2) / AREA_COUNT / ROOM_SPAN;
+  return { x: (at ?? areaCenter(area)) + nudge, y: 0.88 };
 }
 
 /** Buys a thing and sets it down on the floor of the area in view. */
@@ -78,13 +108,14 @@ export function buyRoomItem(
   key: string,
   area = 0,
   month = new Date().getMonth(),
+  at?: number,
 ): RoomBuyResult {
   const item = findRoomItem(itemId);
   if (!item) return { ok: false, reason: 'unknown' };
   if (!inSeason(item, month)) return { ok: false, reason: 'season' };
   if (profile.room.things.length >= MAX_ROOM_THINGS) return { ok: false, reason: 'full' };
   if (profile.coins < item.price) return { ok: false, reason: 'coins' };
-  const spot = floorSpot(area, profile.room.things.length);
+  const spot = floorSpot(area, profile.room.things.length, at);
   return {
     ok: true,
     profile: {
@@ -190,11 +221,11 @@ export function moveInRoom(profile: Profile, key: string, place: Placement): Pro
 }
 
 /** Puts a thing in the toy box, or takes it back out into the area in view. */
-export function setPlaced(profile: Profile, key: string, placed: boolean, area = 0): Profile {
+export function setPlaced(profile: Profile, key: string, placed: boolean, area = 0, at?: number): Profile {
   const thing = profile.room.things.find((t) => t.key === key);
   if (!thing) return profile;
   const room = placed ? profile.room : dropRiders(profile.room, key, thing);
-  const spot = placed ? floorSpot(area, 1) : thing;
+  const spot = placed ? floorSpot(area, 1, at) : thing;
   return withRoom(profile, {
     ...room,
     things: room.things.map((t) => (t.key === key ? { ...loose(t, spot), placed } : t)),
@@ -204,7 +235,7 @@ export function setPlaced(profile: Profile, key: string, placed: boolean, area =
 /** Paints an area's wall or floor one of the free colors. */
 export function setPaint(profile: Profile, part: 'wall' | 'floor', color: number, area = 0): Profile {
   const count = part === 'wall' ? WALL_COLORS.length : FLOOR_COLORS.length;
-  const paint: AreaPaint[] = HOME_AREAS.map((_, i) => profile.room.paint[i] ?? { wall: 0, floor: 0 });
+  const paint: AreaPaint[] = HOME_AREAS.map((_, i) => paintOf(profile.room, i));
   paint[area] = { ...paint[area], [part]: Math.min(count - 1, Math.max(0, color)) };
   return withRoom(profile, { paint });
 }
@@ -218,7 +249,7 @@ export function buddiesHome(profile: Profile): { id: string; spot: BuddySpot }[]
 }
 
 /** Invites a buddy over (standing in the area in view) or sends it off for a nap. */
-export function setBuddyHome(profile: Profile, buddyId: string, home: boolean, area = 0): Profile {
+export function setBuddyHome(profile: Profile, buddyId: string, home: boolean, area = 0, at?: number): Profile {
   const { [buddyId]: spot, ...others } = profile.room.buddies;
   if (!home) {
     if (buddyId === profile.equipped.companion || !spot) return profile;
@@ -226,5 +257,5 @@ export function setBuddyHome(profile: Profile, buddyId: string, home: boolean, a
   }
   if (spot) return profile;
   const n = Object.keys(profile.room.buddies).length + 2;
-  return withRoom(profile, { buddies: { ...profile.room.buddies, [buddyId]: { ...floorSpot(area, n), y: 0.92 } } });
+  return withRoom(profile, { buddies: { ...profile.room.buddies, [buddyId]: { ...floorSpot(area, n, at), y: 0.92 } } });
 }
