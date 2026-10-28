@@ -1,4 +1,4 @@
-import type { GameConfig, Problem } from '@/types';
+import type { GameConfig, Level, Problem } from '@/types';
 import { problemAt } from '@/utils/gameSession';
 import { HOST_ID, type GameMessage, type MatchSetup, type PlayerInfo } from '@/utils/multiplayer/protocol';
 
@@ -16,14 +16,16 @@ export const COOP_WAVES = [
 ] as const;
 
 /**
- * Every phone builds the same problems from the shared seed. In a race
- * everyone gets the same cards; in co-op each player gets their own so
- * nobody repeats a teammate's card.
+ * Every phone builds its problems from the shared seed. In a race, players at
+ * the same level get the same cards; in co-op each player gets their own so
+ * nobody repeats a teammate's card. Each phone picks its own player's level;
+ * without one, the host's classic difficulty is used.
  */
-export function matchConfig(setup: MatchSetup, seat: number): GameConfig {
+export function matchConfig(setup: MatchSetup, seat: number, level?: Level): GameConfig {
   return {
     mode: { kind: 'operation', operation: setup.operation },
-    difficulty: setup.difficulty,
+    difficulty: level?.difficulty ?? setup.difficulty,
+    grade: level?.grade,
     timer: null,
     adaptive: false,
     questionCount: Number.MAX_SAFE_INTEGER,
@@ -31,8 +33,8 @@ export function matchConfig(setup: MatchSetup, seat: number): GameConfig {
   };
 }
 
-export function matchProblem(setup: MatchSetup, seat: number, index: number): Problem {
-  return problemAt(matchConfig(setup, seat), index, setup.difficulty);
+export function matchProblem(setup: MatchSetup, seat: number, index: number, level?: Level): Problem {
+  return problemAt(matchConfig(setup, seat, level), index, level?.difficulty ?? setup.difficulty);
 }
 
 export interface MatchState {

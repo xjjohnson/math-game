@@ -1,5 +1,6 @@
 import { DIFFICULTIES } from '@/constants/difficulty';
-import type { Difficulty, Operation } from '@/types';
+import { GRADE_LIST, levelConfig } from '@/constants/grades';
+import type { Difficulty, Grade, Operation } from '@/types';
 import {
   CHOICE_COUNT,
   generate,
@@ -144,5 +145,46 @@ describe('generateDeck', () => {
 
   it('different seeds give different decks', () => {
     expect(generateDeck('add', 'medium', 1, 20)).not.toEqual(generateDeck('add', 'medium', 2, 20));
+  });
+});
+
+describe('grade levels', () => {
+  const grades = GRADE_LIST;
+
+  it('keeps every answer whole and right at every grade and level', () => {
+    for (const grade of grades) {
+      for (const difficulty of LEVELS) {
+        const config = levelConfig({ grade, difficulty });
+        for (const op of OPS) {
+          for (let seed = 0; seed < 300; seed++) {
+            const p = generate(op, difficulty, createRng(seed), grade);
+            expect(Number.isInteger(p.answer)).toBe(true);
+            if (op === 'divide') expect(p.a).toBe(p.b * p.answer);
+            if (!config.allowNegatives) expect(p.answer).toBeGreaterThanOrEqual(0);
+            if (op === 'add' && config.maxSum !== undefined) expect(p.answer).toBeLessThanOrEqual(config.maxSum);
+            if (op === 'divide' && config.maxDividend !== undefined) {
+              expect(p.a).toBeLessThanOrEqual(config.maxDividend);
+            }
+          }
+        }
+      }
+    }
+  });
+
+  it('keeps kindergarten within 10', () => {
+    for (let seed = 0; seed < 500; seed++) {
+      const add = generate('add', 'medium', createRng(seed), 0);
+      const sub = generate('subtract', 'hard', createRng(seed), 0);
+      expect(add.answer).toBeLessThanOrEqual(10);
+      expect(Math.max(sub.a, sub.b)).toBeLessThanOrEqual(10);
+    }
+  });
+
+  it('gets bigger as the grade goes up', () => {
+    const biggest = (grade: Grade) =>
+      Math.max(...Array.from({ length: 200 }, (_, seed) => generate('add', 'medium', createRng(seed), grade).answer));
+    for (let g = 1; g < grades.length; g++) {
+      expect(biggest(grades[g])).toBeGreaterThanOrEqual(biggest(grades[g - 1]));
+    }
   });
 });

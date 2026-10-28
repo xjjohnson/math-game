@@ -175,10 +175,14 @@ describe('pass-and-play', () => {
     }
     return s;
   };
-  const players: PassPlayer[] = ['Ava', 'Leo', 'Mia', 'Sam'].map((name) => ({ name, avatar: '🙂' }));
+  const players: PassPlayer[] = ['Ava', 'Leo', 'Mia', 'Sam'].map((name) => ({
+    name,
+    avatar: '🙂',
+    level: { grade: 3, difficulty: 'medium' },
+  }));
 
   it('hands the phone round all 4 players, then picks the winner', () => {
-    const start = startPass(players, 'multiply', 'medium', 7);
+    const start = startPass(players, 'multiply', 7);
     let s = passReducer(start, { type: 'begin' });
     for (let i = 0; i < PASS_QUESTIONS; i++) {
       s = passReducer(s, { type: 'answer', given: passProblem(s).answer });
@@ -194,8 +198,22 @@ describe('pass-and-play', () => {
   });
 
   it('gives every player different questions', () => {
-    const s = passReducer(startPass(players, 'add', 'easy', 7), { type: 'begin' });
+    const s = passReducer(startPass(players, 'add', 7), { type: 'begin' });
     const cards = (turn: number) => [0, 1, 2, 3].map((index) => passProblem({ ...s, turn, index }).prompt).join();
     expect(new Set([0, 1, 2, 3].map(cards)).size).toBe(4);
+  });
+
+  it("asks each player at their own grade and difficulty", () => {
+    const mixed: PassPlayer[] = [
+      { name: 'Little', avatar: '🙂', level: { grade: 0, difficulty: 'easy' } },
+      { name: 'Big', avatar: '😎', level: { grade: 5, difficulty: 'hard' } },
+    ];
+    let s = passReducer(startPass(mixed, 'add', 7), { type: 'begin' });
+    for (let index = 0; index < PASS_QUESTIONS; index++) {
+      expect(passProblem({ ...s, turn: 0, index }).answer).toBeLessThanOrEqual(5);
+      expect(passProblem({ ...s, turn: 1, index }).answer).toBeGreaterThanOrEqual(20000);
+    }
+    s = passReducer(s, { type: 'answer', given: passProblem(s).answer });
+    expect(s.histories[0][0]).toMatchObject({ difficulty: 'easy', grade: 0, correct: true });
   });
 });

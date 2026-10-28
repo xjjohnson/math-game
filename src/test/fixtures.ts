@@ -35,6 +35,7 @@ export const makeProfile = (overrides: Partial<Profile> = {}): Profile => ({
   playDates: [],
   dailyChallengeDate: null,
   lastDifficulty: 'easy',
+  grade: 1,
   equipped: { ...DEFAULT_EQUIPPED },
   badges: [],
   week: null,

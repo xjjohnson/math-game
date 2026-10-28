@@ -4,18 +4,20 @@ import { Pressable, StyleSheet, View } from 'react-native';
 
 import { Text } from '@/components/AppText';
 import { BigButton } from '@/components/BigButton';
+import { LevelPicker } from '@/components/LevelPicker';
 import { MatchOptions } from '@/components/MatchOptions';
 import { OptionGroup } from '@/components/OptionGroup';
 import { QuestionPanel } from '@/components/QuestionPanel';
 import { Screen } from '@/components/Screen';
 import { TimerBar } from '@/components/TimerBar';
+import { DEFAULT_GRADE, levelShort } from '@/constants/grades';
 import { colors, fontSizes, radius, spacing, TAP_TARGET } from '@/constants/theme';
 import { usePalette } from '@/hooks/useAccessibility';
 import { useTimer } from '@/hooks/useTimer';
 import type { Peer, Transport } from '@/services/multiplayer';
 import { createNearbyTransport } from '@/services/nearbyTransport';
 import { useActiveProfile, useProfiles } from '@/store/profiles';
-import type { AnswerRecord, Difficulty, Operation } from '@/types';
+import type { AnswerRecord, Level, Operation } from '@/types';
 import { resolveInputStyle } from '@/utils/inputStyle';
 import {
   answerMine,
@@ -93,7 +95,11 @@ export function NearbyPlayScreen() {
   // Host's picks, kept between rematches.
   const [mode, setMode] = useState<MatchMode>('race');
   const [operation, setOperation] = useState<Operation>('add');
-  const [difficulty, setDifficulty] = useState<Difficulty>('easy');
+  // This phone's own grade and difficulty; every player picks their own.
+  const [level, setLevel] = useState<Level>({
+    grade: profile?.grade ?? DEFAULT_GRADE,
+    difficulty: profile?.lastDifficulty ?? 'easy',
+  });
 
   const [match, setMatch, matchRef] = useStateRef<MatchState | null>(null);
 
@@ -231,7 +237,7 @@ export function NearbyPlayScreen() {
   };
 
   const startGame = () => {
-    const setup: MatchSetup = { mode, operation, difficulty, seed: randomSeed() };
+    const setup: MatchSetup = { mode, operation, difficulty: level.difficulty, seed: randomSeed() };
     send({ type: 'start', setup, players: roster });
     setMatch(startMatch(setup, roster, HOST_ID));
     setPhase('playing');
@@ -247,6 +253,7 @@ export function NearbyPlayScreen() {
       <Match
         key={match.setup.seed}
         match={match}
+        level={level}
         onAnswer={(correct) => matchRef.current && apply(answerMine(matchRef.current, correct))}
         onTimeUp={() => matchRef.current && apply(waveTimeUp(matchRef.current))}
         onRematch={() => {
@@ -316,17 +323,11 @@ export function NearbyPlayScreen() {
               </View>
             ))}
           </View>
+          <LevelPicker label="Your grade (everyone picks their own)" level={level} onChange={setLevel} />
           {isHost ? (
             <>
               <OptionGroup label="Game" value={mode} onChange={setMode} options={MODES} />
-              <MatchOptions
-                operation={operation}
-                difficulty={difficulty}
-                onChange={(c) => {
-                  if (c.operation) setOperation(c.operation);
-                  if (c.difficulty) setDifficulty(c.difficulty);
-                }}
-              />
+              <MatchOptions operation={operation} onChange={setOperation} />
               <BigButton
                 label={friends ? `Start with ${roster.length} players` : 'Start'}
                 color={colors.correct}
@@ -347,12 +348,14 @@ export function NearbyPlayScreen() {
 
 function Match({
   match,
+  level,
   onAnswer,
   onTimeUp,
   onRematch,
   onLeave,
 }: {
   match: MatchState;
+  level: Level;
   onAnswer: (correct: boolean) => void;
   onTimeUp: () => void;
   onRematch: () => void;
@@ -378,8 +381,9 @@ function Match({
     if (!over || saved.current || !profile) return;
     saved.current = true;
     playSound(outcomeFor(match) === 'won' ? 'reward' : 'wrong');
-    recordRound(profile.id, multiplayerRound(`${setup.mode}:${setup.operation}:${setup.difficulty}`, history, setup.difficulty));
-  }, [over, match, profile, recordRound, setup, history]);
+    const key = `${setup.mode}:${setup.operation}:g${level.grade}:${level.difficulty}`;
+    recordRound(profile.id, multiplayerRound(key, history, level.difficulty));
+  }, [over, match, profile, recordRound, setup, history, level]);
 
   if (over) {
     const won = outcomeFor(match) === 'won';
@@ -427,7 +431,7 @@ function Match({
     );
   }
 
-  const problem = matchProblem(setup, mySeat(match), shown);
+  const problem = matchProblem(setup, mySeat(match), shown, level);
   const waitingForCall = setup.mode === 'race' && match.correct[me] >= RACE_TARGET;
 
   return (
@@ -454,14 +458,19 @@ function Match({
           {secondsLeft !== null ? <TimerBar total={wave.seconds} left={secondsLeft} /> : null}
         </View>
       )}
+      <Text style={styles.body}>Your level: {levelShort(level)}</Text>
       <QuestionPanel
         key={shown}
         problem={problem}
-        difficulty={setup.difficulty}
-        inputStyle={resolveInputStyle(profile?.inputStyle, setup.difficulty)}
+        difficulty={level.difficulty}
+        grade={level.grade}
+        inputStyle={resolveInputStyle(profile?.inputStyle, level.difficulty)}
         disabled={waitingForCall}
         onAnswer={(given, correct) => {
-          setHistory((h) => [...h, { problem, difficulty: setup.difficulty, given, correct, points: 0 }]);
+          setHistory((h) => [
+            ...h,
+            { problem, difficulty: level.difficulty, grade: level.grade, given, correct, points: 0 },
+          ]);
           onAnswer(correct);
         }}
         onNext={() => setShown((i) => i + 1)}

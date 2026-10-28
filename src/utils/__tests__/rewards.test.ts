@@ -50,11 +50,14 @@ describe('rewards', () => {
   });
 
   it('pays coins by difficulty plus streak bonuses', () => {
+    // Hard × with no grade: 3 for ×, 2 for Hard.
     expect(roundRewards(results('1111100000', 'hard'), false, false)).toEqual({
-      coins: 5 * 3 + 5,
+      coins: 5 * (3 + 2) + 5,
       streakBonusCoins: 5,
       dailyBonusCoins: 0,
       stars: 1,
+      starMultiplier: 3,
+      starsEarned: 3,
     });
   });
 
@@ -66,9 +69,18 @@ describe('rewards', () => {
   });
 
   it('gives everyone the same daily challenge on a date', () => {
-    const a = dailyChallengeConfig('2026-10-22', 'easy');
-    expect(dailyChallengeConfig('2026-10-22', 'easy')).toEqual(a);
-    expect(a).toMatchObject({ timer: 30, dailyDate: '2026-10-22', adaptive: false });
+    const a = dailyChallengeConfig('2026-10-22', { grade: 3, difficulty: 'easy' });
+    expect(dailyChallengeConfig('2026-10-22', { grade: 3, difficulty: 'easy' })).toEqual(a);
+    expect(a).toMatchObject({ timer: 30, dailyDate: '2026-10-22', adaptive: false, grade: 3 });
+  });
+
+  it("only picks what the player's grade teaches for the daily challenge", () => {
+    for (let day = 1; day <= 28; day++) {
+      const date = `2026-02-${String(day).padStart(2, '0')}`;
+      const config = dailyChallengeConfig(date, { grade: 0, difficulty: 'easy' });
+      expect(config.mode).toMatchObject({ kind: 'operation' });
+      expect(['add', 'subtract']).toContain((config.mode as { operation: string }).operation);
+    }
   });
 });
 
@@ -82,11 +94,29 @@ describe('applyRound', () => {
     const second = applyRound(p, r, today);
     p = second.profile;
     expect(p.playDates).toEqual([today]);
-    expect(p.coins).toBe(2 * (9 + 5));
+    // Fixture answers are easy × with no grade: 3 coins each, plus 5 for a streak of 5.
+    expect(p.coins).toBe(2 * (9 * 3 + 5));
     expect(p.stars).toBe(6);
     expect(p.stats.multiply).toEqual({ attempted: 20, correct: 18 });
     expect(accuracy(p.stats.multiply)).toBe(90);
     expect(accuracy(p.stats.add)).toBeNull();
+  });
+
+  it('counts each star more on harder levels', () => {
+    const hard = applyRound(profile(), round(results('1111111111', 'hard')), today);
+    expect(hard.outcome.stars).toBe(3);
+    expect(hard.outcome.starMultiplier).toBe(3);
+    expect(hard.profile.stars).toBe(9);
+    const medium = applyRound(profile(), round(results('1111111111', 'medium')), today);
+    expect(medium.profile.stars).toBe(6);
+  });
+
+  it("scales answer coins by the parent's payout, but not bonuses", () => {
+    const r = round(results('1111'));
+    expect(applyRound(profile(), r, today, 2).outcome.coins).toBe(4 * 3 * 2);
+    expect(applyRound(profile(), r, today, 0.5).outcome.coins).toBe(6);
+    const streak = round(results('11111'));
+    expect(applyRound(profile(), streak, today, 2).outcome.coins).toBe(5 * 3 * 2 + 5);
   });
 
   it('reports a new high score only when beaten', () => {

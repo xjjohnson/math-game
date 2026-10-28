@@ -5,6 +5,9 @@ import { persistStorage } from '@/store/storage';
 
 export type ReduceMotion = 'system' | 'on' | 'off';
 
+/** Parent's setting: how many times the usual coins each right answer pays. */
+export type CoinPayout = 0.5 | 1 | 2;
+
 export interface Settings {
   sound: boolean;
   textToSpeech: boolean;
@@ -14,6 +17,7 @@ export interface Settings {
   colorblindPalette: boolean;
   /** 4-digit code guarding the parent area; null until a parent sets one. */
   parentPin: string | null;
+  coinPayout: CoinPayout;
 }
 
 export const DEFAULT_SETTINGS: Settings = {
@@ -24,6 +28,7 @@ export const DEFAULT_SETTINGS: Settings = {
   dyslexiaFont: false,
   colorblindPalette: false,
   parentPin: null,
+  coinPayout: 1,
 };
 
 interface SettingsState extends Settings {
@@ -37,12 +42,12 @@ export const useSettings = create<SettingsState>()(
     (set) => ({
       ...DEFAULT_SETTINGS,
       update: (changes) => set(changes),
-      // Resetting settings keeps the parent PIN so a child can't clear it.
-      reset: () => set((s) => ({ ...DEFAULT_SETTINGS, parentPin: s.parentPin })),
+      // Resetting settings keeps the parent's choices so a child can't clear them.
+      reset: () => set((s) => ({ ...DEFAULT_SETTINGS, parentPin: s.parentPin, coinPayout: s.coinPayout })),
     }),
     {
       name: 'math-game.settings',
-      version: 2,
+      version: 3,
       storage: persistStorage,
       migrate: (persisted) => ({ ...DEFAULT_SETTINGS, ...(persisted as Partial<Settings>) }),
     },
