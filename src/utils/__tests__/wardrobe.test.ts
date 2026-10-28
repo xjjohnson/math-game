@@ -1,6 +1,6 @@
 import { WEARABLES } from '@/constants/wardrobe';
 import { makeProfile } from '@/test/fixtures';
-import { outfitOf, undress, wear } from '@/utils/wardrobe';
+import { lookOf, outfitOf, setLook, undress, wear } from '@/utils/wardrobe';
 
 describe('buddy clothes', () => {
   it('buys a piece once, then puts it on and takes it off for free', () => {
@@ -35,5 +35,30 @@ describe('buddy clothes', () => {
 
   it('has a color for every shirt', () => {
     expect(WEARABLES.filter((w) => w.slot === 'shirt').every((w) => !!w.color)).toBe(true);
+  });
+});
+
+describe('people buddies', () => {
+  it('start in their own clothes, which come off and go back on for free', () => {
+    const p = makeProfile({ coins: 0 });
+    expect(outfitOf(p, 'buddy-dad')).toEqual({ shirt: 'sweaterTan', legs: 'jeans' });
+    const off = wear(p, 'buddy-dad', 'sweaterTan');
+    if (!off.ok) throw new Error('wear failed');
+    expect(outfitOf(off.profile, 'buddy-dad')).toEqual({ legs: 'jeans' });
+    const back = wear(off.profile, 'buddy-dad', 'sweaterTan');
+    if (!back.ok) throw new Error('wear failed');
+    expect(back.profile.coins).toBe(0);
+    expect(outfitOf(back.profile, 'buddy-dad').shirt).toBe('sweaterTan');
+    // Someone else's starting clothes still cost coins.
+    expect(wear(p, 'buddy-mom', 'jeans')).toEqual({ ok: false, reason: 'coins' });
+    expect(outfitOf(p, 'buddy-pup')).toEqual({});
+  });
+
+  it('changes hair, beard and skin for free, only for people', () => {
+    const p = makeProfile();
+    expect(lookOf(p, 'buddy-pup')).toBeNull();
+    expect(setLook(p, 'buddy-pup', { hair: 'long' })).toBe(p);
+    const changed = setLook(p, 'buddy-dad', { hair: 'curly', beard: null });
+    expect(lookOf(changed, 'buddy-dad')).toMatchObject({ hair: 'curly', beard: null, skin: lookOf(p, 'buddy-dad')!.skin });
   });
 });

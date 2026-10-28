@@ -13,6 +13,7 @@ import {
 
 import { Text } from '@/components/AppText';
 import { BuddyFigure, type Dressed } from '@/components/BuddyFigure';
+import { PersonFigure, type PersonDressed } from '@/components/PersonFigure';
 import { Furniture } from '@/components/Furniture';
 import { PopIn } from '@/components/PopIn';
 import {
@@ -25,6 +26,7 @@ import {
   type FixtureSpot,
   type Season,
 } from '@/constants/room';
+import type { PersonLook } from '@/constants/wardrobe';
 import type { BuddySpot, Room } from '@/types';
 import {
   dropBuddy,
@@ -50,9 +52,9 @@ export interface HomeBuddy {
   spot: BuddySpot;
   fur: string;
   belly: string;
-  shirt?: string;
-  shoes?: string;
   dressed: Dressed;
+  /** People are drawn from their looks and clothes instead of a face emoji. */
+  person?: { look: PersonLook; dressed: PersonDressed };
 }
 
 interface Props {
@@ -331,16 +333,23 @@ export function BuddyRoom(props: Props) {
               ) : null}
               {buddy ? (
                 <>
-                  <BuddyFigure
-                    value={buddy.emoji}
-                    size={Math.round(piece.height)}
-                    fur={buddy.fur}
-                    belly={buddy.belly}
-                    shirt={buddy.shirt}
-                    shoes={buddy.shoes}
-                    dressed={buddy.dressed}
-                    gift={buddy.gift}
-                  />
+                  {buddy.person ? (
+                    <PersonFigure
+                      look={buddy.person.look}
+                      size={Math.round(piece.height)}
+                      dressed={buddy.person.dressed}
+                      gift={buddy.gift}
+                    />
+                  ) : (
+                    <BuddyFigure
+                      value={buddy.emoji}
+                      size={Math.round(piece.height)}
+                      fur={buddy.fur}
+                      belly={buddy.belly}
+                      dressed={buddy.dressed}
+                      gift={buddy.gift}
+                    />
+                  )}
                   {parent?.item?.sleep ? (
                     <Text style={[styles.zzz, { fontSize: Math.round(piece.height * 0.3) }]}>💤</Text>
                   ) : null}

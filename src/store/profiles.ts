@@ -21,7 +21,8 @@ import {
   type RoomBuyResult,
 } from '@/utils/room';
 import { buyItem, equipItem, freeAvatars, type BuyResult } from '@/utils/shop';
-import { undress, wear, type WearResult } from '@/utils/wardrobe';
+import { setLook, undress, wear, type WearResult } from '@/utils/wardrobe';
+import type { PersonLook } from '@/constants/wardrobe';
 
 function emptyStats(): Profile['stats'] {
   return {
@@ -68,6 +69,7 @@ export function createProfile(
     room: emptyRoom(),
     wardrobe: [],
     outfits: {},
+    looks: {},
   };
 }
 
@@ -99,6 +101,8 @@ interface ProfilesState {
   /** Puts clothes on a buddy (buying them first if needed), or takes them off. */
   wear: (id: string, buddyId: string, wearableId: string) => WearResult;
   undress: (id: string, buddyId: string) => void;
+  /** Changes a person buddy's hair, skin or beard. */
+  setLook: (id: string, buddyId: string, change: Partial<PersonLook>) => void;
 }
 
 export const useProfiles = create<ProfilesState>()(
@@ -199,10 +203,12 @@ export const useProfiles = create<ProfilesState>()(
       },
       undress: (id, buddyId) =>
         set((s) => ({ profiles: s.profiles.map((p) => (p.id === id ? undress(p, buddyId) : p)) })),
+      setLook: (id, buddyId, change) =>
+        set((s) => ({ profiles: s.profiles.map((p) => (p.id === id ? setLook(p, buddyId, change) : p)) })),
     }),
     {
       name: 'math-game.profiles',
-      version: 9,
+      version: 10,
       storage: persistStorage,
       migrate: (persisted, version) => {
         const state = persisted as Pick<ProfilesState, 'profiles' | 'activeProfileId'>;
@@ -257,6 +263,10 @@ export const useProfiles = create<ProfilesState>()(
         if (version < 9) {
           // Version 9 added clothes for buddies.
           state.profiles = state.profiles.map((p) => ({ ...p, wardrobe: p.wardrobe ?? [], outfits: p.outfits ?? {} }));
+        }
+        if (version < 10) {
+          // Version 10 added hair, skin and beards for people buddies.
+          state.profiles = state.profiles.map((p) => ({ ...p, looks: p.looks ?? {} }));
         }
         return state as ProfilesState;
       },
