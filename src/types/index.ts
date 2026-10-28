@@ -98,12 +98,25 @@ export interface RoomSpot {
   y: number;
 }
 
+export interface BuddySpot extends RoomSpot {
+  /** Key of the seat (a placed thing) it sits on. */
+  on?: string;
+}
+
 export interface RoomThing extends RoomSpot {
   /** Tells copies of the same item apart. */
   key: string;
   itemId: string;
   /** False while it is put away in the toy box. */
   placed: boolean;
+  /**
+   * What it rests on: a table's or seat's key, a buddy holding it (BUDDY_KEY + id),
+   * or a built-in shelf or counter (FIXTURE_KEY + id).
+   */
+  on?: string;
+  /** The cupboard it is kept in, and which shelf (0 is the top one). */
+  in?: string;
+  shelf?: number;
 }
 
 /** Indexes into WALL_COLORS and FLOOR_COLORS. */
@@ -116,7 +129,7 @@ export interface Room {
   /** Paint for each area, in HOME_AREAS order. */
   paint: AreaPaint[];
   /** Buddies at home and where they stand, keyed by shop item id. The buddy in use is always home. */
-  buddies: Record<string, RoomSpot>;
+  buddies: Record<string, BuddySpot>;
   things: RoomThing[];
 }
 

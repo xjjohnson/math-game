@@ -219,6 +219,11 @@ Phases 1-6 deliver a complete single-player game before any native Bluetooth wor
 - [x] More buddies (bunny, panda, fox, penguin, octopus, unicorn) and a "My buddy" home: pet, treats, a fetch math game, hearts, levels 1-5 with a gift worn at each level
 - [x] Buddy room in a side-view dollhouse style: 20 things to buy with coins (furniture, toys, food bowl, decorations), drag to place, toy box to put away, free wall and floor colors
 - [x] Buddy home that scrolls left and right through a living room, kitchen and bedroom (each with its own free paint), several buddies home at once, 45 everyday things in shop shelves, and 10 Halloween things sold only in October (bought ones stay all year); drag a thing to the side to carry it to the next room
+- [x] Full-screen buddy home with tabs along the bottom (Care, Shop, Toy box, Buddies, Paint) that open drawers
+- [x] Things to play with in the home: kitchen cupboards, oven, fridge, freezer and a bedroom wardrobe open and shut, with shelves to keep small things on; front door and curtains open; lamps switch on; tapping things makes them do something
+- [x] Furniture to use: tables, coffee table, nightstand and dresser to set things on; couch, chair, stool, bench, beanbag and bed (naps) for buddies to sit on; buddies hold one small thing each
+- [x] 10 Thanksgiving things sold only in November (same rule as Halloween), with fall leaves outside
+- [ ] Buddy bodies, clothes and accessories
 
 ---
 
