@@ -26,6 +26,8 @@ interface Props {
   onNext: () => void;
   /** Stops taking answers, e.g. while waiting for the other phone. */
   disabled?: boolean;
+  /** Don't read the card aloud, e.g. on phones watching a teammate's turn. */
+  silent?: boolean;
 }
 
 /**
@@ -33,7 +35,7 @@ interface Props {
  * right answer briefly, then moves on by itself so nobody has to tap Next.
  * Give it a new `key` for each card.
  */
-export function QuestionPanel({ problem, difficulty, inputStyle, onAnswer, onNext, disabled }: Props) {
+export function QuestionPanel({ problem, difficulty, inputStyle, onAnswer, onNext, disabled, silent }: Props) {
   const palette = usePalette();
   const [given, setGiven] = useState<number | null>(null);
   const answered = given !== null;
@@ -45,9 +47,10 @@ export function QuestionPanel({ problem, difficulty, inputStyle, onAnswer, onNex
   const column = useColumnAnswer(problem, { allowNegative });
 
   useEffect(() => {
+    if (silent) return;
     speakProblem(problem);
     return stopSpeaking;
-  }, [problem]);
+  }, [problem, silent]);
 
   useEffect(() => {
     if (!answered) return;

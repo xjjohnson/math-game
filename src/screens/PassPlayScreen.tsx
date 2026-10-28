@@ -1,10 +1,11 @@
-import { router } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
 import { useEffect, useReducer, useRef, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 
 import { Text } from '@/components/AppText';
 import { BigButton } from '@/components/BigButton';
 import { MatchOptions } from '@/components/MatchOptions';
+import { MonsterBar } from '@/components/MonsterBar';
 import { QuestionPanel } from '@/components/QuestionPanel';
 import { Screen } from '@/components/Screen';
 import { colors, fontSizes, radius, spacing } from '@/constants/theme';
@@ -19,9 +20,13 @@ import {
   passScores,
   passWinners,
   startPass,
+  teamHits,
+  teamTarget,
+  teamWon,
   type PassPlayer,
   type PassState,
 } from '@/utils/multiplayer/passAndPlay';
+import { monsterFor } from '@/utils/multiplayer/match';
 import { multiplayerRound } from '@/utils/multiplayer/rounds';
 import { randomSeed } from '@/utils/seededRandom';
 import { playSound } from '@/utils/soundEffects';
@@ -37,14 +42,15 @@ const GUESTS: Record<string, PassPlayer> = {
 
 const MEDALS = ['🥇', '🥈', '🥉'];
 
-/** 2 to 6 players on one phone: each answers 10, then hands it on. */
+/** 2 to 6 players on one phone: each answers 10, then hands it on. Team Up has them share one monster. */
 export function PassPlayScreen() {
+  const team = useLocalSearchParams<{ team?: string }>().team === '1';
   const [game, setGame] = useState<PassState | null>(null);
-  if (!game) return <Setup onStart={setGame} />;
+  if (!game) return <Setup team={team} onStart={setGame} />;
   return <Game key={game.seed} start={game} onAgain={() => setGame(null)} />;
 }
 
-function Setup({ onStart }: { onStart: (state: PassState) => void }) {
+function Setup({ team, onStart }: { team: boolean; onStart: (state: PassState) => void }) {
   const { profiles, activeProfileId } = useProfiles();
   const others = profiles.filter((p) => p.id !== activeProfileId);
   // Seats in the order players were picked; that's the order they take turns.
@@ -64,7 +70,12 @@ function Setup({ onStart }: { onStart: (state: PassState) => void }) {
     setSeats((s) => (s.includes(id) ? s.filter((x) => x !== id) : s.length < MAX_PASS_PLAYERS ? [...s, id] : s));
 
   return (
-    <Screen title="Take turns">
+    <Screen title={team ? 'Team up' : 'Take turns'}>
+      {team ? (
+        <Text style={styles.note}>
+          Take turns answering 10 each. Every right answer hits the monster, so beat it together!
+        </Text>
+      ) : null}
       <View style={styles.group} accessibilityLabel="Players">
         <Text style={styles.label}>
           Who's playing? Tap to add or remove ({seats.length} of up to {MAX_PASS_PLAYERS})
@@ -99,7 +110,7 @@ function Setup({ onStart }: { onStart: (state: PassState) => void }) {
         label="Start"
         color={colors.correct}
         disabled={seats.length < 2}
-        onPress={() => onStart(startPass(seats.map(player), operation, difficulty, randomSeed()))}
+        onPress={() => onStart(startPass(seats.map(player), operation, difficulty, randomSeed(), team))}
       />
     </Screen>
   );
@@ -123,10 +134,38 @@ function Game({ start, onAgain }: { start: PassState; onAgain: () => void }) {
     playSound('reward');
     state.players.forEach((p, i) => {
       if (!p.profileId) return;
-      const key = `pass:${state.operation}:${state.difficulty}`;
+      const key = `${state.team ? 'team' : 'pass'}:${state.operation}:${state.difficulty}`;
       recordRound(p.profileId, multiplayerRound(key, state.histories[i], state.difficulty));
     });
   }, [state, recordRound]);
+
+  const monster = monsterFor(state.seed);
+
+  if (state.phase === 'finished' && state.team) {
+    const won = teamWon(state);
+    return (
+      <Screen title={won ? '🎉 You beat the monster!' : `The ${monster} got away this time`}>
+        <MonsterBar monster={monster} hits={teamHits(state)} health={teamTarget(state)} />
+        <Text style={styles.note}>
+          {won ? 'Great teamwork!' : `So close! The team needed ${teamTarget(state)} hits.`}
+        </Text>
+        <View style={styles.standings}>
+          {state.players.map((p, seat) => (
+            <View key={seat} style={styles.scoreRow}>
+              <Text style={styles.place}>⭐</Text>
+              <Text style={styles.scoreName} numberOfLines={1}>
+                {p.avatar} {p.name}
+              </Text>
+              <Text style={styles.scoreValue}>{scores[seat]} hits</Text>
+            </View>
+          ))}
+        </View>
+        <Text style={styles.note}>Players with a profile got coins for their right answers.</Text>
+        <BigButton label="Play again" color={colors.correct} onPress={onAgain} />
+        <BigButton label="Home" outline onPress={() => router.dismissAll()} />
+      </Screen>
+    );
+  }
 
   if (state.phase === 'finished') {
     const winners = passWinners(state);
@@ -162,7 +201,16 @@ function Game({ start, onAgain }: { start: PassState; onAgain: () => void }) {
       <Screen title={state.turn === 0 ? 'First up' : 'Pass the phone!'}>
         <Text style={styles.handoffAvatar}>{current.avatar}</Text>
         <Text style={styles.handoffName}>{current.name}, it's your turn</Text>
-        {leader !== null ? (
+        {state.team ? (
+          <>
+            <MonsterBar monster={monster} hits={teamHits(state)} health={teamTarget(state)} compact />
+            <Text style={styles.note}>
+              {teamWon(state)
+                ? 'The monster is beaten! Keep going for more coins.'
+                : `The team needs ${teamTarget(state) - teamHits(state)} more hits.`}
+            </Text>
+          </>
+        ) : leader !== null ? (
           <Text style={styles.note}>
             Best so far: {state.players[leader].name} with {scores[leader]}. Can you beat it?
           </Text>
@@ -184,6 +232,7 @@ function Game({ start, onAgain }: { start: PassState; onAgain: () => void }) {
         </Text>
         <Text style={styles.status}>✓ {scores[state.turn]}</Text>
       </View>
+      {state.team ? <MonsterBar monster={monster} hits={teamHits(state)} health={teamTarget(state)} compact /> : null}
       <QuestionPanel
         key={`${state.turn}-${state.index}`}
         problem={passProblem(state)}

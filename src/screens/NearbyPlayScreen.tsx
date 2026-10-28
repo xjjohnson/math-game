@@ -5,6 +5,7 @@ import { Pressable, StyleSheet, View } from 'react-native';
 import { Text } from '@/components/AppText';
 import { BigButton } from '@/components/BigButton';
 import { MatchOptions } from '@/components/MatchOptions';
+import { MonsterBar } from '@/components/MonsterBar';
 import { OptionGroup } from '@/components/OptionGroup';
 import { QuestionPanel } from '@/components/QuestionPanel';
 import { Screen } from '@/components/Screen';
@@ -15,18 +16,25 @@ import { useTimer } from '@/hooks/useTimer';
 import type { Peer, Transport } from '@/services/multiplayer';
 import { createNearbyTransport } from '@/services/nearbyTransport';
 import { useActiveProfile, useProfiles } from '@/store/profiles';
-import type { AnswerRecord, Difficulty, Operation } from '@/types';
+import type { AnswerRecord, Difficulty, Operation, Problem } from '@/types';
 import { resolveInputStyle } from '@/utils/inputStyle';
 import {
   answerMine,
   COOP_WAVES,
   isOver,
+  isTeamMode,
   matchProblem,
+  MONSTER,
+  monsterFor,
   mySeat,
   outcomeFor,
   playerLeft,
   RACE_TARGET,
   receive,
+  RELAY,
+  relayLap,
+  runner,
+  stageSeconds,
   standings,
   startMatch,
   waveTarget,
@@ -55,6 +63,8 @@ type Phase = 'choose' | 'finding' | 'lobby' | 'playing' | 'gone';
 const MODES: { value: MatchMode; label: string }[] = [
   { value: 'race', label: `🏁 Race\nFirst to ${RACE_TARGET} right wins` },
   { value: 'coop', label: `🛡️ Co-op Defense\nBeat ${COOP_WAVES.length} waves together` },
+  { value: 'monster', label: `🐉 Monster Battle\nTeam up to beat it in ${MONSTER.seconds / 60} minutes` },
+  { value: 'relay', label: `🏃 Relay\nOne at a time, ${RELAY.laps} laps, help each other` },
 ];
 
 const MEDALS = ['🥇', '🥈', '🥉'];
@@ -73,7 +83,7 @@ function useStateRef<T>(initial: T) {
   return [value, set, ref] as const;
 }
 
-/** Up to 8 phones over Nearby: one hosts, the rest join, then Race or Co-op Defense. */
+/** Up to 8 phones over Nearby: one hosts, the rest join, then Race or one of the team games. */
 export function NearbyPlayScreen() {
   const profile = useActiveProfile();
   const me: PlayerInfo = { id: HOST_ID, name: profile?.name ?? 'Player', avatar: profile?.avatar ?? '🙂' };
@@ -364,13 +374,16 @@ function Match({
   const { setup, me, players } = match;
   const [shown, setShown] = useState(0);
   const [history, setHistory] = useState<AnswerRecord[]>([]);
+  /** Relay: the card this phone just answered, kept on screen until its ✓ or ✗ has shown. */
+  const [pending, setPending] = useState<number | null>(null);
   const saved = useRef(false);
   const over = isOver(match);
   const host = me === HOST_ID;
   const nameOf = (id: string | null) => players.find((p) => p.id === id)?.name ?? 'Someone';
 
-  const wave = COOP_WAVES[match.wave];
-  const secondsLeft = useTimer(setup.mode === 'coop' ? wave.seconds : null, !over, match.wave, () => {
+  const team = isTeamMode(setup.mode);
+  const seconds = stageSeconds(match);
+  const secondsLeft = useTimer(team ? seconds : null, !over, match.wave, () => {
     if (host) onTimeUp();
   });
 
@@ -384,17 +397,16 @@ function Match({
   if (over) {
     const won = outcomeFor(match) === 'won';
     const ranked = standings(match);
-    const title =
-      setup.mode === 'race'
-        ? won
-          ? '🏆 You win!'
-          : `${nameOf(match.winner)} wins!`
-        : won
-          ? '🛡️ You beat every wave!'
-          : 'The clock won this time';
+    const titles: Record<MatchMode, [won: string, lost: string]> = {
+      race: ['🏆 You win!', `${nameOf(match.winner)} wins!`],
+      coop: ['🛡️ You beat every wave!', 'The clock won this time'],
+      monster: ['🎉 You beat the monster!', `The ${monsterFor(setup.seed)} got away this time`],
+      relay: ['🏃 Your team finished the relay!', 'The clock won this time'],
+    };
+    const title = titles[setup.mode][won ? 0 : 1];
     return (
       <Screen title={title}>
-        {setup.mode === 'coop' ? (
+        {team ? (
           <Text style={styles.body}>
             Team total: {ranked.reduce((sum, p) => sum + p.correct, 0)} right.
           </Text>
@@ -427,6 +439,62 @@ function Match({
     );
   }
 
+  const record = (problem: Problem, given: number, correct: boolean) =>
+    setHistory((h) => [...h, { problem, difficulty: setup.difficulty, given, correct, points: 0 }]);
+
+  if (setup.mode === 'relay') {
+    const baton = runner(match);
+    const myTurn = baton === me;
+    // Keep this phone's own card up through its feedback, even once the baton has moved on.
+    const card = pending ?? match.cards;
+    const problem = matchProblem(setup, 0, card);
+    const playing = players.filter((p) => !match.left.includes(p.id));
+    const watching = pending === null && !myTurn;
+    const last = match.last && match.last.playerId !== me ? match.last : null;
+    const turnText = last?.correct
+      ? `✅ ${nameOf(last.playerId)} got it! ${nameOf(baton)}'s turn. Help them out!`
+      : last?.playerId === baton
+        ? `💪 New card for ${nameOf(baton)}. Help them out!`
+        : `${nameOf(baton)}'s turn. Help them out!`;
+    return (
+      <Screen>
+        <View style={styles.section}>
+          <Text style={styles.heading}>
+            Lap {relayLap(match)} of {RELAY.laps} · team of {playing.length}
+          </Text>
+          <View style={styles.baton} accessibilityLabel={`${myTurn ? 'Your' : `${nameOf(baton)}'s`} turn`}>
+            {playing.map((p) => (
+              <Text key={p.id} style={[styles.batonPlayer, p.id === baton && styles.batonNow]}>
+                {p.avatar}
+              </Text>
+            ))}
+          </View>
+          <ProgressBar label="Team" value={match.waveCorrect} total={waveTarget(match)} color={palette.correct} />
+          {secondsLeft !== null ? <TimerBar total={seconds} left={secondsLeft} /> : null}
+          <Text style={styles.heading} accessibilityLiveRegion="polite">
+            {watching ? turnText : '🏃 Your turn!'}
+          </Text>
+        </View>
+        <View style={[styles.section, watching && styles.watching]}>
+          <QuestionPanel
+            key={card}
+            problem={problem}
+            difficulty={setup.difficulty}
+            inputStyle={resolveInputStyle(profile?.inputStyle, setup.difficulty)}
+            disabled={watching}
+            silent={watching}
+            onAnswer={(given, correct) => {
+              setPending(card);
+              record(problem, given, correct);
+              onAnswer(correct);
+            }}
+            onNext={() => setPending(null)}
+          />
+        </View>
+      </Screen>
+    );
+  }
+
   const problem = matchProblem(setup, mySeat(match), shown);
   const waitingForCall = setup.mode === 'race' && match.correct[me] >= RACE_TARGET;
 
@@ -445,13 +513,19 @@ function Match({
             />
           ))}
         </View>
+      ) : setup.mode === 'monster' ? (
+        <View style={styles.section}>
+          <Text style={styles.heading}>Team of {players.length - match.left.length} · every right answer is a hit!</Text>
+          <MonsterBar monster={monsterFor(setup.seed)} hits={match.waveCorrect} health={waveTarget(match)} compact />
+          {secondsLeft !== null ? <TimerBar total={seconds} left={secondsLeft} /> : null}
+        </View>
       ) : (
         <View style={styles.section}>
           <Text style={styles.heading}>
             Wave {match.wave + 1} of {COOP_WAVES.length} · team of {players.length - match.left.length}
           </Text>
           <ProgressBar label="Team" value={match.waveCorrect} total={waveTarget(match)} color={palette.correct} />
-          {secondsLeft !== null ? <TimerBar total={wave.seconds} left={secondsLeft} /> : null}
+          {secondsLeft !== null ? <TimerBar total={seconds} left={secondsLeft} /> : null}
         </View>
       )}
       <QuestionPanel
@@ -461,7 +535,7 @@ function Match({
         inputStyle={resolveInputStyle(profile?.inputStyle, setup.difficulty)}
         disabled={waitingForCall}
         onAnswer={(given, correct) => {
-          setHistory((h) => [...h, { problem, difficulty: setup.difficulty, given, correct, points: 0 }]);
+          record(problem, given, correct);
           onAnswer(correct);
         }}
         onNext={() => setShown((i) => i + 1)}
@@ -536,6 +610,10 @@ const styles = StyleSheet.create({
   playerName: { flex: 1, fontSize: fontSizes.body, fontWeight: '800', color: colors.text },
   playerTag: { fontSize: 16, fontWeight: '700', color: colors.textMuted },
   playerScore: { fontSize: fontSizes.button, fontWeight: '900', color: colors.text },
+  baton: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', gap: spacing.sm },
+  batonPlayer: { fontSize: 32, opacity: 0.35 },
+  batonNow: { opacity: 1, transform: [{ scale: 1.3 }] },
+  watching: { opacity: 0.6 },
   barRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
   faded: { opacity: 0.4 },
   barLabel: { width: 110, fontSize: 18, fontWeight: '800', color: colors.text },

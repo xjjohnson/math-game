@@ -33,7 +33,7 @@ const styles = StyleSheet.create({
   },
   fill: { height: '100%', borderRadius: radius.md },
   seconds: {
-    width: 48,
+    width: 64,
     textAlign: 'right',
     fontSize: 20,
     fontWeight: '800',
