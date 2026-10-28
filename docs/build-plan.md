@@ -68,7 +68,7 @@ Cross-platform interactive math learning game for kids (ages 5-15), React Native
 - Answer input: multiple choice for younger kids, number pad for older, set per profile or automatically by difficulty
 - Coins and stars for correct answers, streak bonuses, progress tracker, sound triggers on correct answers
 - Shop: avatar items, badges, backgrounds, card-flip styles, companions (each buddy has a room to decorate, and can be petted, fed and played with)
-- Multiple profiles, PIN-protected parent area
+- Multiple profiles, parent area behind a fixed 4-digit code (1210, same on every device)
 
 ---
 

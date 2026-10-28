@@ -15,8 +15,6 @@ export interface Settings {
   reduceMotion: ReduceMotion;
   dyslexiaFont: boolean;
   colorblindPalette: boolean;
-  /** 4-digit code guarding the parent area; null until a parent sets one. */
-  parentPin: string | null;
   coinPayout: CoinPayout;
   /** The buddy's name and the tips along the top of the buddy's home. */
   homeTips: boolean;
@@ -29,7 +27,6 @@ export const DEFAULT_SETTINGS: Settings = {
   reduceMotion: 'system',
   dyslexiaFont: false,
   colorblindPalette: false,
-  parentPin: null,
   coinPayout: 1,
   homeTips: true,
 };
@@ -46,13 +43,17 @@ export const useSettings = create<SettingsState>()(
       ...DEFAULT_SETTINGS,
       update: (changes) => set(changes),
       // Resetting settings keeps the parent's choices so a child can't clear them.
-      reset: () => set((s) => ({ ...DEFAULT_SETTINGS, parentPin: s.parentPin, coinPayout: s.coinPayout })),
+      reset: () => set((s) => ({ ...DEFAULT_SETTINGS, coinPayout: s.coinPayout })),
     }),
     {
       name: 'math-game.settings',
-      version: 3,
+      version: 4,
       storage: persistStorage,
-      migrate: (persisted) => ({ ...DEFAULT_SETTINGS, ...(persisted as Partial<Settings>) }),
+      // v4: the parent code is fixed (PARENT_CODE), so any PIN saved before is dropped.
+      migrate: (persisted) => {
+        const { parentPin: _oldPin, ...rest } = persisted as Partial<Settings> & { parentPin?: unknown };
+        return { ...DEFAULT_SETTINGS, ...rest };
+      },
     },
   ),
 );

@@ -19,75 +19,36 @@ import { trickiest } from '@/utils/weakSpots';
 
 const PIN_LENGTH = 4;
 
-/** What the PIN pad is asking for. */
-type Step = 'enter' | 'create' | 'confirm' | 'open';
+/** The code that opens the parent area, the same on every device. */
+export const PARENT_CODE = '1210';
 
 export function ParentScreen() {
-  const { parentPin, update } = useSettings();
-  const [step, setStep] = useState<Step>(parentPin ? 'enter' : 'create');
-  const [firstTry, setFirstTry] = useState('');
+  const [open, setOpen] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
 
   const submit = (pin: string) => {
-    if (step === 'enter') {
-      if (pin === parentPin) {
-        setMessage(null);
-        setStep('open');
-      } else {
-        setMessage('That PIN is not right. Try again.');
-      }
-    } else if (step === 'create') {
-      setFirstTry(pin);
+    if (pin === PARENT_CODE) {
       setMessage(null);
-      setStep('confirm');
-    } else if (step === 'confirm') {
-      if (pin === firstTry) {
-        update({ parentPin: pin });
-        setMessage('PIN saved.');
-        setStep('open');
-      } else {
-        setMessage("Those didn't match. Start again.");
-        setStep('create');
-      }
+      setOpen(true);
+    } else {
+      setMessage('That code is not right. Try again.');
     }
   };
 
-  if (step !== 'open') {
-    const title =
-      step === 'enter'
-        ? 'Enter the parent PIN'
-        : step === 'create'
-          ? 'Choose a 4-digit parent PIN'
-          : 'Type the same PIN again';
+  if (!open) {
     return (
       <Screen title="Parent area">
-        <PinPad key={step} title={title} message={message} onComplete={submit} />
+        <PinPad title="Enter the parent code" message={message} onComplete={submit} />
       </Screen>
     );
   }
 
   return (
     <Screen title="Parent area">
-      {message ? <Text style={styles.message}>{message}</Text> : null}
       <PayoutSettings />
       <ParentReport />
       <View style={styles.actions}>
-        <BigButton
-          label="Change PIN"
-          outline
-          onPress={() => {
-            setMessage(null);
-            setStep('create');
-          }}
-        />
-        <BigButton
-          label="🔒 Lock"
-          color={colors.text}
-          onPress={() => {
-            setMessage(null);
-            setStep('enter');
-          }}
-        />
+        <BigButton label="🔒 Lock" color={colors.text} onPress={() => setOpen(false)} />
       </View>
     </Screen>
   );
@@ -152,7 +113,7 @@ function PinPad({
         )}
       </View>
       <Text style={styles.note}>
-        The PIN keeps this report for grown-ups. Resetting settings does not clear it.
+        The code keeps this area for grown-ups.
       </Text>
     </View>
   );
