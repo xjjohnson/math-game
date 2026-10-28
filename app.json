@@ -3,6 +3,18 @@
     "name": "Math Game",
     "slug": "math-game",
     "version": "1.0.0",
+    "owner": "xjjohnsonxs-team",
+    "runtimeVersion": {
+      "policy": "fingerprint"
+    },
+    "updates": {
+      "url": "https://u.expo.dev/67babded-0c06-4bee-aa67-412b18c4cf4b",
+      "requestHeaders": {
+        "expo-channel-name": "production"
+      },
+      "checkAutomatically": "ON_LOAD",
+      "fallbackToCacheTimeout": 0
+    },
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
@@ -30,8 +42,14 @@
     "plugins": [
       "expo-router",
       "expo-font",
-      "./modules/math-nearby/app.plugin.js"
+      "./modules/math-nearby/app.plugin.js",
+      "expo-updates"
     ],
-    "scheme": "mathgame"
+    "scheme": "mathgame",
+    "extra": {
+      "eas": {
+        "projectId": "67babded-0c06-4bee-aa67-412b18c4cf4b"
+      }
+    }
   }
 }

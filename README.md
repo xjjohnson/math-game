@@ -44,6 +44,12 @@ an "Update now" button that downloads the APK and opens Android's installer (Set
 updates does the same). This needs the release to be downloadable without signing in, so the repo has
 to be public.
 
+**Over-the-air updates.** When a merge only changes JavaScript (screens, questions, rewards, fixes),
+the workflow skips the APK and publishes it with EAS Update instead, which takes a few minutes. Phones
+download it by themselves at launch and Home shows "Restart to get it". The workflow tells the two apart
+by the native fingerprint stored in `version.json`. This needs an `EXPO_TOKEN` secret (an Expo access
+token) under Settings → Secrets and variables → Actions; without it every merge builds an APK as before.
+
 The other two ways also give an `.apk` to install on each phone.
 
 **In the cloud with EAS (no Android Studio needed):**
