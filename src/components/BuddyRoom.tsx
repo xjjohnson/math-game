@@ -12,7 +12,7 @@ import {
 } from 'react-native';
 
 import { Text } from '@/components/AppText';
-import { BuddyFace } from '@/components/BuddyFace';
+import { BuddyFigure, type Dressed } from '@/components/BuddyFigure';
 import { Furniture } from '@/components/Furniture';
 import { PopIn } from '@/components/PopIn';
 import {
@@ -48,6 +48,9 @@ export interface HomeBuddy {
   gift: string | null;
   name: string;
   spot: BuddySpot;
+  fur: string;
+  belly: string;
+  dressed: Dressed;
 }
 
 interface Props {
@@ -326,7 +329,14 @@ export function BuddyRoom(props: Props) {
               ) : null}
               {buddy ? (
                 <>
-                  <BuddyFace value={buddy.emoji} size={Math.round(piece.height / 1.25)} gift={buddy.gift} />
+                  <BuddyFigure
+                    value={buddy.emoji}
+                    size={Math.round(piece.height)}
+                    fur={buddy.fur}
+                    belly={buddy.belly}
+                    dressed={buddy.dressed}
+                    gift={buddy.gift}
+                  />
                   {parent?.item?.sleep ? (
                     <Text style={[styles.zzz, { fontSize: Math.round(piece.height * 0.3) }]}>💤</Text>
                   ) : null}

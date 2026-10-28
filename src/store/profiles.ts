@@ -21,6 +21,7 @@ import {
   type RoomBuyResult,
 } from '@/utils/room';
 import { buyItem, equipItem, freeAvatars, type BuyResult } from '@/utils/shop';
+import { undress, wear, type WearResult } from '@/utils/wardrobe';
 
 function emptyStats(): Profile['stats'] {
   return {
@@ -65,6 +66,8 @@ export function createProfile(
     buddyHearts: {},
     buddyCare: null,
     room: emptyRoom(),
+    wardrobe: [],
+    outfits: {},
   };
 }
 
@@ -93,6 +96,9 @@ interface ProfilesState {
   paintRoom: (id: string, part: 'wall' | 'floor', color: number, area: number) => void;
   /** Invites a buddy into the home, or sends it off for a nap. */
   setBuddyHome: (id: string, buddyId: string, home: boolean, area: number) => void;
+  /** Puts clothes on a buddy (buying them first if needed), or takes them off. */
+  wear: (id: string, buddyId: string, wearableId: string) => WearResult;
+  undress: (id: string, buddyId: string) => void;
 }
 
 export const useProfiles = create<ProfilesState>()(
@@ -182,10 +188,21 @@ export const useProfiles = create<ProfilesState>()(
         set((s) => ({
           profiles: s.profiles.map((p) => (p.id === id ? setBuddyHome(p, buddyId, home, area) : p)),
         })),
+      wear: (id, buddyId, wearableId) => {
+        const current = get().profiles.find((p) => p.id === id);
+        if (!current) return { ok: false, reason: 'unknown' };
+        const result = wear(current, buddyId, wearableId);
+        if (result.ok) {
+          set((s) => ({ profiles: s.profiles.map((p) => (p.id === id ? result.profile : p)) }));
+        }
+        return result;
+      },
+      undress: (id, buddyId) =>
+        set((s) => ({ profiles: s.profiles.map((p) => (p.id === id ? undress(p, buddyId) : p)) })),
     }),
     {
       name: 'math-game.profiles',
-      version: 8,
+      version: 9,
       storage: persistStorage,
       migrate: (persisted, version) => {
         const state = persisted as Pick<ProfilesState, 'profiles' | 'activeProfileId'>;
@@ -236,6 +253,10 @@ export const useProfiles = create<ProfilesState>()(
             ...p,
             room: upgradeRoom(p.room, p.equipped?.companion ?? null),
           }));
+        }
+        if (version < 9) {
+          // Version 9 added clothes for buddies.
+          state.profiles = state.profiles.map((p) => ({ ...p, wardrobe: p.wardrobe ?? [], outfits: p.outfits ?? {} }));
         }
         return state as ProfilesState;
       },

@@ -87,7 +87,14 @@ export interface Profile {
   buddyCare: BuddyCare | null;
   /** The buddies' home: paint colors, who is home and the things placed in it. */
   room: Room;
+  /** Clothes and accessories bought, by wearable id. Any buddy can wear them. */
+  wardrobe: string[];
+  /** What each buddy has on, keyed by the buddy's shop item id. */
+  outfits: Record<string, Outfit>;
 }
+
+/** Wearable ids a buddy has on, one per spot. */
+export type Outfit = Partial<Record<'hat' | 'face' | 'neck' | 'shirt' | 'feet', string>>;
 
 /**
  * Spots are shares of the whole home's width (x, so 0 to 1 spans every area) and of its

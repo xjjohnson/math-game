@@ -203,10 +203,11 @@ export function layoutHome(room: Room, buddies: BuddyAt[], size: HomeSize, open:
     } else if (t.on?.startsWith(BUDDY_KEY)) {
       parent = place(t.on);
       if (parent) {
-        h = Math.min(h, parent.height * 0.5);
+        // In the buddy's paw, at the end of its arm.
+        h = Math.min(h, parent.height * 0.42);
         w = h * (item.wide ?? 1);
-        x = parent.x + parent.width * 0.38;
-        y = parent.y - parent.height * 0.04;
+        x = parent.x + parent.width * 0.34;
+        y = parent.y - parent.height * 0.08;
       }
     } else if (t.on) {
       parent = place(t.on);

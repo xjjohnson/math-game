@@ -205,7 +205,7 @@ export const FLOOR_COLORS = ['#C98F5E', '#E7CFC4', '#B9C7D9', '#A8C79A', '#D9B8E
 export const MAX_ROOM_THINGS = 80;
 
 /** Drawn height of a buddy, as a share of the room's size unit. */
-export const BUDDY_SIZE = 0.3;
+export const BUDDY_SIZE = 0.36;
 
 export function findRoomItem(id: string): RoomItem | undefined {
   return ROOM_ITEMS.find((item) => item.id === id);
