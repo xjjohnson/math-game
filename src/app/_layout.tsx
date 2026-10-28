@@ -30,6 +30,9 @@ export default function RootLayout() {
         <Stack.Screen name="profiles" options={{ title: 'Players' }} />
         <Stack.Screen name="mode" options={{ title: 'New game' }} />
         <Stack.Screen name="play" options={{ title: 'Play' }} />
+        <Stack.Screen name="worksheet" options={{ title: 'Worksheet' }} />
+        <Stack.Screen name="learn" options={{ title: 'Learn how' }} />
+        <Stack.Screen name="lesson" options={{ title: 'Lesson' }} />
         <Stack.Screen name="progress" options={{ title: 'My progress' }} />
         <Stack.Screen name="shop" options={{ title: 'Shop' }} />
         <Stack.Screen name="buddy" options={{ title: 'My buddy' }} />

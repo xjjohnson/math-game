@@ -159,6 +159,8 @@ export interface GameConfig {
   wordProblems?: boolean;
   /** Coach column problems one column at a time, carrying and borrowing like on paper. */
   showWork?: boolean;
+  /** Show every question on one page and mark them all at the end. */
+  worksheet?: boolean;
 }
 
 export interface AnswerRecord {

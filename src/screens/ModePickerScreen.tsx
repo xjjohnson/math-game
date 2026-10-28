@@ -41,6 +41,7 @@ export function ModePickerScreen() {
   const [includeDivision, setIncludeDivision] = useState(false);
   const [wordProblems, setWordProblems] = useState(false);
   const [showWork, setShowWork] = useState(false);
+  const [worksheet, setWorksheet] = useState(false);
 
   const isTables = choice === 'tables';
 
@@ -57,14 +58,16 @@ export function ModePickerScreen() {
       // Times tables score like Medium; the tables themselves set the challenge.
       difficulty: isTables ? 'medium' : difficulty,
       grade: isTables ? undefined : level.grade,
-      timer,
-      adaptive: !isTables && adaptive,
+      // A worksheet is answered at the player's own pace, in any order.
+      timer: worksheet ? null : timer,
+      adaptive: !isTables && !worksheet && adaptive,
       wordProblems: !isTables && wordProblems,
-      showWork: !isTables && showWork,
+      showWork: !isTables && !worksheet && showWork,
+      worksheet,
       questionCount: QUESTIONS_PER_ROUND,
       seed: randomSeed(),
     };
-    router.push({ pathname: '/play', params: { config: JSON.stringify(config) } });
+    router.push({ pathname: worksheet ? '/worksheet' : '/play', params: { config: JSON.stringify(config) } });
   };
 
   return (
@@ -120,9 +123,11 @@ export function ModePickerScreen() {
               {GRADES[level.grade].name} doesn't usually do this yet, so the numbers stay small.
             </Text>
           ) : null}
-          <ToggleRow label="Change difficulty as I play" value={adaptive} onChange={setAdaptive} />
+          {worksheet ? null : (
+            <ToggleRow label="Change difficulty as I play" value={adaptive} onChange={setAdaptive} />
+          )}
           <ToggleRow label="Word problems (little stories)" value={wordProblems} onChange={setWordProblems} />
-          {choice !== 'divide' ? (
+          {choice !== 'divide' && !worksheet ? (
             <>
               <ToggleRow
                 label="✏️ Show my work (learn to carry and borrow)"
@@ -144,9 +149,13 @@ export function ModePickerScreen() {
         </>
       )}
 
-      <OptionGroup label="Timer (per question)" value={timer} onChange={setTimer} options={TIMER_OPTIONS} />
+      <ToggleRow label="📝 Worksheet (all questions on one page, check at the end)" value={worksheet} onChange={setWorksheet} />
 
-      {profile ? (
+      {worksheet ? null : (
+        <OptionGroup label="Timer (per question)" value={timer} onChange={setTimer} options={TIMER_OPTIONS} />
+      )}
+
+      {profile && !worksheet ? (
         <OptionGroup
           label="How to answer"
           value={profile.inputStyle}
