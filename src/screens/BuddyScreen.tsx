@@ -319,8 +319,10 @@ export function BuddyScreen() {
                 </Pressable>
               ))}
             </View>
-            <View style={styles.coins} accessible accessibilityLabel={`${profile.coins} coins`}>
-              <Text style={styles.coinText}>🪙 {profile.coins}</Text>
+            <View style={styles.coins}>
+              <Text style={styles.coinText} numberOfLines={1} accessibilityLabel={`${profile.coins} coins`}>
+                {`🪙 ${profile.coins}`}
+              </Text>
             </View>
           </View>
           {buddyId ? (
@@ -331,8 +333,10 @@ export function BuddyScreen() {
             </View>
           ) : null}
           {line ? (
-            <View style={styles.bubble} accessibilityLiveRegion="polite">
-              <Text style={styles.bubbleText}>{line}</Text>
+            <View style={styles.bubble}>
+              <Text style={styles.bubbleText} accessibilityLiveRegion="polite">
+                {line}
+              </Text>
             </View>
           ) : null}
         </View>
@@ -847,6 +851,7 @@ const styles = StyleSheet.create({
   },
   tagText: { fontSize: 16, fontWeight: '900', color: colors.text },
   bubble: {
+    alignSelf: 'center',
     maxWidth: 520,
     backgroundColor: colors.surface,
     borderRadius: radius.md,
