@@ -91,8 +91,15 @@ function WorkText({ line, color }: { line: WorkLine; color: string }) {
           : line.tone === 'note'
             ? { color }
             : null;
+  // Leading spaces line the columns up; keep them out of the strike-through.
+  const indent = line.text.length - line.text.trimStart().length;
   // Plain RN Text: the dyslexia font isn't monospaced, so columns would drift.
-  return <RNText style={[styles.work, { fontFamily: MONO }, tone]}>{line.text}</RNText>;
+  return (
+    <RNText style={[styles.work, { fontFamily: MONO }]}>
+      {line.text.slice(0, indent)}
+      <RNText style={tone}>{line.text.slice(indent)}</RNText>
+    </RNText>
+  );
 }
 
 function NumberLine({

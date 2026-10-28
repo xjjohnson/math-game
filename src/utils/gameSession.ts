@@ -1,8 +1,9 @@
+import { DIFFICULTIES } from '@/constants/difficulty';
 import type { AnswerRecord, Difficulty, GameConfig, Problem } from '@/types';
 import { adjustDifficulty } from '@/utils/adaptive';
 import { buildProblem, generate, generateTimesTable } from '@/utils/mathEngine';
 import { pointsFor } from '@/utils/scoring';
-import { createRng } from '@/utils/seededRandom';
+import { createRng, randomSeed } from '@/utils/seededRandom';
 import { toWordProblem } from '@/utils/wordProblems';
 
 export const QUESTIONS_PER_ROUND = 10;
@@ -54,7 +55,27 @@ export function highScoreKey(config: GameConfig): string {
     mode.kind === 'operation'
       ? `${mode.operation}${config.wordProblems ? '-words' : ''}`
       : `tables-${[...mode.tables].sort((a, b) => a - b).join('-')}${mode.includeDivision ? '-div' : ''}`;
-  return `${name}:${config.difficulty}:${config.timer ?? 'none'}${config.adaptive ? ':adaptive' : ''}`;
+  return `${name}:${config.difficulty}:${config.timer ?? 'none'}${config.adaptive ? ':adaptive' : ''}${config.worksheet ? ':sheet' : ''}`;
+}
+
+/** Reads a round's settings from the screen's URL, falling back to an easy addition round. */
+export function parseConfig(raw: string | undefined): GameConfig {
+  const fallback: GameConfig = {
+    mode: { kind: 'operation', operation: 'add' },
+    difficulty: 'easy',
+    timer: null,
+    adaptive: false,
+    questionCount: QUESTIONS_PER_ROUND,
+    seed: randomSeed(),
+  };
+  if (!raw) return fallback;
+  try {
+    const parsed = JSON.parse(raw) as GameConfig;
+    if (!parsed.mode || !(parsed.difficulty in DIFFICULTIES)) return fallback;
+    return parsed;
+  } catch {
+    return fallback;
+  }
 }
 
 export function startSession(config: GameConfig): SessionState {

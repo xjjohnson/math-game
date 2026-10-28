@@ -135,6 +135,9 @@ const styles = StyleSheet.create({
   checkText: { color: colors.primaryText },
   compactKey: { minHeight: 56 },
   compactCheck: { flexBasis: '30%', flexGrow: 1 },
+  sheetRow: { flexDirection: 'row', gap: spacing.xs },
+  sheetKey: { flexBasis: 0, minHeight: 56 },
+  sheetNext: { backgroundColor: colors.primary },
 });
 
 interface ColumnPadProps {
@@ -191,6 +194,67 @@ export function ColumnPad({ onKey, onCheck, canCheck, disabled = false }: Column
           </Pressable>
         );
       })}
+    </View>
+  );
+}
+
+interface SheetPadProps {
+  onKey: (key: string) => void;
+  onNext: () => void;
+  allowNegative?: boolean;
+}
+
+const SHEET_ROWS = [
+  ['1', '2', '3', '4', '5', '6'],
+  ['7', '8', '9', '0', '⌫', 'next'],
+];
+
+/**
+ * A short two-row pad for worksheets, so most of the page stays visible.
+ * "Next" jumps to the next empty answer box.
+ */
+export function SheetPad({ onKey, onNext, allowNegative = false }: SheetPadProps) {
+  useEffect(() => {
+    if (Platform.OS !== 'web') return;
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (/^[0-9]$/.test(e.key)) onKey(e.key);
+      else if (e.key === 'Backspace') onKey('⌫');
+      else if (e.key === '-') onKey('±');
+      else if (e.key === 'Enter' || e.key === 'Tab') onNext();
+      else return;
+      e.preventDefault();
+    };
+    document.addEventListener('keydown', onKeyDown);
+    return () => document.removeEventListener('keydown', onKeyDown);
+  });
+
+  return (
+    <View style={styles.wrap}>
+      {SHEET_ROWS.map((row, r) => (
+        <View key={r} style={styles.sheetRow}>
+          {(r === 1 && allowNegative ? ['±', ...row] : row).map((key) => {
+            const next = key === 'next';
+            return (
+              <Pressable
+                key={key}
+                onPress={() => (next ? onNext() : onKey(key))}
+                accessibilityRole="button"
+                accessibilityLabel={next ? 'Next answer' : key === '⌫' ? 'Delete' : key === '±' ? 'Minus' : key}
+                style={({ pressed }) => [
+                  styles.key,
+                  styles.sheetKey,
+                  next && styles.sheetNext,
+                  pressed && styles.pressed,
+                ]}
+              >
+                <Text style={[styles.keyText, next && styles.checkText]}>
+                  {next ? '➜' : key === '±' ? '−' : key}
+                </Text>
+              </Pressable>
+            );
+          })}
+        </View>
+      ))}
     </View>
   );
 }

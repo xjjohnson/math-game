@@ -106,6 +106,9 @@ Cross-platform interactive math learning game for kids (ages 5-15), React Native
 - Adaptive difficulty from recent accuracy
 - Weak-spots review (resurfaces missed facts)
 - Word problems for the older range
+- Count it out: tap-to-count picture of the problem during a round (dots, ten-frames, rows, shared groups, hundreds/tens/ones blocks)
+- Learn how: step-by-step lessons on school methods, grouped by operation with rough ages (count on, make a ten, carrying, count back, count up, borrowing, equal groups, skip counting, times table tricks, break it apart, sharing, think times, long division), each ending in a matching practice round
+- Worksheet mode: all 10 questions on one page, answered in any order with a short pad, marked together at the end (untimed; same coins, stars and high scores, kept separately)
 
 ## Motivation
 
@@ -178,6 +181,9 @@ Phases 1-6 deliver a complete single-player game before any native Bluetooth wor
 - [ ] Weak-spots review (Phase 6)
 - [ ] Times-tables mode (Phase 3)
 - [ ] Word problems for the older range (Phase 6)
+- [x] Counting aid during play (kid-test feedback)
+- [x] Learn how lessons on school methods (kid-test feedback)
+- [x] Worksheet mode: many questions per page, check at the end (kid-test feedback)
 
 ### Motivation and retention
 - [ ] Daily challenge with bonus reward (Phase 4)

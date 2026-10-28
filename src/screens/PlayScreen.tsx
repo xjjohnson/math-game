@@ -1,4 +1,4 @@
-import { router, useLocalSearchParams } from 'expo-router';
+import { useLocalSearchParams } from 'expo-router';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 
@@ -10,10 +10,9 @@ import { CountingAid } from '@/components/CountingAid';
 import { FlashCard, isStacked } from '@/components/FlashCard';
 import { ColumnHint } from '@/components/ColumnHint';
 import { ColumnPad, NumberPad } from '@/components/NumberPad';
-import { PopIn } from '@/components/PopIn';
+import { isNotable, RoundResults } from '@/components/RoundResults';
 import { Screen } from '@/components/Screen';
 import { TimerBar } from '@/components/TimerBar';
-import { findBadge } from '@/constants/badges';
 import { DIFFICULTIES } from '@/constants/difficulty';
 import { colors, fontSizes, radius, spacing } from '@/constants/theme';
 import { usePalette } from '@/hooks/useAccessibility';
@@ -25,40 +24,19 @@ import type { GameConfig } from '@/types';
 import { countingModel } from '@/utils/countingAid';
 import { speakProblem, stopSpeaking, vibrate } from '@/utils/feedback';
 import {
-  correctCount,
   highScoreKey,
   lastAnswer,
-  QUESTIONS_PER_ROUND,
-  type SessionState,
+  parseConfig,
 } from '@/utils/gameSession';
 import { resolveInputStyle } from '@/utils/inputStyle';
 import type { RoundOutcome } from '@/utils/progress';
-import { DAILY_PASS, STREAK_MILESTONE } from '@/utils/rewards';
+import { STREAK_MILESTONE } from '@/utils/rewards';
 import { randomSeed } from '@/utils/seededRandom';
 import { cardStyleFor, companionFor } from '@/utils/shop';
 import { playSound } from '@/utils/soundEffects';
 
 /** How long a right answer stays on screen before the next card. */
 const CORRECT_PAUSE_MS = 900;
-
-function parseConfig(raw: string | undefined): GameConfig {
-  const fallback: GameConfig = {
-    mode: { kind: 'operation', operation: 'add' },
-    difficulty: 'easy',
-    timer: null,
-    adaptive: false,
-    questionCount: QUESTIONS_PER_ROUND,
-    seed: randomSeed(),
-  };
-  if (!raw) return fallback;
-  try {
-    const parsed = JSON.parse(raw) as GameConfig;
-    if (!parsed.mode || !(parsed.difficulty in DIFFICULTIES)) return fallback;
-    return parsed;
-  } catch {
-    return fallback;
-  }
-}
 
 export function PlayScreen() {
   const params = useLocalSearchParams<{ config?: string }>();
@@ -123,16 +101,7 @@ function Round({ config, onPlayAgain }: { config: GameConfig; onPlayAgain: () =>
       dailyDate: config.dailyDate,
     });
     setOutcome(result);
-    if (
-      result &&
-      (result.dailyBonusCoins > 0 ||
-        result.weeklyBonusCoins > 0 ||
-        result.newBadges.length > 0 ||
-        result.newHighScore ||
-        result.stars === 3)
-    ) {
-      playSound('reward');
-    }
+    if (result && isNotable(result)) playSound('reward');
   }, [state, profile, config, recordRound]);
 
   const allowNegative =
@@ -144,7 +113,7 @@ function Round({ config, onPlayAgain }: { config: GameConfig; onPlayAgain: () =>
 
   if (state.phase === 'finished') {
     return (
-      <Results state={state} outcome={outcome} daily={!!config.dailyDate} onPlayAgain={onPlayAgain} />
+      <RoundResults summary={state} outcome={outcome} daily={!!config.dailyDate} onPlayAgain={onPlayAgain} />
     );
   }
 
@@ -253,88 +222,6 @@ function Round({ config, onPlayAgain }: { config: GameConfig; onPlayAgain: () =>
   );
 }
 
-function Results({
-  state,
-  outcome,
-  daily,
-  onPlayAgain,
-}: {
-  state: SessionState;
-  outcome: RoundOutcome | null;
-  daily: boolean;
-  onPlayAgain: () => void;
-}) {
-  const right = correctCount(state);
-  const total = state.history.length;
-  const missed = state.history.filter((r) => !r.correct);
-  const cheer = right === total ? 'Perfect round!' : right >= total * 0.7 ? 'Awesome work!' : 'Good practice!';
-
-  return (
-    <Screen title={cheer}>
-      {outcome ? (
-        <View style={styles.rewards}>
-          <View style={styles.starRow} accessible accessibilityLabel={`${outcome.stars} out of 3 stars`}>
-            {[0, 1, 2].map((i) => (
-              <PopIn key={i} delay={250 * i} damping={9}>
-                <Text style={[styles.stars, i >= outcome.stars && styles.starEmpty]}>
-                  {i < outcome.stars ? '★' : '☆'}
-                </Text>
-              </PopIn>
-            ))}
-          </View>
-          <Text style={styles.coins}>+{outcome.coins} 🪙</Text>
-          {outcome.streakBonusCoins > 0 ? (
-            <Text style={styles.bonus}>Includes +{outcome.streakBonusCoins} for streaks of {STREAK_MILESTONE}</Text>
-          ) : null}
-          {outcome.dailyBonusCoins > 0 ? (
-            <Text style={styles.bonus}>🎉 Daily challenge complete! +{outcome.dailyBonusCoins} bonus</Text>
-          ) : daily ? (
-            <Text style={styles.bonus}>Get {DAILY_PASS} right to win the daily bonus.</Text>
-          ) : null}
-          {outcome.weeklyBonusCoins > 0 ? (
-            <Text style={styles.bonus}>🏆 All weekly goals done! +{outcome.weeklyBonusCoins} bonus</Text>
-          ) : null}
-          {outcome.newHighScore ? <Text style={styles.highScore}>🏆 New high score!</Text> : null}
-          {outcome.newBadges.map((id) => {
-            const badge = findBadge(id);
-            return badge ? (
-              <Text key={id} style={styles.badge}>
-                {badge.emoji} New badge: {badge.name}
-              </Text>
-            ) : null;
-          })}
-        </View>
-      ) : null}
-      <View style={styles.summary}>
-        <Stat label="Score" value={String(state.score)} />
-        <Stat label="Right" value={`${right} / ${total}`} />
-        <Stat label="Best streak" value={String(state.bestStreak)} />
-      </View>
-      {missed.length > 0 ? (
-        <View style={styles.missed}>
-          <Text style={styles.missedTitle}>Practice these</Text>
-          {missed.map((r, i) => (
-            <Text key={i} style={styles.missedItem}>
-              {r.problem.prompt} = {r.problem.answer}
-            </Text>
-          ))}
-        </View>
-      ) : null}
-      <BigButton label="Play again" color={colors.correct} onPress={onPlayAgain} />
-      <BigButton label={daily ? 'Home' : 'Change game'} outline onPress={() => router.back()} />
-    </Screen>
-  );
-}
-
-function Stat({ label, value }: { label: string; value: string }) {
-  return (
-    <View style={styles.stat}>
-      <Text style={styles.statValue}>{value}</Text>
-      <Text style={styles.statLabel}>{label}</Text>
-    </View>
-  );
-}
-
 const styles = StyleSheet.create({
   statusRow: { flexDirection: 'row', justifyContent: 'space-between' },
   status: { fontSize: fontSizes.body, fontWeight: '800', color: colors.text, fontVariant: ['tabular-nums'] },
@@ -350,32 +237,4 @@ const styles = StyleSheet.create({
   },
   countToggleText: { fontSize: 18, fontWeight: '800', color: colors.primary },
   feedback: { fontSize: fontSizes.button, fontWeight: '800', textAlign: 'center' },
-  highScore: { fontSize: fontSizes.button, fontWeight: '900', color: colors.accent, textAlign: 'center' },
-  rewards: { alignItems: 'center', gap: spacing.xs },
-  starRow: { flexDirection: 'row', gap: spacing.md },
-  stars: { fontSize: 56, color: colors.accent },
-  starEmpty: { opacity: 0.5 },
-  coins: { fontSize: fontSizes.title, fontWeight: '900', color: colors.text },
-  bonus: { fontSize: 18, fontWeight: '700', color: colors.textMuted, textAlign: 'center' },
-  badge: { fontSize: fontSizes.body, fontWeight: '900', color: colors.primary, textAlign: 'center' },
-  summary: { flexDirection: 'row', gap: spacing.sm },
-  stat: {
-    flex: 1,
-    backgroundColor: colors.surface,
-    borderRadius: radius.md,
-    borderWidth: 3,
-    borderColor: colors.border,
-    paddingVertical: spacing.md,
-    alignItems: 'center',
-  },
-  statValue: { fontSize: fontSizes.button + 4, fontWeight: '900', color: colors.text },
-  statLabel: { fontSize: 16, fontWeight: '700', color: colors.textMuted },
-  missed: {
-    backgroundColor: colors.surface,
-    borderRadius: radius.md,
-    padding: spacing.md,
-    gap: spacing.xs,
-  },
-  missedTitle: { fontSize: fontSizes.body, fontWeight: '800', color: colors.text },
-  missedItem: { fontSize: fontSizes.body, color: colors.text, fontVariant: ['tabular-nums'] },
 });

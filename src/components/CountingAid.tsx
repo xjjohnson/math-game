@@ -32,8 +32,9 @@ export function CountingAid({ problem, model }: Props) {
   }, [order, flat]);
   const total = order.reduce((sum, i) => sum + flat[i].value, 0);
 
-  const tint = (item: CountItem) =>
-    item.part === 'a' ? palette.operations[problem.operation] : colors.accent;
+  // Division's color is already orange, so its second color is blue.
+  const second = problem.operation === 'divide' ? colors.primary : colors.accent;
+  const tint = (item: CountItem) => (item.part === 'a' ? palette.operations[problem.operation] : second);
 
   let index = 0;
   return (
@@ -43,7 +44,13 @@ export function CountingAid({ problem, model }: Props) {
         {model.groups.map((group, g) => (
           <View key={g} style={[styles.group, model.layout === 'rows' && styles.rowGroup]}>
             {model.layout === 'frames' ? <Text style={styles.groupLabel}>{group.label}</Text> : null}
-            <View style={[styles.items, model.layout === 'frames' && styles.frame]}>
+            <View
+              style={[
+                styles.items,
+                model.layout === 'frames' &&
+                  (group.items.some((it) => it.shape !== 'dot') ? styles.blockFrame : styles.frame),
+              ]}
+            >
               {group.items.map((item) => {
                 const i = index++;
                 const count = countAt.get(i);
@@ -104,13 +111,14 @@ const styles = StyleSheet.create({
   },
   tip: { fontSize: 18, fontWeight: '700', color: colors.text, textAlign: 'center' },
   groups: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', gap: spacing.md },
-  rows: { flexDirection: 'column', alignItems: 'center', gap: spacing.xs },
+  rows: { flexDirection: 'column', flexWrap: 'nowrap', alignItems: 'center', gap: spacing.xs },
   group: { alignItems: 'center', gap: spacing.xs },
   rowGroup: { flexDirection: 'row' },
   groupLabel: { fontSize: 18, fontWeight: '800', color: colors.textMuted },
   items: { flexDirection: 'row', flexWrap: 'wrap', gap: 4, justifyContent: 'center' },
   // Five across, like a ten-frame, so groups of five are easy to see.
   frame: { maxWidth: DOT * 5 + 4 * 4 },
+  blockFrame: { maxWidth: 280, alignItems: 'flex-end' },
   dot: {
     width: DOT,
     height: DOT,
@@ -120,9 +128,10 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     backgroundColor: colors.surface,
   },
+  // A tall rod, like a base-ten block.
   ten: {
-    width: DOT * 5 + 4 * 4,
-    height: DOT - 6,
+    width: DOT,
+    height: DOT * 3,
     borderRadius: 6,
     borderWidth: 3,
     alignItems: 'center',
@@ -130,8 +139,8 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surface,
   },
   hundred: {
-    width: DOT * 5 + 4 * 4,
-    height: DOT * 2,
+    width: DOT * 3,
+    height: DOT * 3,
     borderRadius: 6,
     borderWidth: 3,
     alignItems: 'center',
@@ -141,7 +150,7 @@ const styles = StyleSheet.create({
   crossed: { opacity: 0.45, borderStyle: 'dashed' },
   count: { fontSize: 14, fontWeight: '900', color: colors.textMuted },
   countOn: { color: colors.primaryText },
-  countBig: { fontSize: 16 },
+  countBig: { fontSize: 13 },
   footer: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: spacing.md },
   total: { fontSize: fontSizes.body, fontWeight: '800', color: colors.text },
   totalNumber: { color: colors.primary, fontSize: fontSizes.button },
