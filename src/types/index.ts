@@ -121,7 +121,7 @@ export interface RoomThing extends RoomSpot {
    * or a built-in shelf or counter (FIXTURE_KEY + id).
    */
   on?: string;
-  /** The cupboard it is kept in, and which shelf (0 is the top one). */
+  /** The cupboard it is kept in, and which shelf (0 is the top one); x is then how far along the shelf. */
   in?: string;
   shelf?: number;
 }

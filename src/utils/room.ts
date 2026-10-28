@@ -153,7 +153,9 @@ export function placeThing(profile: Profile, key: string, place: Placement): Pro
   if (!thing) return profile;
   let room = profile.room;
   if (place.in) {
-    const kept: RoomThing = { ...loose(thing, thing), in: place.in, shelf: place.shelf ?? 0 };
+    // In a cupboard, x is how far along the shelf it sits (0 to 1).
+    const along = { x: Math.min(1, Math.max(0, place.x)), y: thing.y };
+    const kept: RoomThing = { ...loose(thing, along), in: place.in, shelf: place.shelf ?? 0 };
     return withRoom(profile, { things: room.things.map((t) => (t.key === key ? kept : t)) });
   }
   const spot = clampSpot(place);

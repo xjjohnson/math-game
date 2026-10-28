@@ -131,18 +131,6 @@ export function layoutHome(room: Room, buddies: BuddyAt[], size: HomeSize, open:
   const { width: W, height: H, unit } = size;
   const things = new Map(room.things.filter((t) => t.placed).map((t) => [t.key, t]));
   const buddyAt = new Map(buddies.map((b) => [BUDDY_KEY + b.id, b]));
-  // Each kept thing's place in line on its shelf.
-  const inLine = new Map<string, { index: number; of: number }>();
-  const lines = new Map<string, string[]>();
-  for (const t of things.values()) {
-    if (!t.in) continue;
-    const c = findCupboard(t.in);
-    if (!c) continue;
-    const line = `${c.id}:${Math.min(c.shelves - 1, Math.max(0, t.shelf ?? 0))}`;
-    lines.set(line, [...(lines.get(line) ?? []), t.key]);
-  }
-  for (const keys of lines.values()) keys.forEach((k, index) => inLine.set(k, { index, of: keys.length }));
-
   const done = new Map<string, Piece | null>();
   const visiting = new Set<string>();
   const place = (key: string): Piece | null => {
@@ -178,14 +166,13 @@ export function layoutHome(room: Room, buddies: BuddyAt[], size: HomeSize, open:
 
     if (t.in) {
       const c = findCupboard(t.in);
-      const spot = inLine.get(key);
-      if (!c || !spot || !open.has(c.id)) return null;
-      const { inner, row, band, capacity } = shelvesOf(c, size);
+      if (!c || !open.has(c.id)) return null;
+      const { inner, row, band } = shelvesOf(c, size);
       const shelf = Math.min(c.shelves - 1, Math.max(0, t.shelf ?? 0));
-      const step = row.width / Math.max(capacity, spot.of);
       h = Math.min(h, band * 0.78);
       w = h;
-      const x = row.left + step * (spot.index + 0.5);
+      // Right where it was dropped along the shelf, kept inside the cupboard.
+      const x = clampAround(row.left + Math.min(1, Math.max(0, t.x)) * row.width, row.left + row.width / 2, (row.width - w) / 2);
       const y = inner.top + band * (shelf + 1) - 3;
       return { key, x, y, width: w, height: h, thing: t, item, stored: true, rootY: y, depth: 0 };
     }
@@ -284,7 +271,7 @@ export function dropThing(
 
   for (const c of CUPBOARDS) {
     if (!open.has(c.id)) continue;
-    const { inner, band, capacity } = shelvesOf(c, size);
+    const { inner, row, band, capacity } = shelvesOf(c, size);
     if (!inside(baseX, midY, inner)) continue;
     const want = Math.min(c.shelves - 1, Math.max(0, Math.floor((midY - inner.top) / band)));
     const order = Array.from({ length: c.shelves }, (_, i) => i).sort(
@@ -294,7 +281,8 @@ export function dropThing(
       const used = pieces.filter(
         (p) => p.key !== piece.key && p.thing?.in === c.id && (p.thing.shelf ?? 0) === shelf,
       ).length;
-      if (used < capacity) return { ...free, in: c.id, shelf };
+      // Along the shelf, as a share of its width, so it stays where it was dropped.
+      if (used < capacity) return { x: (baseX - row.left) / row.width, y: free.y, in: c.id, shelf };
     }
   }
 

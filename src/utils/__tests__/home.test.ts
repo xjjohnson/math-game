@@ -35,10 +35,10 @@ describe('home layout', () => {
     expect(size.unit).toBeLessThanOrEqual(760);
   });
 
-  it('keeps things in shut cupboards hidden and lines them up on shelves when open', () => {
+  it('keeps things in shut cupboards hidden and shows them where they were put on the shelf', () => {
     const p = withThings([
-      { key: 'a', itemId: 'milk', x: 0, y: 0, in: 'fridge', shelf: 1 },
-      { key: 'b', itemId: 'apples', x: 0, y: 0, in: 'fridge', shelf: 1 },
+      { key: 'a', itemId: 'milk', x: 0.2, y: 0, in: 'fridge', shelf: 1 },
+      { key: 'b', itemId: 'apples', x: 0.8, y: 0, in: 'fridge', shelf: 1 },
     ]);
     expect(layout(p).some((x) => x.key === 'a')).toBe(false);
     const open = layout(p, ['fridge']);
@@ -47,7 +47,8 @@ describe('home layout', () => {
     expect(a.stored).toBe(true);
     expect(a.y).toBeCloseTo(b.y);
     expect(b.x).toBeGreaterThan(a.x);
-    const { inner } = shelvesOf(CUPBOARDS.find((c) => c.id === 'fridge')!, size);
+    const { inner, row } = shelvesOf(CUPBOARDS.find((c) => c.id === 'fridge')!, size);
+    expect(b.x).toBeGreaterThan(row.left + row.width / 2);
     expect(a.y).toBeLessThanOrEqual(inner.top + inner.height);
     expect(a.y).toBeGreaterThan(inner.top + inner.height / 2);
   });
@@ -85,7 +86,9 @@ describe('dropping things', () => {
     const milk = piece(pieces, 'milk');
     const { inner, band } = shelvesOf(CUPBOARDS.find((c) => c.id === 'fridge')!, size);
     const [dx, dy] = to(milk, inner.left + inner.width / 2, inner.top + band * 2 - 4);
-    expect(dropThing(pieces, milk, dx, dy, size, new Set(['fridge']))).toMatchObject({ in: 'fridge', shelf: 1 });
+    const kept = dropThing(pieces, milk, dx, dy, size, new Set(['fridge']));
+    expect(kept).toMatchObject({ in: 'fridge', shelf: 1 });
+    expect(kept.x).toBeCloseTo((inner.left + inner.width / 2 - shelvesOf(CUPBOARDS.find((c) => c.id === 'fridge')!, size).row.left) / shelvesOf(CUPBOARDS.find((c) => c.id === 'fridge')!, size).row.width);
     // A shut fridge takes nothing.
     expect(dropThing(pieces, milk, dx, dy, size, new Set()).in).toBeUndefined();
   });
@@ -159,8 +162,9 @@ describe('placing in the home', () => {
 
   it('keeps things in cupboards, and takes them out loose', () => {
     const p = withThings([{ key: 'milk', itemId: 'milk', x: 0.5, y: 0.9 }]);
-    const kept = placeThing(p, 'milk', { x: 0, y: 0, in: 'fridge', shelf: 1 });
-    expect(kept.room.things[0]).toMatchObject({ in: 'fridge', shelf: 1, x: 0.5, y: 0.9 });
+    const kept = placeThing(p, 'milk', { x: 0.6, y: 0, in: 'fridge', shelf: 1 });
+    expect(kept.room.things[0].x).toBe(0.6);
+    expect(kept.room.things[0]).toMatchObject({ in: 'fridge', shelf: 1, y: 0.9 });
     const out = placeThing(kept, 'milk', { x: 0.4, y: 0.92 });
     expect(out.room.things[0].in).toBeUndefined();
     expect(out.room.things[0].shelf).toBeUndefined();
