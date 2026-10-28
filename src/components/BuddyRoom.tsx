@@ -16,6 +16,7 @@ import { Text } from '@/components/AppText';
 import { BuddyFigure, type Dressed } from '@/components/BuddyFigure';
 import { PersonFigure, type PersonDressed } from '@/components/PersonFigure';
 import { Furniture } from '@/components/Furniture';
+import { Drifting, FloatUp, Lively, type BounceKind } from '@/components/Motion';
 import { PopIn } from '@/components/PopIn';
 import {
   CUPBOARDS,
@@ -46,7 +47,7 @@ import {
   type HomeSize,
   type Piece,
 } from '@/utils/home';
-import { AREA_COUNT, paintOf, type Placement } from '@/utils/room';
+import { AREA_COUNT, BUDDY_KEY, paintOf, type Placement } from '@/utils/room';
 
 export interface HomeBuddy {
   /** Shop item id. */
@@ -82,6 +83,8 @@ interface Props {
   onToggle?: (name: string, open: boolean) => void;
   /** A built-in thing was tapped; `on` is whether it is now switched on. */
   onTapGadget?: (gadget: Gadget, on: boolean) => void;
+  /** Change `n` to have that buddy hop and wave, as when it levels up. */
+  cheer?: { buddyId: string; n: number };
 }
 
 const TRIM = '#A86B45';
@@ -147,7 +150,7 @@ interface Pop {
  */
 export function BuddyRoom(props: Props) {
   const { room, buddies, area, onAreaChange, onView, tidying, season, onPlaceThing, onPlaceBuddy } = props;
-  const { onTapThing, onTapBuddy, onToggle, onTapGadget } = props;
+  const { onTapThing, onTapBuddy, onToggle, onTapGadget, cheer } = props;
   const [view, setView] = useState({ width: 0, height: 0 });
   const [open, setOpen] = useState<ReadonlySet<string>>(new Set());
   const [lit, setLit] = useState<ReadonlySet<string>>(new Set());
@@ -156,6 +159,10 @@ export function BuddyRoom(props: Props) {
   /** How far each piece being dragged (or riding along) has moved, by piece key. */
   const [moving, setMoving] = useState<Record<string, { dx: number; dy: number }>>({});
   const [pops, setPops] = useState<Pop[]>([]);
+  /** The last one-off animation for each piece, replayed when `n` changes. */
+  const [bumps, setBumps] = useState<Record<string, { n: number; kind: BounceKind }>>({});
+  /** Set once the home has drawn, so only things added after that pop in. */
+  const drawn = useRef(false);
   const popId = useRef(0);
   const popTimers = useRef<ReturnType<typeof setTimeout>[]>([]);
   const scroll = useRef<ScrollViewInstance>(null);
@@ -176,6 +183,18 @@ export function BuddyRoom(props: Props) {
     },
     [],
   );
+
+  useEffect(() => {
+    if (size) drawn.current = true;
+  });
+
+  const bump = (key: string, kind: BounceKind) =>
+    setBumps((b) => ({ ...b, [key]: { n: (b[key]?.n ?? 0) + 1, kind } }));
+
+  useEffect(() => {
+    if (cheer?.n) bump(BUDDY_KEY + cheer.buddyId, 'hop');
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [cheer?.n]);
 
   const onLayout = (e: LayoutChangeEvent) => {
     const { width, height } = e.nativeEvent.layout;
@@ -252,9 +271,13 @@ export function BuddyRoom(props: Props) {
   const buddyById = new Map(buddies.map((b) => [b.id, b]));
 
   const tapPiece = (piece: Piece) => {
-    if (piece.buddyId) return onTapBuddy(piece.buddyId);
+    if (piece.buddyId) {
+      bump(piece.key, 'hop');
+      return onTapBuddy(piece.buddyId);
+    }
     const item = piece.item;
     if (!tidying && item) {
+      if (!item.light) bump(piece.key, 'wiggle');
       if (item.light) {
         setLit((set) => {
           const next = new Set(set);
@@ -270,6 +293,7 @@ export function BuddyRoom(props: Props) {
   };
 
   const dropPiece = (piece: Piece, dx: number, dy: number) => {
+    bump(piece.key, 'land');
     if (piece.buddyId) onPlaceBuddy(piece.buddyId, dropBuddy(pieces, piece, dx, dy, size));
     else onPlaceThing(piece.key, dropThing(pieces, piece, dx, dy, size, open));
   };
@@ -513,6 +537,9 @@ export function BuddyRoom(props: Props) {
             const offset = moving[piece.key];
             const buddy = piece.buddyId ? buddyById.get(piece.buddyId) : undefined;
             const parent = piece.parent ? byKey.get(piece.parent) : undefined;
+            const asleep = !!parent?.item?.sleep;
+            const tall = Math.round(piece.height);
+            const b = bumps[piece.key];
             return (
               <PieceView
                 key={piece.key}
@@ -534,36 +561,52 @@ export function BuddyRoom(props: Props) {
                     ]}
                   />
                 ) : null}
-                {buddy ? (
-                  <>
-                    {buddy.person ? (
-                      <PersonFigure
-                        look={buddy.person.look}
-                        size={Math.round(piece.height)}
-                        dressed={buddy.person.dressed}
-                        gift={buddy.gift}
-                      />
+                <PopIn skip={!drawn.current} damping={9} style={styles.fill}>
+                  <Lively
+                    height={tall}
+                    seed={piece.key}
+                    breathe={!!buddy && !offset}
+                    asleep={asleep}
+                    bounce={b?.n}
+                    bounceKind={b?.kind}
+                    style={styles.fill}
+                  >
+                    {buddy ? (
+                      buddy.person ? (
+                        <PersonFigure
+                          look={buddy.person.look}
+                          size={tall}
+                          dressed={buddy.person.dressed}
+                          gift={buddy.gift}
+                          alive
+                          asleep={asleep}
+                          wave={b?.kind === 'hop' ? b.n : undefined}
+                        />
+                      ) : (
+                        <BuddyFigure
+                          value={buddy.emoji}
+                          size={tall}
+                          fur={buddy.fur}
+                          belly={buddy.belly}
+                          dressed={buddy.dressed}
+                          gift={buddy.gift}
+                          wave={b?.kind === 'hop' ? b.n : undefined}
+                        />
+                      )
+                    ) : piece.item?.draw ? (
+                      <Furniture shape={piece.item.draw} width={piece.width} height={piece.height} />
                     ) : (
-                      <BuddyFigure
-                        value={buddy.emoji}
-                        size={Math.round(piece.height)}
-                        fur={buddy.fur}
-                        belly={buddy.belly}
-                        dressed={buddy.dressed}
-                        gift={buddy.gift}
-                      />
+                      <Text style={{ fontSize: Math.round(piece.height * 0.85), lineHeight: tall }}>
+                        {piece.item?.emoji}
+                      </Text>
                     )}
-                    {parent?.item?.sleep ? (
-                      <Text style={[styles.zzz, { fontSize: Math.round(piece.height * 0.3) }]}>💤</Text>
-                    ) : null}
-                  </>
-                ) : piece.item?.draw ? (
-                  <Furniture shape={piece.item.draw} width={piece.width} height={piece.height} />
-                ) : (
-                  <Text style={{ fontSize: Math.round(piece.height * 0.85), lineHeight: Math.round(piece.height) }}>
-                    {piece.item?.emoji}
-                  </Text>
-                )}
+                  </Lively>
+                </PopIn>
+                {buddy && asleep ? (
+                  <Drifting rise={piece.height * 0.25} style={styles.zzz}>
+                    <Text style={{ fontSize: Math.round(piece.height * 0.3) }}>💤</Text>
+                  </Drifting>
+                ) : null}
               </PieceView>
             );
           })}
@@ -580,13 +623,14 @@ export function BuddyRoom(props: Props) {
         )}
 
         {pops.map((p) => (
-          <PopIn
+          <FloatUp
             key={p.id}
-            damping={8}
+            rise={size.unit * 0.12}
+            duration={POP_MS}
             style={[styles.pop, { left: p.x - size.unit * 0.06, top: p.y - size.unit * 0.13 }]}
           >
             <Text style={{ fontSize: Math.round(size.unit * 0.09) }}>{p.emoji}</Text>
-          </PopIn>
+          </FloatUp>
         ))}
       </ScrollView>
     </View>
@@ -1032,6 +1076,7 @@ const styles = StyleSheet.create({
   },
   openDoor: { position: 'absolute', top: -2, bottom: -2, borderWidth: 2, borderColor: OUTLINE, borderRadius: 3 },
   piece: { position: 'absolute', alignItems: 'center', justifyContent: 'flex-end' },
+  fill: { width: '100%', height: '100%', alignItems: 'center', justifyContent: 'flex-end' },
   layer: { position: 'absolute', left: 0, top: 0, right: 0, bottom: 0 },
   dark: { position: 'absolute', top: 0, bottom: 0, backgroundColor: DARK },
   gadget: { position: 'absolute', alignItems: 'center', justifyContent: 'flex-end' },

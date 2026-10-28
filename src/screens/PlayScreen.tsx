@@ -10,6 +10,7 @@ import { CountingAid } from '@/components/CountingAid';
 import { FlashCard, isStacked } from '@/components/FlashCard';
 import { ColumnHint } from '@/components/ColumnHint';
 import { ColumnPad, NumberPad } from '@/components/NumberPad';
+import { PopIn } from '@/components/PopIn';
 import { isNotable, RoundResults } from '@/components/RoundResults';
 import { Screen } from '@/components/Screen';
 import { TimerBar } from '@/components/TimerBar';
@@ -191,13 +192,15 @@ function Round({ config, onPlayAgain }: { config: GameConfig; onPlayAgain: () =>
       ) : null}
 
       {showFeedback ? (
-        <Text style={[styles.feedback, { color: last.correct ? palette.correct : palette.wrong }]}>
-          {last.correct
-            ? `✓ Great job! +${last.points} points`
-            : last.given === null
-              ? "✗ Time's up!"
-              : '✗ Not quite. Remember this one!'}
-        </Text>
+        <PopIn key={`feedback-${state.index}`} damping={10}>
+          <Text style={[styles.feedback, { color: last.correct ? palette.correct : palette.wrong }]}>
+            {last.correct
+              ? `✓ Great job! +${last.points} points`
+              : last.given === null
+                ? "✗ Time's up!"
+                : '✗ Not quite. Remember this one!'}
+          </Text>
+        </PopIn>
       ) : null}
 
       {inputStyle === 'choices' && !typingColumns ? (

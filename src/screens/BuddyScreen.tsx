@@ -9,6 +9,7 @@ import type { Dressed } from '@/components/BuddyFigure';
 import { BuddyRoom, type HomeBuddy } from '@/components/BuddyRoom';
 import { ChoiceButtons } from '@/components/ChoiceButtons';
 import { Furniture } from '@/components/Furniture';
+import { Confetti } from '@/components/Motion';
 import { Screen } from '@/components/Screen';
 import { Sticker } from '@/components/Sticker';
 import {
@@ -113,6 +114,9 @@ export function BuddyScreen() {
   const homeTips = useSettings((s) => s.homeTips);
   const updateSettings = useSettings((s) => s.update);
   const [game, setGame] = useState<Game | null>(null);
+  /** Bumped to make the buddy hop and wave, and to throw confetti on a new level. */
+  const [cheers, setCheers] = useState(0);
+  const [party, setParty] = useState(0);
   const rng = useRef(createRng(randomSeed()));
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -200,6 +204,8 @@ export function BuddyScreen() {
     const result = careForBuddy(profile.id, action);
     if (result.ok) {
       if (result.levelUp) {
+        setCheers((n) => n + 1);
+        setParty((n) => n + 1);
         playSound('reward');
         const reached = buddyLevel(result.hearts);
         const gift = giftForLevel(reached);
@@ -224,6 +230,7 @@ export function BuddyScreen() {
     const right = choice === game.problem.answer;
     playSound(right ? 'correct' : 'wrong');
     if (right) {
+      setCheers((n) => n + 1);
       const cheer = companion ? companion.cheers[game.number % companion.cheers.length] : 'Yes!';
       if (!doCare('play', `❤️ ${cheer}`)) say(`${cheer} (Hearts from games are full for today.)`);
     } else {
@@ -318,12 +325,14 @@ export function BuddyScreen() {
             else if (what === 'door') say(`${name} peeks outside. Hello, world!`);
             else if (what !== 'curtains') say(`Drag small things into the ${what}.`);
           }}
+          cheer={buddyId ? { buddyId, n: cheers } : undefined}
           onTapGadget={(g, on) => {
             if (g.lightSwitch) say(on ? 'Lights on! 💡' : g.fx ? `Party time! ${g.fx}` : 'Lights off. Night night! 🌙');
             else if (g.glow) say(on ? `${name} turns on the ${g.name}. ✨` : `${name} turns off the ${g.name}.`);
             else if (g.says) say(`${name} ${g.says}! ${g.fx ?? ''}`);
           }}
         />
+        <Confetti burst={party} />
 
         <View style={[styles.top, { paddingTop: insets.top + spacing.sm }]} pointerEvents="box-none">
           <View style={styles.topRow} pointerEvents="box-none">
