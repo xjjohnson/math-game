@@ -1,6 +1,12 @@
-import type { GameConfig, Problem } from '@/types';
+import type { GameConfig, Level, Problem } from '@/types';
 import { problemAt } from '@/utils/gameSession';
-import { HOST_ID, type GameMessage, type MatchSetup, type PlayerInfo } from '@/utils/multiplayer/protocol';
+import {
+  HOST_ID,
+  type GameMessage,
+  type MatchMode,
+  type MatchSetup,
+  type PlayerInfo,
+} from '@/utils/multiplayer/protocol';
 
 /** Head-to-Head Race: first to this many right answers wins. */
 export const RACE_TARGET = 10;
@@ -16,23 +22,67 @@ export const COOP_WAVES = [
 ] as const;
 
 /**
- * Every phone builds the same problems from the shared seed. In a race
- * everyone gets the same cards; in co-op each player gets their own so
- * nobody repeats a teammate's card.
+ * Monster Battle: one big monster for the whole team. Every right answer is a
+ * hit; it has this much health per player still in the game, and the team has
+ * this long to beat it. Wrong answers cost nothing.
  */
-export function matchConfig(setup: MatchSetup, seat: number): GameConfig {
+export const MONSTER = { perPlayer: 6, seconds: 120 } as const;
+
+/** The monster you face is picked from the match seed, so every phone sees the same one. */
+export const MONSTERS = ['🐉', '👾', '🦖', '🐙', '👹', '🦑', '🧌'] as const;
+
+export const monsterFor = (seed: number) => MONSTERS[seed % MONSTERS.length];
+
+/**
+ * Relay: one player answers at a time, and everyone's phone shows that card so
+ * the team can help. A right answer passes the baton to the next player; a
+ * wrong one gets them another card. Each player runs this many laps, and the
+ * clock gives the team this long per right answer it needs.
+ */
+export const RELAY = { laps: 3, secondsPerLeg: 20 } as const;
+
+/** Team modes: everyone shares one goal and the host's clock decides. */
+export const isTeamMode = (mode: MatchMode) => mode !== 'race';
+
+/** The timed stages of a team mode. Monster Battle and Relay are a single long one. */
+export function stagesFor(mode: MatchMode): readonly { perPlayer: number; seconds: number }[] {
+  if (mode === 'monster') return [MONSTER];
+  if (mode === 'relay') return [{ perPlayer: RELAY.laps, seconds: 0 }];
+  return COOP_WAVES;
+}
+
+/** How long the team has for the current stage. A relay's clock depends on the team it started with. */
+export function stageSeconds(state: MatchState): number {
+  if (state.setup.mode === 'relay') return RELAY.secondsPerLeg * RELAY.laps * state.players.length;
+  return stagesFor(state.setup.mode)[state.wave].seconds;
+}
+
+/**
+ * Every phone builds its problems from the shared seed. In a race, players at
+ * the same level get the same cards; in team modes each player gets their own
+ * so nobody repeats a teammate's card. Each player has their own level;
+ * without one, the host's classic difficulty is used.
+ */
+export function matchConfig(setup: MatchSetup, seat: number, level?: Level): GameConfig {
   return {
     mode: { kind: 'operation', operation: setup.operation },
-    difficulty: setup.difficulty,
+    difficulty: level?.difficulty ?? setup.difficulty,
+    grade: level?.grade,
     timer: null,
     adaptive: false,
     questionCount: Number.MAX_SAFE_INTEGER,
-    seed: setup.mode === 'coop' && seat > 0 ? (setup.seed ^ Math.imul(seat, 0x5bd1e995)) >>> 0 : setup.seed,
+    seed: isTeamMode(setup.mode) && seat > 0 ? (setup.seed ^ Math.imul(seat, 0x5bd1e995)) >>> 0 : setup.seed,
   };
 }
 
-export function matchProblem(setup: MatchSetup, seat: number, index: number): Problem {
-  return problemAt(matchConfig(setup, seat), index, setup.difficulty);
+/** The host's level, carried in the setup; a relay's shared cards use it. */
+export function setupLevel(setup: MatchSetup): Level | undefined {
+  return setup.grade === undefined ? undefined : { grade: setup.grade, difficulty: setup.difficulty };
+}
+
+/** A player's card at their level. A relay shows seat 0's cards on every phone, one at a time. */
+export function matchProblem(setup: MatchSetup, seat: number, index: number, level?: Level): Problem {
+  return problemAt(matchConfig(setup, seat, level), index, level?.difficulty ?? setup.difficulty);
 }
 
 export interface MatchState {
@@ -43,16 +93,20 @@ export interface MatchState {
   me: string;
   /** Cards answered on this phone; the next card's index. */
   myIndex: number;
+  /** Relay: cards the team has answered; the card on every screen now. */
+  cards: number;
+  /** Relay: the last answer, so watching phones can cheer or sigh. */
+  last: { playerId: string; correct: boolean } | null;
   /** Right answers per player id. */
   correct: Record<string, number>;
   /** Players whose phones dropped out. */
   left: string[];
-  /** Co-op: current wave (0-based) and the team's right answers in it. */
+  /** Team modes: current wave (0-based) and the team's right answers in it. */
   wave: number;
   waveCorrect: number;
   /** Race: the host's call on who won. */
   winner: string | null;
-  /** Co-op: the host's call on how it went. */
+  /** Team modes: the host's call on how it went. */
   result: 'won' | 'lost' | null;
 }
 
@@ -62,6 +116,8 @@ export function startMatch(setup: MatchSetup, players: PlayerInfo[], me: string)
     players,
     me,
     myIndex: 0,
+    cards: 0,
+    last: null,
     correct: Object.fromEntries(players.map((p) => [p.id, 0])),
     left: [],
     wave: 0,
@@ -73,17 +129,17 @@ export function startMatch(setup: MatchSetup, players: PlayerInfo[], me: string)
 
 export const isHost = (state: MatchState) => state.me === HOST_ID;
 
-/** Where this phone's player sits; picks their co-op cards. */
+/** Where this phone's player sits; picks their team-mode cards. */
 export const mySeat = (state: MatchState) => Math.max(0, state.players.findIndex((p) => p.id === state.me));
 
 export function isOver(state: MatchState): boolean {
   return state.winner !== null || state.result !== null;
 }
 
-/** Co-op: right answers the team needs to clear the current wave. */
+/** Team modes: right answers the team needs to clear the current wave (or beat the monster). */
 export function waveTarget(state: MatchState): number {
   const playing = Math.max(1, state.players.length - state.left.length);
-  return COOP_WAVES[state.wave].perPlayer * playing;
+  return stagesFor(state.setup.mode)[state.wave].perPlayer * playing;
 }
 
 /** Players from most right answers to fewest; ties keep seating order. */
@@ -96,10 +152,25 @@ export function standings(state: MatchState): (PlayerInfo & { correct: number })
 /** What happens next, from this phone's side, and what it sends. */
 export type Step = [MatchState, GameMessage[]];
 
+/** Relay: who holds the baton. It goes round the players still in the game, in seating order. */
+export function runner(state: MatchState): string {
+  const playing = state.players.filter((p) => !state.left.includes(p.id));
+  return (playing[state.waveCorrect % Math.max(1, playing.length)] ?? state.players[0]).id;
+}
+
+/** Relay: the lap the team is on (1-based), capped at the last. */
+export const relayLap = (state: MatchState) =>
+  Math.min(RELAY.laps, Math.floor(state.waveCorrect / Math.max(1, state.players.length - state.left.length)) + 1);
+
 function count(state: MatchState, playerId: string, correct: boolean): MatchState {
-  if (!correct || isOver(state) || !(playerId in state.correct)) return state;
+  if (isOver(state) || !(playerId in state.correct)) return state;
+  const relay = state.setup.mode === 'relay';
+  // In a relay only the runner may answer, and every answer moves everyone to the next card.
+  if (relay && playerId !== runner(state)) return state;
+  const seen = relay ? { ...state, cards: state.cards + 1, last: { playerId, correct } } : state;
+  if (!correct) return seen;
   return {
-    ...state,
+    ...seen,
     correct: { ...state.correct, [playerId]: state.correct[playerId] + 1 },
     waveCorrect: state.waveCorrect + 1,
   };
@@ -116,7 +187,7 @@ function referee(state: MatchState, timeUp = false): Step {
     return winner ? [{ ...state, winner }, [{ type: 'end', winner }]] : [state, []];
   }
   if (state.waveCorrect >= waveTarget(state)) {
-    if (state.wave === COOP_WAVES.length - 1) {
+    if (state.wave === stagesFor(state.setup.mode).length - 1) {
       return [{ ...state, result: 'won' }, [{ type: 'end', result: 'won' }]];
     }
     const wave = state.wave + 1;
@@ -170,7 +241,7 @@ export function playerLeft(state: MatchState, playerId: string): Step {
   return [after, [{ type: 'left', playerId }, ...calls]];
 }
 
-/** Co-op: the host's wave timer ran out. */
+/** Team modes: the host's clock ran out. */
 export function waveTimeUp(state: MatchState): Step {
   return referee(state, true);
 }

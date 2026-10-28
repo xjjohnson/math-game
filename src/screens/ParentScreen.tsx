@@ -3,12 +3,15 @@ import { Pressable, StyleSheet, View } from 'react-native';
 
 import { Text } from '@/components/AppText';
 import { BigButton } from '@/components/BigButton';
+import { OptionGroup } from '@/components/OptionGroup';
 import { Screen } from '@/components/Screen';
+import { stickerText } from '@/constants/art';
 import { findBadge } from '@/constants/badges';
 import { OPERATIONS } from '@/constants/difficulty';
+import { GRADES } from '@/constants/grades';
 import { colors, fontSizes, radius, spacing, TAP_TARGET } from '@/constants/theme';
 import { useProfiles } from '@/store/profiles';
-import { useSettings } from '@/store/settings';
+import { useSettings, type CoinPayout } from '@/store/settings';
 import type { Profile } from '@/types';
 import { dateKey, dayStreak } from '@/utils/dates';
 import { accuracy } from '@/utils/progress';
@@ -66,6 +69,7 @@ export function ParentScreen() {
   return (
     <Screen title="Parent area">
       {message ? <Text style={styles.message}>{message}</Text> : null}
+      <PayoutSettings />
       <ParentReport />
       <View style={styles.actions}>
         <BigButton
@@ -154,6 +158,35 @@ function PinPad({
   );
 }
 
+const PAYOUTS: { value: CoinPayout; label: string }[] = [
+  { value: 0.5, label: 'Half' },
+  { value: 1, label: 'Normal' },
+  { value: 2, label: 'Double' },
+];
+
+function PayoutSettings() {
+  const { coinPayout, update } = useSettings();
+  return (
+    <View style={styles.card}>
+      <Text style={styles.player}>🪙 Coins and stars</Text>
+      <Text style={styles.line}>
+        Each right answer pays coins by how hard it is: + pays 1, − pays 2, × pays 3 and ÷ pays 4. Medium adds 1,
+        Hard adds 2, and every two grades add 1 more (2nd-3rd +1, 4th-5th +2, 6th+ +3). Every 5 in a row pays 5
+        bonus coins.
+      </Text>
+      <Text style={styles.line}>
+        A round earns up to 3 stars for accuracy. On Medium each star counts twice, and on Hard three times.
+      </Text>
+      <OptionGroup<CoinPayout>
+        label="Coins per right answer"
+        value={coinPayout}
+        onChange={(value) => update({ coinPayout: value })}
+        options={PAYOUTS}
+      />
+    </View>
+  );
+}
+
 function ParentReport() {
   const profiles = useProfiles((s) => s.profiles);
   if (profiles.length === 0) {
@@ -168,7 +201,27 @@ function ParentReport() {
   );
 }
 
+function Adjust({ label, steps, onPress }: { label: string; steps: number[]; onPress: (by: number) => void }) {
+  return (
+    <View style={styles.adjustRow}>
+      <Text style={styles.adjustLabel}>{label}</Text>
+      {steps.map((by) => (
+        <Pressable
+          key={by}
+          onPress={() => onPress(by)}
+          accessibilityRole="button"
+          accessibilityLabel={`${by > 0 ? 'Add' : 'Take away'} ${Math.abs(by)} ${label.toLowerCase()}`}
+          style={({ pressed }) => [styles.adjustKey, pressed && styles.keyPressed]}
+        >
+          <Text style={styles.adjustText}>{by > 0 ? `+${by}` : `−${-by}`}</Text>
+        </Pressable>
+      ))}
+    </View>
+  );
+}
+
 function PlayerReport({ profile }: { profile: Profile }) {
+  const adjustBalance = useProfiles((s) => s.adjustBalance);
   const today = dateKey();
   const tricky = trickiest(profile.missed, 5);
   const badges = profile.badges.map(findBadge).filter((b) => b !== undefined);
@@ -177,7 +230,7 @@ function PlayerReport({ profile }: { profile: Profile }) {
   return (
     <View style={styles.card}>
       <Text style={styles.player}>
-        {profile.avatar} {profile.name}
+        {stickerText(profile.avatar)} {profile.name}
       </Text>
       <Text style={styles.line}>
         Played on {days} {days === 1 ? 'day' : 'days'}
@@ -185,8 +238,14 @@ function PlayerReport({ profile }: { profile: Profile }) {
         . Current day streak: {dayStreak(profile.playDates, today)}.
       </Text>
       <Text style={styles.line}>
-        Best answer streak: {profile.bestStreak} · 🪙 {profile.coins} coins · ⭐ {profile.stars} stars
+        Best answer streak: {profile.bestStreak} · {GRADES[profile.grade].name}
       </Text>
+
+      <Text style={styles.heading}>
+        🪙 {profile.coins} coins · ⭐ {profile.stars} stars
+      </Text>
+      <Adjust label="Coins" steps={[-50, -10, 10, 50]} onPress={(by) => adjustBalance(profile.id, { coins: by })} />
+      <Adjust label="Stars" steps={[-5, -1, 1, 5]} onPress={(by) => adjustBalance(profile.id, { stars: by })} />
 
       <Text style={styles.heading}>Accuracy</Text>
       {OPERATIONS.map((op) => {
@@ -249,4 +308,17 @@ const styles = StyleSheet.create({
   player: { fontSize: fontSizes.button, fontWeight: '900', color: colors.text },
   heading: { fontSize: fontSizes.body, fontWeight: '800', color: colors.text, marginTop: spacing.sm },
   line: { fontSize: 16, color: colors.text },
+  adjustRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs },
+  adjustLabel: { flex: 1, fontSize: 16, fontWeight: '700', color: colors.text },
+  adjustKey: {
+    minWidth: 56,
+    height: 48,
+    borderRadius: radius.md,
+    borderWidth: 3,
+    borderColor: colors.border,
+    backgroundColor: colors.background,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  adjustText: { fontSize: 18, fontWeight: '800', color: colors.text },
 });

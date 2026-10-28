@@ -4,18 +4,23 @@ import { Pressable, StyleSheet, TextInput, View } from 'react-native';
 
 import { Text } from '@/components/AppText';
 import { BigButton } from '@/components/BigButton';
+import { OptionGroup } from '@/components/OptionGroup';
 import { Screen } from '@/components/Screen';
+import { Sticker } from '@/components/Sticker';
+import { DEFAULT_GRADE, GRADE_LIST, GRADES } from '@/constants/grades';
 import { AVATARS, colors, fontSizes, radius, spacing, TAP_TARGET } from '@/constants/theme';
 import { useProfiles } from '@/store/profiles';
+import type { Grade } from '@/types';
 
 export function ProfilesScreen() {
   const { profiles, activeProfileId, addProfile, removeProfile, setActiveProfile } = useProfiles();
   const [name, setName] = useState('');
   const [avatar, setAvatar] = useState<string>(AVATARS[0]);
+  const [grade, setGrade] = useState<Grade>(DEFAULT_GRADE);
 
   const create = () => {
     if (!name.trim()) return;
-    addProfile(name, avatar);
+    addProfile(name, avatar, grade);
     setName('');
     router.back();
   };
@@ -36,8 +41,9 @@ export function ProfilesScreen() {
                 router.back();
               }}
             >
-              <Text style={styles.rowAvatar}>{p.avatar}</Text>
+              <Sticker value={p.avatar} size={40} />
               <Text style={styles.rowName}>{p.name}</Text>
+              <Text style={styles.rowGrade}>{GRADES[p.grade].short}</Text>
             </Pressable>
             <Pressable
               style={styles.remove}
@@ -76,6 +82,13 @@ export function ProfilesScreen() {
           </Pressable>
         ))}
       </View>
+      <OptionGroup<Grade>
+        label="Grade in school"
+        value={grade}
+        onChange={setGrade}
+        compact
+        options={GRADE_LIST.map((g) => ({ value: g, label: GRADES[g].short }))}
+      />
       <BigButton label="Add player" color={colors.correct} disabled={!name.trim()} onPress={create} />
     </Screen>
   );
@@ -92,8 +105,8 @@ const styles = StyleSheet.create({
   },
   activeRow: { borderColor: colors.primary },
   rowMain: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: spacing.md, minHeight: TAP_TARGET, paddingHorizontal: spacing.md },
-  rowAvatar: { fontSize: 40 },
-  rowName: { fontSize: fontSizes.button, fontWeight: '700', color: colors.text },
+  rowName: { flex: 1, fontSize: fontSizes.button, fontWeight: '700', color: colors.text },
+  rowGrade: { fontSize: fontSizes.body, fontWeight: '700', color: colors.textMuted },
   remove: { width: TAP_TARGET, height: TAP_TARGET, alignItems: 'center', justifyContent: 'center' },
   removeText: { fontSize: fontSizes.button, color: colors.wrong, fontWeight: '800' },
   heading: { fontSize: fontSizes.button, fontWeight: '800', color: colors.text, marginTop: spacing.lg },

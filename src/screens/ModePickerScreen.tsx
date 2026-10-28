@@ -4,12 +4,14 @@ import { Pressable, StyleSheet, Switch, View } from 'react-native';
 
 import { Text } from '@/components/AppText';
 import { BigButton } from '@/components/BigButton';
+import { LevelPicker } from '@/components/LevelPicker';
 import { OptionGroup } from '@/components/OptionGroup';
 import { Screen } from '@/components/Screen';
-import { DIFFICULTIES, OPERATIONS, TIMER_OPTIONS } from '@/constants/difficulty';
+import { OPERATIONS, TIMER_OPTIONS } from '@/constants/difficulty';
+import { DEFAULT_GRADE, GRADES } from '@/constants/grades';
 import { colors, fontSizes, radius, spacing, TAP_TARGET } from '@/constants/theme';
 import { useActiveProfile, useProfiles } from '@/store/profiles';
-import type { Difficulty, GameConfig, InputStyle, Operation, TimerSetting } from '@/types';
+import type { GameConfig, InputStyle, Level, Operation, TimerSetting } from '@/types';
 import { QUESTIONS_PER_ROUND } from '@/utils/gameSession';
 import { randomSeed } from '@/utils/seededRandom';
 
@@ -28,7 +30,11 @@ export function ModePickerScreen() {
   const updateProfile = useProfiles((s) => s.updateProfile);
 
   const [choice, setChoice] = useState<Choice>('add');
-  const [difficulty, setDifficulty] = useState<Difficulty>('easy');
+  const [level, setLevel] = useState<Level>({
+    grade: profile?.grade ?? DEFAULT_GRADE,
+    difficulty: profile?.lastDifficulty ?? 'easy',
+  });
+  const { difficulty } = level;
   const [timer, setTimer] = useState<TimerSetting>(null);
   const [adaptive, setAdaptive] = useState(false);
   const [tables, setTables] = useState<number[]>([2]);
@@ -51,6 +57,7 @@ export function ModePickerScreen() {
         : { kind: 'operation', operation: choice },
       // Times tables score like Medium; the tables themselves set the challenge.
       difficulty: isTables ? 'medium' : difficulty,
+      grade: isTables ? undefined : level.grade,
       // A worksheet is answered at the player's own pace, in any order.
       timer: worksheet ? null : timer,
       adaptive: !isTables && !worksheet && adaptive,
@@ -103,15 +110,19 @@ export function ModePickerScreen() {
         </View>
       ) : (
         <>
-          <OptionGroup
-            label="Difficulty"
-            value={difficulty}
-            onChange={setDifficulty}
-            options={(Object.keys(DIFFICULTIES) as Difficulty[]).map((d) => ({
-              value: d,
-              label: `${DIFFICULTIES[d].label}\n${DIFFICULTIES[d].description}`,
-            }))}
+          <LevelPicker
+            level={level}
+            onChange={(next) => {
+              setLevel(next);
+              // The grade sticks to the player, so it's ready next time and for the daily challenge.
+              if (profile && next.grade !== profile.grade) updateProfile(profile.id, { grade: next.grade });
+            }}
           />
+          {!GRADES[level.grade].taught.includes(choice as Operation) ? (
+            <Text style={styles.note}>
+              {GRADES[level.grade].name} doesn't usually do this yet, so the numbers stay small.
+            </Text>
+          ) : null}
           {worksheet ? null : (
             <ToggleRow label="Change difficulty as I play" value={adaptive} onChange={setAdaptive} />
           )}
@@ -130,7 +141,7 @@ export function ModePickerScreen() {
               {showWork ? (
                 <Text style={styles.note}>
                   Bigger problems go one column at a time, starting with the ones.
-                  {difficulty === 'easy' ? ' Easy problems are one digit, so pick Medium or Hard to see it.' : ''}
+                  {' One-digit problems are answered in one go.'}
                 </Text>
               ) : null}
             </>

@@ -30,7 +30,8 @@ describe('worksheet', () => {
     expect(result.history[7].given).toBeNull();
     expect(result.bestStreak).toBe(3);
     const expected = [1, 2, 3, 0, 1, 2, 3, 0, 1, 2].reduce(
-      (sum, streak) => sum + (streak ? pointsFor('medium', streak, null, null) : 0),
+      (sum, streak) =>
+        sum + (streak ? pointsFor({ operation: 'multiply', difficulty: 'medium' }, streak, null, null) : 0),
       0,
     );
     expect(result.score).toBe(expected);

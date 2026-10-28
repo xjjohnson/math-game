@@ -1,4 +1,4 @@
-import { DIFFICULTIES } from '@/constants/difficulty';
+import { difficultyConfigFor } from '@/constants/grades';
 import type { AnswerRecord, GameConfig, Problem } from '@/types';
 import { problemAt } from '@/utils/gameSession';
 import { pointsFor } from '@/utils/scoring';
@@ -14,7 +14,7 @@ export function worksheetProblems(config: GameConfig): Problem[] {
 
 /** Whether this problem's answer box needs a minus key. */
 export function allowsNegative(config: GameConfig, problem: Problem): boolean {
-  return DIFFICULTIES[config.difficulty].allowNegatives && problem.operation === 'subtract' && !problem.story;
+  return difficultyConfigFor(config.difficulty, config.grade).allowNegatives && problem.operation === 'subtract' && !problem.story;
 }
 
 export interface WorksheetResult {
@@ -37,9 +37,10 @@ export function gradeWorksheet(
     const correct = given === problem.answer;
     streak = correct ? streak + 1 : 0;
     bestStreak = Math.max(bestStreak, streak);
-    const points = correct ? pointsFor(config.difficulty, streak, null, null) : 0;
+    const question = { operation: problem.operation, difficulty: config.difficulty, grade: config.grade };
+    const points = correct ? pointsFor(question, streak, null, null) : 0;
     score += points;
-    return { problem, difficulty: config.difficulty, given, correct, points };
+    return { problem, difficulty: config.difficulty, grade: config.grade, given, correct, points };
   });
   return { history, score, bestStreak };
 }

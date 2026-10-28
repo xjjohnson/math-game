@@ -64,7 +64,14 @@ export function RoundResults({
               </PopIn>
             ))}
           </View>
-          <Text style={styles.coins}>+{outcome.coins} 🪙</Text>
+          <Text style={styles.coins}>
+            +{outcome.coins} 🪙   +{outcome.starsEarned} ⭐
+          </Text>
+          {outcome.starMultiplier > 1 && outcome.stars > 0 ? (
+            <Text style={styles.bonus}>
+              Harder levels pay more: each star counted {outcome.starMultiplier} times
+            </Text>
+          ) : null}
           {outcome.streakBonusCoins > 0 ? (
             <Text style={styles.bonus}>Includes +{outcome.streakBonusCoins} for streaks of {STREAK_MILESTONE}</Text>
           ) : null}
@@ -88,7 +95,7 @@ export function RoundResults({
         </View>
       ) : null}
       <View style={styles.summary}>
-        <Stat label="Score" value={String(summary.score)} />
+        <Stat label="Points" value={String(summary.score)} />
         <Stat label="Right" value={`${right} / ${total}`} />
         <Stat label="Best streak" value={String(summary.bestStreak)} />
       </View>

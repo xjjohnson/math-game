@@ -5,11 +5,11 @@ import { Text } from '@/components/AppText';
 import { ChoiceButtons } from '@/components/ChoiceButtons';
 import { FlashCard, isStacked } from '@/components/FlashCard';
 import { ColumnPad, NumberPad } from '@/components/NumberPad';
-import { DIFFICULTIES } from '@/constants/difficulty';
+import { difficultyConfigFor } from '@/constants/grades';
 import { fontSizes } from '@/constants/theme';
 import { usePalette } from '@/hooks/useAccessibility';
 import { useColumnAnswer } from '@/hooks/useColumnAnswer';
-import type { Difficulty, InputStyle, Problem } from '@/types';
+import type { Difficulty, Grade, InputStyle, Problem } from '@/types';
 import { speakProblem, stopSpeaking, vibrate } from '@/utils/feedback';
 import { playSound } from '@/utils/soundEffects';
 
@@ -19,6 +19,7 @@ const WRONG_PAUSE_MS = 1600;
 interface Props {
   problem: Problem;
   difficulty: Difficulty;
+  grade?: Grade;
   inputStyle: InputStyle;
   /** Called the moment the player answers. */
   onAnswer: (given: number, correct: boolean) => void;
@@ -26,6 +27,8 @@ interface Props {
   onNext: () => void;
   /** Stops taking answers, e.g. while waiting for the other phone. */
   disabled?: boolean;
+  /** Don't read the card aloud, e.g. on phones watching a teammate's turn. */
+  silent?: boolean;
 }
 
 /**
@@ -33,21 +36,22 @@ interface Props {
  * right answer briefly, then moves on by itself so nobody has to tap Next.
  * Give it a new `key` for each card.
  */
-export function QuestionPanel({ problem, difficulty, inputStyle, onAnswer, onNext, disabled }: Props) {
+export function QuestionPanel({ problem, difficulty, grade, inputStyle, onAnswer, onNext, disabled, silent }: Props) {
   const palette = usePalette();
   const [given, setGiven] = useState<number | null>(null);
   const answered = given !== null;
   const correct = given === problem.answer;
 
   const allowNegative =
-    DIFFICULTIES[difficulty].allowNegatives && problem.operation === 'subtract' && !problem.story;
+    difficultyConfigFor(difficulty, grade).allowNegatives && problem.operation === 'subtract' && !problem.story;
   const typingColumns = isStacked(problem) && inputStyle !== 'choices';
   const column = useColumnAnswer(problem, { allowNegative });
 
   useEffect(() => {
+    if (silent) return;
     speakProblem(problem);
     return stopSpeaking;
-  }, [problem]);
+  }, [problem, silent]);
 
   useEffect(() => {
     if (!answered) return;

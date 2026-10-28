@@ -66,7 +66,7 @@ Cross-platform interactive math learning game for kids (ages 5-15), React Native
 - Timers: 10s, 30s, untimed practice
 - Answer input: multiple choice for younger kids, number pad for older, set per profile or automatically by difficulty
 - Coins and stars for correct answers, streak bonuses, progress tracker, sound triggers on correct answers
-- Shop: avatar items, badges, backgrounds, card-flip styles, companions
+- Shop: avatar items, badges, backgrounds, card-flip styles, companions (each buddy has a room to decorate, and can be petted, fed and played with)
 - Multiple profiles, PIN-protected parent area
 
 ---
@@ -88,7 +88,9 @@ Cross-platform interactive math learning game for kids (ages 5-15), React Native
 **Modes:**
 - Head-to-Head Race: first to 10 correct wins
 - Co-op Defense: shared score bar, clear waves before the timer expires
-- Pass-and-play on one device (no networking)
+- Monster Battle (team): one shared monster, 6 health per player, every right answer is a hit, 2 minutes on the clock
+- Relay (team): one player answers at a time and every phone shows that card so the team can help; a right answer passes the baton; 3 laps, 20 seconds per leg
+- Pass-and-play on one device (no networking): Take Turns (competition) or Team Up (everyone's right answers hit one monster, 7 health per player)
 
 ---
 
@@ -171,6 +173,7 @@ Phases 1-6 deliver a complete single-player game before any native Bluetooth wor
 - [ ] WebRTC transport for PC multiplayer (Phase 9, only if wanted)
 - [ ] LAN WebSocket fallback if WebRTC pairing is flaky (only if needed)
 - [ ] Keep MockTransport for solo testing of multiplayer logic
+- [ ] More co-op modes: Monster Battle and Relay on several phones, Team Up on one phone (protocol v3)
 
 ### Profiles
 - [ ] Multiple kid profiles on one device, each with its own coins and progress (Phase 1 store design)
@@ -201,6 +204,10 @@ Phases 1-6 deliver a complete single-player game before any native Bluetooth wor
 - [ ] Avatar items (Phase 5)
 - [ ] Themed backgrounds and card-flip styles (Phase 5)
 - [ ] Pets or companions that react to answers (Phase 5 or later)
+- [x] Bluey and Stitch avatars and buddies (fan-style drawings for family use only; kid request 2026-10-23)
+- [x] Themed backgrounds with faint pictures: space, ocean, jungle, candy, dinos, rainbow, snow, backyard, beach
+- [x] More buddies (bunny, panda, fox, penguin, octopus, unicorn) and a "My buddy" home: pet, treats, a fetch math game, hearts, levels 1-5 with a gift worn at each level
+- [x] Buddy room in a side-view dollhouse style: 20 things to buy with coins (furniture, toys, food bowl, decorations), drag to place, toy box to put away, free wall and floor colors
 
 ---
 

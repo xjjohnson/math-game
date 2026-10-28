@@ -14,12 +14,12 @@ export function MultiplayerScreen() {
         label="📱📱 Several phones"
         color={colors.primary}
         disabled={!Nearby}
-        accessibilityHint="Race or team up with up to 7 friends on their own phones nearby."
+        accessibilityHint="Race, or team up against waves or a monster, with up to 7 friends on their own phones nearby."
         onPress={() => router.push('/nearby-play')}
       />
       <Text style={styles.note}>
         {Nearby
-          ? 'Up to 8 phones. Race to 10 or team up against the clock. No Wi-Fi or internet needed.'
+          ? 'Up to 8 phones. Race to 10, or team up to beat the waves or a monster. No Wi-Fi or internet needed.'
           : 'Playing on several phones needs the Math Game app on Android.'}
       </Text>
       <BigButton
@@ -29,6 +29,13 @@ export function MultiplayerScreen() {
         onPress={() => router.push('/pass-play')}
       />
       <Text style={styles.note}>2 to 6 players. Each answers 10, then hands the phone on.</Text>
+      <BigButton
+        label="🤝 One phone, team up"
+        color={colors.correct}
+        accessibilityHint="Up to 6 players take turns on this device and hit one monster together."
+        onPress={() => router.push({ pathname: '/pass-play', params: { team: '1' } })}
+      />
+      <Text style={styles.note}>2 to 6 players take turns, and every right answer hits the same monster.</Text>
     </Screen>
   );
 }

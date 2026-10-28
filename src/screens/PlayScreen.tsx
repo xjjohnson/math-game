@@ -13,7 +13,7 @@ import { ColumnPad, NumberPad } from '@/components/NumberPad';
 import { isNotable, RoundResults } from '@/components/RoundResults';
 import { Screen } from '@/components/Screen';
 import { TimerBar } from '@/components/TimerBar';
-import { DIFFICULTIES } from '@/constants/difficulty';
+import { difficultyConfigFor } from '@/constants/grades';
 import { colors, fontSizes, radius, spacing } from '@/constants/theme';
 import { usePalette } from '@/hooks/useAccessibility';
 import { useColumnAnswer } from '@/hooks/useColumnAnswer';
@@ -21,6 +21,7 @@ import { useGameSession } from '@/hooks/useGameSession';
 import { useTimer } from '@/hooks/useTimer';
 import { useActiveProfile, useProfiles } from '@/store/profiles';
 import type { GameConfig } from '@/types';
+import { buddyGift } from '@/utils/buddy';
 import { countingModel } from '@/utils/countingAid';
 import { speakProblem, stopSpeaking, vibrate } from '@/utils/feedback';
 import {
@@ -105,7 +106,7 @@ function Round({ config, onPlayAgain }: { config: GameConfig; onPlayAgain: () =>
   }, [state, profile, config, recordRound]);
 
   const allowNegative =
-    DIFFICULTIES[state.difficulty].allowNegatives &&
+    difficultyConfigFor(state.difficulty, config.grade).allowNegatives &&
     state.problem.operation === 'subtract' &&
     !state.problem.story;
   const column = useColumnAnswer(state.problem, { allowNegative, teach: !!config.showWork });
@@ -130,10 +131,13 @@ function Round({ config, onPlayAgain }: { config: GameConfig; onPlayAgain: () =>
           {state.index + 1} / {config.questionCount}
         </Text>
         <Text style={styles.status}>🔥 {state.streak}</Text>
-        <Text style={styles.status}>⭐ {state.score}</Text>
+        {/* Points, not stars: stars are only handed out at the end of a round. */}
+        <Text style={styles.status} accessibilityLabel={`${state.score} points`}>
+          🎯 {state.score}
+        </Text>
       </View>
       {config.adaptive ? (
-        <Text style={styles.level}>Level: {DIFFICULTIES[state.difficulty].label}</Text>
+        <Text style={styles.level}>Level: {difficultyConfigFor(state.difficulty, config.grade).label}</Text>
       ) : null}
       {config.timer !== null && secondsLeft !== null ? (
         <TimerBar total={config.timer} left={secondsLeft} />
@@ -182,13 +186,14 @@ function Round({ config, onPlayAgain }: { config: GameConfig; onPlayAgain: () =>
           companion={companion}
           correct={showFeedback ? last.correct : null}
           turn={state.index}
+          gift={buddyGift(profile)}
         />
       ) : null}
 
       {showFeedback ? (
         <Text style={[styles.feedback, { color: last.correct ? palette.correct : palette.wrong }]}>
           {last.correct
-            ? `✓ Great job! +${last.points}`
+            ? `✓ Great job! +${last.points} points`
             : last.given === null
               ? "✗ Time's up!"
               : '✗ Not quite. Remember this one!'}

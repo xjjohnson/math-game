@@ -2,6 +2,15 @@ export type Operation = 'add' | 'subtract' | 'multiply' | 'divide';
 
 export type Difficulty = 'easy' | 'medium' | 'hard';
 
+/** School grade: 0 is kindergarten, 6 is "6th and up". */
+export type Grade = 0 | 1 | 2 | 3 | 4 | 5 | 6;
+
+/** A grade plus easy, medium or hard inside it. */
+export interface Level {
+  grade: Grade;
+  difficulty: Difficulty;
+}
+
 /** Seconds per question, or null for untimed practice. */
 export type TimerSetting = 10 | 30 | null;
 
@@ -44,6 +53,8 @@ export interface Profile {
   id: string;
   name: string;
   avatar: string;
+  /** The avatar picked when the player was made, so it can always be picked again for free. */
+  startAvatar: string;
   inputStyle: InputStyle;
   createdAt: number;
   coins: number;
@@ -60,6 +71,8 @@ export interface Profile {
   dailyChallengeDate: string | null;
   /** Difficulty of the last round; the daily challenge uses it. */
   lastDifficulty: Difficulty;
+  /** School grade the questions are pitched at. */
+  grade: Grade;
   /** Shop item ids in use (the avatar is stored as `avatar` itself). */
   equipped: Equipped;
   /** Earned badge ids, in the order they were earned. */
@@ -68,6 +81,43 @@ export interface Profile {
   week: WeekProgress | null;
   /** Facts to review, keyed by factKey(). */
   missed: Record<string, MissedFact>;
+  /** Hearts each buddy has earned, keyed by shop item id. */
+  buddyHearts: Record<string, number>;
+  /** Today's buddy care, for the daily limits; null before the first. */
+  buddyCare: BuddyCare | null;
+  /** The buddy's room: paint colors and the things placed in it. */
+  room: Room;
+}
+
+/** Spots are shares of the room's width (x) and height (y, where things stand). */
+export interface RoomSpot {
+  x: number;
+  y: number;
+}
+
+export interface RoomThing extends RoomSpot {
+  /** Tells copies of the same item apart. */
+  key: string;
+  itemId: string;
+  /** False while it is put away in the toy box. */
+  placed: boolean;
+}
+
+export interface Room {
+  /** Indexes into WALL_COLORS and FLOOR_COLORS. */
+  wall: number;
+  floor: number;
+  buddy: RoomSpot;
+  things: RoomThing[];
+}
+
+export interface BuddyCare {
+  /** Local date, "YYYY-MM-DD". */
+  date: string;
+  pets: number;
+  treats: number;
+  /** Hearts earned from the buddy's game today. */
+  playHearts: number;
 }
 
 export interface Equipped {
@@ -96,6 +146,8 @@ export type GameMode =
 export interface GameConfig {
   mode: GameMode;
   difficulty: Difficulty;
+  /** School grade; without one, the classic 1-, 2- and 3-digit levels are used. */
+  grade?: Grade;
   timer: TimerSetting;
   /** Step difficulty up or down from recent accuracy (operation mode only). */
   adaptive: boolean;
@@ -114,6 +166,8 @@ export interface GameConfig {
 export interface AnswerRecord {
   problem: Problem;
   difficulty: Difficulty;
+  /** Grade the question was pitched at, when the round had one. */
+  grade?: Grade;
   /** null when the timer ran out. */
   given: number | null;
   correct: boolean;

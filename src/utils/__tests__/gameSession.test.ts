@@ -8,7 +8,7 @@ import {
   startSession,
   type SessionState,
 } from '@/utils/gameSession';
-import { pointsFor, streakBonus, timeBonus } from '@/utils/scoring';
+import { answerValue, pointsFor, streakBonus, timeBonus } from '@/utils/scoring';
 
 const config = (overrides: Partial<GameConfig> = {}): GameConfig => ({
   mode: { kind: 'operation', operation: 'add' },
@@ -54,7 +54,22 @@ describe('scoring', () => {
   });
 
   it('adds base, streak and time', () => {
-    expect(pointsFor('hard', 3, 30, 12.2)).toBe(30 + 5 + 12);
+    // × is worth 3, Hard adds 2, 4th grade adds 2: 7 coins, so 70 points.
+    expect(pointsFor({ operation: 'multiply', difficulty: 'hard', grade: 4 }, 3, 30, 12.2)).toBe(70 + 5 + 12);
+  });
+
+  it('pays harder operations, levels and grades more', () => {
+    const add = answerValue('add', 'easy', 0);
+    const subtract = answerValue('subtract', 'easy', 0);
+    const multiply = answerValue('multiply', 'easy', 0);
+    const divide = answerValue('divide', 'easy', 0);
+    expect(add).toBeLessThan(subtract);
+    expect(subtract).toBeLessThan(multiply);
+    expect(multiply).toBeLessThan(divide);
+    expect(answerValue('add', 'medium', 0)).toBeGreaterThan(add);
+    expect(answerValue('add', 'hard', 0)).toBeGreaterThan(answerValue('add', 'medium', 0));
+    expect(answerValue('add', 'easy', 6)).toBeGreaterThan(add);
+    expect(answerValue('add', 'easy')).toBe(add);
   });
 });
 

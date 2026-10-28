@@ -35,12 +35,18 @@ export default function RootLayout() {
         <Stack.Screen name="lesson" options={{ title: 'Lesson' }} />
         <Stack.Screen name="progress" options={{ title: 'My progress' }} />
         <Stack.Screen name="shop" options={{ title: 'Shop' }} />
+        <Stack.Screen name="buddy" options={{ title: 'My buddy' }} />
         <Stack.Screen name="settings" options={{ title: 'Settings' }} />
         <Stack.Screen name="parent" options={{ title: 'Parent area' }} />
         <Stack.Screen name="permissions" options={{ title: 'Play nearby' }} />
         <Stack.Screen name="nearby-test" options={{ title: 'Nearby test' }} />
         <Stack.Screen name="multiplayer" options={{ title: 'Play with a friend' }} />
-        <Stack.Screen name="pass-play" options={{ title: 'Take turns' }} />
+        <Stack.Screen
+          name="pass-play"
+          options={({ route }) => ({
+            title: (route.params as { team?: string } | undefined)?.team === '1' ? 'Team up' : 'Take turns',
+          })}
+        />
         <Stack.Screen name="nearby-play" options={{ title: 'Several phones' }} />
       </Stack>
     </>
