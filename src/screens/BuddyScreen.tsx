@@ -4,12 +4,20 @@ import { Pressable, StyleSheet, View } from 'react-native';
 
 import { Text } from '@/components/AppText';
 import { BigButton } from '@/components/BigButton';
-import { BuddyRoom } from '@/components/BuddyRoom';
+import { BuddyRoom, type HomeBuddy } from '@/components/BuddyRoom';
 import { ChoiceButtons } from '@/components/ChoiceButtons';
 import { Screen } from '@/components/Screen';
 import { Sticker } from '@/components/Sticker';
-import { findRoomItem, MAX_ROOM_THINGS, ROOM_ITEMS } from '@/constants/room';
-import { itemsIn } from '@/constants/shop';
+import {
+  findRoomItem,
+  HOME_AREAS,
+  inSeason,
+  MAX_ROOM_THINGS,
+  ROOM_ITEM_GROUPS,
+  ROOM_ITEMS,
+  type RoomItemGroup,
+} from '@/constants/room';
+import { itemsIn, type ShopItem } from '@/constants/shop';
 import { colors, fontSizes, radius, spacing, TAP_TARGET } from '@/constants/theme';
 import { useActiveProfile, useProfiles } from '@/store/profiles';
 import type { Operation, Problem, RoomThing } from '@/types';
@@ -31,8 +39,14 @@ import {
 import { dateKey } from '@/utils/dates';
 import { generate } from '@/utils/mathEngine';
 import { createRng, pick, randomSeed } from '@/utils/seededRandom';
+import { BUDDY_KEY, buddiesHome } from '@/utils/room';
 import { owns } from '@/utils/shop';
 import { playSound } from '@/utils/soundEffects';
+
+type Panel = 'none' | 'shop' | 'tidy' | 'buddies';
+
+/** Halloween things and the spooky window are October only. */
+const OCTOBER = 9;
 
 /** Questions in one game of fetch. */
 const GAME_LENGTH = 5;
@@ -48,9 +62,10 @@ interface Game {
 /** The buddy's home: pet it, give it treats and play a quick game to earn hearts and level up. */
 export function BuddyScreen() {
   const profile = useActiveProfile();
-  const { careForBuddy, equip, buyRoomItem, moveInRoom, setPlaced, paintRoom } = useProfiles();
+  const { careForBuddy, equip, buyRoomItem, moveInRoom, setPlaced, paintRoom, setBuddyHome } = useProfiles();
   const [line, setLine] = useState<string | null>(null);
-  const [panel, setPanel] = useState<'none' | 'shop' | 'tidy'>('none');
+  const [panel, setPanel] = useState<Panel>('none');
+  const [area, setArea] = useState(0);
   const [game, setGame] = useState<Game | null>(null);
   const rng = useRef(createRng(randomSeed()));
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -102,6 +117,27 @@ export function BuddyScreen() {
   const playHeartsLeft = DAILY_PLAY_HEARTS - care.playHearts;
 
   const say = (text: string) => setLine(text);
+  const month = new Date().getMonth();
+  const areaName = HOME_AREAS[area]?.name.toLowerCase() ?? 'room';
+
+  const nameOf = (id: string) => owned.find((item) => item.id === id)?.name ?? 'Buddy';
+  const home = buddiesHome(profile);
+  const homeBuddies: HomeBuddy[] = home.flatMap(({ id, spot }) => {
+    const item = owned.find((o) => o.id === id);
+    if (!item || item.category !== 'companion') return [];
+    const gift = giftForLevel(buddyLevel(buddyHearts(profile, id)));
+    return [{ id, emoji: item.companion.emoji, gift, name: item.name, spot }];
+  });
+
+  /** Makes another buddy the one you're with. The one before stays home where it stood. */
+  const switchTo = (id: string) => {
+    if (id === buddyId) return;
+    const before = home.find((b) => b.id === buddyId);
+    if (before) moveInRoom(profile.id, BUDDY_KEY + before.id, before.spot);
+    equip(profile.id, id);
+    setBuddyHome(profile.id, id, true, area);
+    setLine(`${nameOf(id)} is with you now!`);
+  };
 
   const doCare = (action: CareAction, happy: string) => {
     const result = careForBuddy(profile.id, action);
@@ -154,17 +190,22 @@ export function BuddyScreen() {
         <>
           <BuddyRoom
             room={profile.room}
-            buddy={{ emoji: companion.emoji, gift: giftForLevel(level), name }}
+            buddies={homeBuddies}
+            area={area}
+            onAreaChange={setArea}
+            spooky={month === OCTOBER}
             tidying={panel === 'tidy'}
             onMove={(key, spot) => moveInRoom(profile.id, key, spot)}
-            onTapBuddy={() =>
-              petsLeft > 0 ? doCare('pet', `❤️ ${name} loves that!`) : say(`${name} waves at you! 👋`)
-            }
+            onTapBuddy={(id) => {
+              if (id !== buddyId) switchTo(id);
+              else if (petsLeft > 0) doCare('pet', `❤️ ${name} loves that!`);
+              else say(`${name} waves at you! 👋`);
+            }}
             onTapThing={(key) => {
               const thing = profile.room.things.find((t) => t.key === key);
               const item = thing && findRoomItem(thing.itemId);
               if (panel === 'tidy') {
-                setPlaced(profile.id, key, false);
+                setPlaced(profile.id, key, false, area);
                 say(`${item?.name ?? 'That'} went in the toy box.`);
               } else if (item) {
                 say(`${name} likes the ${item.name.toLowerCase()}! ${item.emoji}`);
@@ -176,23 +217,35 @@ export function BuddyScreen() {
               panel={panel}
               setPanel={setPanel}
               coins={profile.coins}
+              month={month}
+              area={area}
+              onArea={setArea}
               stored={profile.room.things.filter((t) => !t.placed)}
               full={profile.room.things.length >= MAX_ROOM_THINGS}
+              buddies={owned.filter((item) => item.category === 'companion')}
+              isHome={(id) => home.some((b) => b.id === id)}
+              using={buddyId}
+              onBuddyHome={(id, atHome) => {
+                setBuddyHome(profile.id, id, atHome, area);
+                say(atHome ? `${nameOf(id)} came over to play!` : `${nameOf(id)} went off for a nap. 💤`);
+              }}
               onBuy={(itemId) => {
                 const item = findRoomItem(itemId);
-                const result = buyRoomItem(profile.id, itemId);
+                const result = buyRoomItem(profile.id, itemId, area);
                 if (result.ok) {
                   playSound('reward');
-                  say(`${item?.emoji} New ${item?.name.toLowerCase()}! Drag it where you like.`);
+                  say(`${item?.emoji} New ${item?.name.toLowerCase()} in the ${areaName}! Drag it where you like.`);
                 } else if (result.reason === 'coins' && item) {
                   const short = item.price - profile.coins;
                   say(`You need ${short} more coins for the ${item.name.toLowerCase()}.`);
                 } else if (result.reason === 'full') {
-                  say('The room is full! Put something in the toy box first.');
+                  say('The house is full! Put something in the toy box first.');
+                } else if (result.reason === 'season') {
+                  say('That one is only in the shop in October.');
                 }
               }}
-              onTakeOut={(key) => setPlaced(profile.id, key, true)}
-              onPaint={(part) => paintRoom(profile.id, part)}
+              onTakeOut={(key) => setPlaced(profile.id, key, true, area)}
+              onPaint={(part) => paintRoom(profile.id, part, area)}
             />
           ) : null}
           <Text style={styles.name}>{name}</Text>
@@ -287,11 +340,7 @@ export function BuddyScreen() {
               return (
                 <Pressable
                   key={item.id}
-                  onPress={() => {
-                    if (using) return;
-                    equip(profile.id, item.id);
-                    setLine(`${item.name} is here!`);
-                  }}
+                  onPress={() => switchTo(item.id)}
                   accessibilityRole="button"
                   accessibilityLabel={`${item.name}, Level ${itemLevel}${using ? ', with you' : ''}`}
                   accessibilityState={{ selected: using }}
@@ -381,27 +430,49 @@ const styles = StyleSheet.create({
   thingEmoji: { fontSize: 32 },
   thingPrice: { fontSize: 13, fontWeight: '800', color: colors.textMuted },
   locked: { opacity: 0.5 },
+  seasonal: { backgroundColor: '#FFE0B2', borderColor: '#F57C00' },
   choiceLevel: { fontSize: 14, fontWeight: '800', color: colors.textMuted },
 });
 
 interface RoomToolsProps {
-  panel: 'none' | 'shop' | 'tidy';
-  setPanel: (panel: 'none' | 'shop' | 'tidy') => void;
+  panel: Panel;
+  setPanel: (panel: Panel) => void;
   coins: number;
+  /** This month, 0 = January; seasonal things only show in their month. */
+  month: number;
+  area: number;
+  onArea: (area: number) => void;
   stored: RoomThing[];
   full: boolean;
+  buddies: ShopItem[];
+  isHome: (id: string) => boolean;
+  using: string | null;
+  onBuddyHome: (id: string, home: boolean) => void;
   onBuy: (itemId: string) => void;
   onTakeOut: (key: string) => void;
   onPaint: (part: 'wall' | 'floor') => void;
 }
 
-/** Buttons under the room: add things, put things away, and paint. */
+/** Buttons under the home: pick a room, add things, put things away, invite buddies and paint. */
 function RoomTools(props: RoomToolsProps) {
-  const { panel, setPanel, coins, stored, full, onBuy, onTakeOut, onPaint } = props;
-  const toggle = (next: 'shop' | 'tidy') => setPanel(panel === next ? 'none' : next);
+  const { panel, setPanel, coins, month, area, onArea, stored, full, buddies } = props;
+  const { isHome, using, onBuddyHome, onBuy, onTakeOut, onPaint } = props;
+  const toggle = (next: Exclude<Panel, 'none'>) => setPanel(panel === next ? 'none' : next);
+  const areaName = HOME_AREAS[area]?.name.toLowerCase() ?? 'room';
+  // Shop shelves with something on sale this month; the shelf starts on the room in view.
+  const groups = ROOM_ITEM_GROUPS.filter((g) => ROOM_ITEMS.some((i) => i.group === g.id && inSeason(i, month)));
+  const [picked, setShelf] = useState<RoomItemGroup | null>(null);
+  const shelf = picked ?? HOME_AREAS[area]?.id ?? 'living';
   return (
     <View style={styles.tools}>
-      <Text style={styles.hint}>Drag things to move them. Tap your buddy to say hi.</Text>
+      <View style={styles.toolRow}>
+        {HOME_AREAS.map((a, i) => (
+          <ToolButton key={a.id} label={`${a.emoji} ${a.name}`} active={area === i} onPress={() => onArea(i)} />
+        ))}
+      </View>
+      <Text style={styles.hint}>
+        Swipe the house to see every room. Drag things to move them, even to another room.
+      </Text>
       <View style={styles.toolRow}>
         <ToolButton label="🛒 Add things" active={panel === 'shop'} onPress={() => toggle('shop')} />
         <ToolButton
@@ -409,34 +480,46 @@ function RoomTools(props: RoomToolsProps) {
           active={panel === 'tidy'}
           onPress={() => toggle('tidy')}
         />
+        {buddies.length > 1 ? (
+          <ToolButton label="🐾 Buddies" active={panel === 'buddies'} onPress={() => toggle('buddies')} />
+        ) : null}
         <ToolButton label="🎨 Wall" onPress={() => onPaint('wall')} />
         <ToolButton label="🟫 Floor" onPress={() => onPaint('floor')} />
       </View>
       {panel === 'shop' ? (
-        <View style={styles.row}>
-          {ROOM_ITEMS.map((item) => (
-            <Pressable
-              key={item.id}
-              onPress={() => onBuy(item.id)}
-              accessibilityRole="button"
-              accessibilityLabel={`${item.name}, ${item.price} coins`}
-              accessibilityState={{ disabled: full || coins < item.price }}
-              style={({ pressed }) => [
-                styles.thing,
-                (full || coins < item.price) && styles.locked,
-                pressed && styles.pressed,
-              ]}
-            >
-              <Text style={styles.thingEmoji}>{item.emoji}</Text>
-              <Text style={styles.thingPrice}>🪙 {item.price}</Text>
-            </Pressable>
-          ))}
-        </View>
+        <>
+          <View style={styles.toolRow}>
+            {groups.map((g) => (
+              <ToolButton key={g.id} label={g.name} active={shelf === g.id} onPress={() => setShelf(g.id)} />
+            ))}
+          </View>
+          <Text style={styles.hint}>New things go in the {areaName}.</Text>
+          <View style={styles.row}>
+            {ROOM_ITEMS.filter((item) => item.group === shelf && inSeason(item, month)).map((item) => (
+              <Pressable
+                key={item.id}
+                onPress={() => onBuy(item.id)}
+                accessibilityRole="button"
+                accessibilityLabel={`${item.name}, ${item.price} coins`}
+                accessibilityState={{ disabled: full || coins < item.price }}
+                style={({ pressed }) => [
+                  styles.thing,
+                  item.month !== undefined && styles.seasonal,
+                  (full || coins < item.price) && styles.locked,
+                  pressed && styles.pressed,
+                ]}
+              >
+                <Text style={styles.thingEmoji}>{item.emoji}</Text>
+                <Text style={styles.thingPrice}>🪙 {item.price}</Text>
+              </Pressable>
+            ))}
+          </View>
+        </>
       ) : null}
       {panel === 'tidy' ? (
         <>
           <Text style={styles.hint}>
-            Tap a thing in the room to put it away. Tap one here to set it back out.
+            Tap a thing in the house to put it away. Tap one here to set it out in the {areaName}.
           </Text>
           <View style={styles.row}>
             {stored.length === 0 ? <Text style={styles.hint}>The toy box is empty.</Text> : null}
@@ -451,6 +534,31 @@ function RoomTools(props: RoomToolsProps) {
                   style={({ pressed }) => [styles.thing, pressed && styles.pressed]}
                 >
                   <Text style={styles.thingEmoji}>{item?.emoji}</Text>
+                </Pressable>
+              );
+            })}
+          </View>
+        </>
+      ) : null}
+      {panel === 'buddies' ? (
+        <>
+          <Text style={styles.hint}>Tap a buddy to invite it over, or to send it off for a nap.</Text>
+          <View style={styles.row}>
+            {buddies.map((item) => {
+              if (item.category !== 'companion') return null;
+              const withYou = item.id === using;
+              const here = isHome(item.id);
+              return (
+                <Pressable
+                  key={item.id}
+                  onPress={() => (withYou ? undefined : onBuddyHome(item.id, !here))}
+                  accessibilityRole="button"
+                  accessibilityLabel={`${item.name}, ${withYou ? 'with you' : here ? 'at home' : 'napping'}`}
+                  accessibilityState={{ selected: here, disabled: withYou }}
+                  style={({ pressed }) => [styles.choice, here && styles.using, pressed && styles.pressed]}
+                >
+                  <Sticker value={item.companion.emoji} size={32} />
+                  <Text style={styles.choiceLevel}>{withYou ? '⭐ You' : here ? '🏠 Home' : '💤 Nap'}</Text>
                 </Pressable>
               );
             })}

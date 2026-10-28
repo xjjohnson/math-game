@@ -85,11 +85,14 @@ export interface Profile {
   buddyHearts: Record<string, number>;
   /** Today's buddy care, for the daily limits; null before the first. */
   buddyCare: BuddyCare | null;
-  /** The buddy's room: paint colors and the things placed in it. */
+  /** The buddies' home: paint colors, who is home and the things placed in it. */
   room: Room;
 }
 
-/** Spots are shares of the room's width (x) and height (y, where things stand). */
+/**
+ * Spots are shares of the whole home's width (x, so 0 to 1 spans every area) and of its
+ * height (y, where things stand).
+ */
 export interface RoomSpot {
   x: number;
   y: number;
@@ -103,11 +106,17 @@ export interface RoomThing extends RoomSpot {
   placed: boolean;
 }
 
-export interface Room {
-  /** Indexes into WALL_COLORS and FLOOR_COLORS. */
+/** Indexes into WALL_COLORS and FLOOR_COLORS. */
+export interface AreaPaint {
   wall: number;
   floor: number;
-  buddy: RoomSpot;
+}
+
+export interface Room {
+  /** Paint for each area, in HOME_AREAS order. */
+  paint: AreaPaint[];
+  /** Buddies at home and where they stand, keyed by shop item id. The buddy in use is always home. */
+  buddies: Record<string, RoomSpot>;
   things: RoomThing[];
 }
 
