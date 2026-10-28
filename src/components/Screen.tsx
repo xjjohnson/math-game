@@ -3,9 +3,10 @@ import { ScrollView, StyleSheet } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Text } from '@/components/AppText';
+import { BackgroundDecor } from '@/components/BackgroundDecor';
 import { colors, fontSizes, spacing } from '@/constants/theme';
 import { useActiveProfile } from '@/store/profiles';
-import { backgroundColor } from '@/utils/shop';
+import { backgroundColor, backgroundDecor } from '@/utils/shop';
 
 interface Props {
   title?: string;
@@ -18,13 +19,15 @@ interface Props {
 
 /** Standard page wrapper: safe area, scrolling, centered column for tablets and PC. */
 export function Screen({ title, children, compact = false, noHeader = false }: Props) {
-  const background = backgroundColor(useActiveProfile());
+  const profile = useActiveProfile();
+  const background = backgroundColor(profile);
   return (
     <SafeAreaView
       style={[styles.safe, { backgroundColor: background }]}
       // The header bar already sits below the status bar, so only header-less screens pad the top.
       edges={noHeader ? ['top', 'bottom', 'left', 'right'] : ['bottom', 'left', 'right']}
     >
+      <BackgroundDecor decor={backgroundDecor(profile)} />
       <ScrollView contentContainerStyle={[styles.content, compact && styles.compact]}>
         {title ? <Text style={styles.title} accessibilityRole="header">{title}</Text> : null}
         {children}

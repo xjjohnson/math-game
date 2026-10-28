@@ -70,6 +70,43 @@ export interface Profile {
   week: WeekProgress | null;
   /** Facts to review, keyed by factKey(). */
   missed: Record<string, MissedFact>;
+  /** Hearts each buddy has earned, keyed by shop item id. */
+  buddyHearts: Record<string, number>;
+  /** Today's buddy care, for the daily limits; null before the first. */
+  buddyCare: BuddyCare | null;
+  /** The buddy's room: paint colors and the things placed in it. */
+  room: Room;
+}
+
+/** Spots are shares of the room's width (x) and height (y, where things stand). */
+export interface RoomSpot {
+  x: number;
+  y: number;
+}
+
+export interface RoomThing extends RoomSpot {
+  /** Tells copies of the same item apart. */
+  key: string;
+  itemId: string;
+  /** False while it is put away in the toy box. */
+  placed: boolean;
+}
+
+export interface Room {
+  /** Indexes into WALL_COLORS and FLOOR_COLORS. */
+  wall: number;
+  floor: number;
+  buddy: RoomSpot;
+  things: RoomThing[];
+}
+
+export interface BuddyCare {
+  /** Local date, "YYYY-MM-DD". */
+  date: string;
+  pets: number;
+  treats: number;
+  /** Hearts earned from the buddy's game today. */
+  playHearts: number;
 }
 
 export interface Equipped {

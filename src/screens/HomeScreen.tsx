@@ -1,13 +1,16 @@
 import { router } from 'expo-router';
-import { StyleSheet, View } from 'react-native';
+import { Pressable, StyleSheet, View } from 'react-native';
 
 import { Text } from '@/components/AppText';
 import { BigButton } from '@/components/BigButton';
+import { BuddyFace } from '@/components/BuddyFace';
 import { Screen } from '@/components/Screen';
+import { Sticker } from '@/components/Sticker';
 import { UpdateBanner } from '@/components/UpdateBanner';
 import { DIFFICULTIES, OPERATIONS } from '@/constants/difficulty';
 import { colors, fontSizes, spacing } from '@/constants/theme';
 import { useActiveProfile } from '@/store/profiles';
+import { buddyGift } from '@/utils/buddy';
 import { dateKey, dayStreak } from '@/utils/dates';
 import { DAILY_CHALLENGE_BONUS, DAILY_PASS, dailyChallengeConfig } from '@/utils/rewards';
 import { randomSeed } from '@/utils/seededRandom';
@@ -32,10 +35,18 @@ export function HomeScreen() {
       <View style={styles.profile}>
         {profile ? (
           <>
-            <Text style={styles.avatar}>
-              {profile.avatar}
-              {companion ? <Text style={styles.buddy}> {companion.emoji}</Text> : null}
-            </Text>
+            <View style={styles.faces}>
+              <Sticker value={profile.avatar} size={72} />
+              {companion ? (
+                <Pressable
+                  onPress={() => router.push('/buddy')}
+                  accessibilityRole="button"
+                  accessibilityLabel="Visit my buddy"
+                >
+                  <BuddyFace value={companion.emoji} size={44} gift={buddyGift(profile)} />
+                </Pressable>
+              ) : null}
+            </View>
             <Text style={styles.name}>Hi, {profile.name}!</Text>
             <Text style={styles.stats}>
               🪙 {profile.coins}   ⭐ {profile.stars}   📅 {days} {days === 1 ? 'day' : 'days'}
@@ -90,6 +101,12 @@ export function HomeScreen() {
             style={styles.half}
           />
           <BigButton
+            label="🐾 My buddy"
+            color={colors.operations.divide}
+            onPress={() => router.push('/buddy')}
+            style={styles.half}
+          />
+          <BigButton
             label="My progress"
             color={colors.accent}
             onPress={() => router.push('/progress')}
@@ -110,8 +127,7 @@ export function HomeScreen() {
 
 const styles = StyleSheet.create({
   profile: { alignItems: 'center', gap: spacing.xs, marginBottom: spacing.md },
-  avatar: { fontSize: 72 },
-  buddy: { fontSize: 44 },
+  faces: { flexDirection: 'row', alignItems: 'flex-end', gap: spacing.sm },
   pair: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.md },
   half: { flexGrow: 1, flexBasis: '40%' },
   name: { fontSize: fontSizes.button, fontWeight: '700', color: colors.text, textAlign: 'center' },
