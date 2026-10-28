@@ -6,7 +6,6 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Text } from '@/components/AppText';
 import { BigButton } from '@/components/BigButton';
 import type { Dressed } from '@/components/BuddyFigure';
-import type { Cloth } from '@/components/PersonFigure';
 import { BuddyRoom, type HomeBuddy } from '@/components/BuddyRoom';
 import { ChoiceButtons } from '@/components/ChoiceButtons';
 import { Furniture } from '@/components/Furniture';
@@ -64,7 +63,7 @@ import { generate } from '@/utils/mathEngine';
 import { BUDDY_KEY, buddiesHome } from '@/utils/room';
 import { createRng, pick, randomSeed } from '@/utils/seededRandom';
 import { owns } from '@/utils/shop';
-import { canWear, lookOf, outfitOf } from '@/utils/wardrobe';
+import { canWear, clothOf, lookOf, outfitOf } from '@/utils/wardrobe';
 import { playSound } from '@/utils/soundEffects';
 
 /** The tabs along the bottom; each opens a drawer over the home. */
@@ -568,12 +567,8 @@ function personOf(profile: Profile, buddyId: string): HomeBuddy['person'] {
   const look = lookOf(profile, buddyId);
   if (!look) return undefined;
   const outfit = outfitOf(profile, buddyId);
-  const cloth = (id?: string): Cloth | undefined => {
-    const w = id ? findWearable(id) : undefined;
-    return w?.color ? { color: w.color, cut: w.cut, pattern: w.pattern, patternColor: w.patternColor } : undefined;
-  };
   const { hat, face, neck, feet } = dressedOf(profile, buddyId);
-  return { look, dressed: { hat, face, neck, feet, top: cloth(outfit.shirt), legs: cloth(outfit.legs) } };
+  return { look, dressed: { hat, face, neck, feet, top: clothOf(outfit.shirt), legs: clothOf(outfit.legs) } };
 }
 
 /** Dress up tabs: clothes spots, plus hair, beard and skin for people. */

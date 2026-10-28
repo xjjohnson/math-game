@@ -1,4 +1,4 @@
-import { artFor, stickerText } from '@/constants/art';
+import { artFor, PERSON_STICKERS, stickerText } from '@/constants/art';
 import { SHOP_ITEMS } from '@/constants/shop';
 import { makeProfile, results } from '@/test/fixtures';
 import { newBadges } from '@/utils/badges';
@@ -23,11 +23,20 @@ describe('shop catalog', () => {
     const drawn = faces.filter((f) => f.startsWith('@'));
     expect(drawn).toEqual(expect.arrayContaining(['@bluey', '@stitch']));
     for (const f of drawn) {
-      expect(artFor(f)).toBeDefined();
+      expect(artFor(f) ?? PERSON_STICKERS[f]).toBeDefined();
       expect(f.length).toBeLessThanOrEqual(8);
     }
     expect(stickerText('@bluey')).toBe('🐶');
     expect(stickerText('🦊')).toBe('🦊');
+    expect(stickerText('@mom')).not.toContain('@');
+  });
+
+  it('draws each person from their own look', () => {
+    for (const item of SHOP_ITEMS) {
+      if (item.category !== 'companion') continue;
+      const person = PERSON_STICKERS[item.companion.emoji];
+      if (person) expect(person.buddyId).toBe(item.id);
+    }
   });
 });
 
