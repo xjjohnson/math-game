@@ -50,6 +50,8 @@ export interface HomeBuddy {
   spot: BuddySpot;
   fur: string;
   belly: string;
+  shirt?: string;
+  shoes?: string;
   dressed: Dressed;
 }
 
@@ -334,6 +336,8 @@ export function BuddyRoom(props: Props) {
                     size={Math.round(piece.height)}
                     fur={buddy.fur}
                     belly={buddy.belly}
+                    shirt={buddy.shirt}
+                    shoes={buddy.shoes}
                     dressed={buddy.dressed}
                     gift={buddy.gift}
                   />

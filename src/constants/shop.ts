@@ -310,6 +310,103 @@ export const SHOP_ITEMS: ShopItem[] = [
       comforts: ['No one gets left behind!', 'Try again!', 'Still good!'],
     },
   },
+  // People, with the same bodies and clothes as the animal buddies.
+  {
+    id: 'buddy-girl',
+    category: 'companion',
+    name: 'Girl',
+    price: 100,
+    companion: {
+      emoji: '👧🏻',
+      treat: '🍓',
+      cheers: ['Yay, you did it!', 'So smart!', 'High five!'],
+      comforts: ["That's okay!", 'Try again!', 'You can do it!'],
+    },
+  },
+  {
+    id: 'buddy-boy',
+    category: 'companion',
+    name: 'Boy',
+    price: 100,
+    companion: {
+      emoji: '👦🏾',
+      treat: '🍕',
+      cheers: ['Awesome!', 'Nailed it!', 'Way to go!'],
+      comforts: ['No problem!', 'Next one!', "Let's keep going!"],
+    },
+  },
+  {
+    id: 'buddy-kid',
+    category: 'companion',
+    name: 'Kid',
+    price: 100,
+    companion: {
+      emoji: '🧒🏽',
+      treat: '🧃',
+      cheers: ['Woo-hoo!', 'Great job!', 'You rock!'],
+      comforts: ['Oops, okay!', 'Try the next one!', 'Keep at it!'],
+    },
+  },
+  {
+    id: 'buddy-mom',
+    category: 'companion',
+    name: 'Mom',
+    price: 100,
+    companion: {
+      emoji: '👩🏼',
+      treat: '☕',
+      cheers: ['Proud of you!', 'Brilliant!', 'Look at you go!'],
+      comforts: ['Good try, sweetie!', 'Mistakes help us learn!', 'Take your time!'],
+    },
+  },
+  {
+    id: 'buddy-dad',
+    category: 'companion',
+    name: 'Dad',
+    price: 100,
+    companion: {
+      emoji: '👨🏿',
+      treat: '🥪',
+      cheers: ['Touchdown!', 'Nice work, champ!', 'That’s my kid!'],
+      comforts: ['Shake it off!', 'Next play!', 'You’ll get it!'],
+    },
+  },
+  {
+    id: 'buddy-grandma',
+    category: 'companion',
+    name: 'Grandma',
+    price: 100,
+    companion: {
+      emoji: '👵🏽',
+      treat: '🥧',
+      cheers: ['Wonderful, dear!', 'Clever cookie!', 'Splendid!'],
+      comforts: ['Never mind, dear!', 'Try again, love!', 'Slow and steady!'],
+    },
+  },
+  {
+    id: 'buddy-grandpa',
+    category: 'companion',
+    name: 'Grandpa',
+    price: 100,
+    companion: {
+      emoji: '👴🏻',
+      treat: '🍩',
+      cheers: ['Well done, kiddo!', 'Top notch!', 'Sharp as a tack!'],
+      comforts: ['Back in my day I missed some too!', 'Try again!', 'Keep on trucking!'],
+    },
+  },
+  {
+    id: 'buddy-baby',
+    category: 'companion',
+    name: 'Baby',
+    price: 100,
+    companion: {
+      emoji: '👶🏾',
+      treat: '🍼',
+      cheers: ['Goo goo, yay!', 'Wheee!', 'Clap clap!'],
+      comforts: ['Uh-oh!', 'Bababa, again!', 'Peekaboo, try again!'],
+    },
+  },
 ];
 
 export const DEFAULT_EQUIPPED = {

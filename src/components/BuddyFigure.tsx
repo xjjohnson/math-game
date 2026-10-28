@@ -20,6 +20,9 @@ interface Props {
   size: number;
   fur: string;
   belly: string;
+  /** Everyday clothes (people), shown when Dress up has nothing on in their place. */
+  shirt?: string;
+  shoes?: string;
   dressed: Dressed;
   /** What the buddy wears for its level, perched by its head. */
   gift?: string | null;
@@ -28,7 +31,8 @@ interface Props {
 const LINE = '#3E2C23';
 
 /** A buddy with a body: its face as the head, a round body, arms, feet and its clothes. */
-export function BuddyFigure({ value, size, fur, belly, dressed, gift }: Props) {
+export function BuddyFigure({ value, size, fur, belly, shirt: everyday, shoes, dressed, gift }: Props) {
+  const shirt = dressed.shirt ?? everyday;
   const s = size;
   const line = Math.max(2, Math.round(s * 0.015));
   const edge = { borderWidth: line, borderColor: LINE };
@@ -48,14 +52,14 @@ export function BuddyFigure({ value, size, fur, belly, dressed, gift }: Props) {
         style={[
           styles.part,
           edge,
-          { backgroundColor: dressed.shirt ?? fur, width: armW, height: armH, top: armTop, left: s / 2 - bodyW / 2 - armW * 0.55, borderRadius: armW, transform: [{ rotate: '20deg' }] },
+          { backgroundColor: shirt ?? fur, width: armW, height: armH, top: armTop, left: s / 2 - bodyW / 2 - armW * 0.55, borderRadius: armW, transform: [{ rotate: '20deg' }] },
         ]}
       />
       <View
         style={[
           styles.part,
           edge,
-          { backgroundColor: dressed.shirt ?? fur, width: armW, height: armH, top: armTop, left: s / 2 + bodyW / 2 - armW * 0.45, borderRadius: armW, transform: [{ rotate: '-20deg' }] },
+          { backgroundColor: shirt ?? fur, width: armW, height: armH, top: armTop, left: s / 2 + bodyW / 2 - armW * 0.45, borderRadius: armW, transform: [{ rotate: '-20deg' }] },
         ]}
       />
       {/* Feet. */}
@@ -65,7 +69,7 @@ export function BuddyFigure({ value, size, fur, belly, dressed, gift }: Props) {
           style={[
             styles.part,
             edge,
-            { backgroundColor: fur, width: footW, height: footH, bottom: 0, left: s / 2 + side * s * 0.12 - footW / 2, borderRadius: footH },
+            { backgroundColor: shoes ?? fur, width: footW, height: footH, bottom: 0, left: s / 2 + side * s * 0.12 - footW / 2, borderRadius: footH },
           ]}
         />
       ))}
@@ -78,8 +82,8 @@ export function BuddyFigure({ value, size, fur, belly, dressed, gift }: Props) {
           { backgroundColor: fur, width: bodyW, height: bodyH, bottom: bodyBottom, left: s / 2 - bodyW / 2, borderRadius: bodyW / 2 },
         ]}
       >
-        {dressed.shirt ? (
-          <View style={[styles.shirt, { backgroundColor: dressed.shirt, height: '72%' }]}>
+        {shirt ? (
+          <View style={[styles.shirt, { backgroundColor: shirt, height: '72%' }]}>
             <View style={[styles.collar, { width: bodyW * 0.3, height: bodyH * 0.14, borderBottomLeftRadius: bodyW, borderBottomRightRadius: bodyW }]} />
           </View>
         ) : (

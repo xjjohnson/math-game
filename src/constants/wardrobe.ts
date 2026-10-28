@@ -49,8 +49,18 @@ export function findWearable(id: string): Wearable | undefined {
   return WEARABLES.find((w) => w.id === id);
 }
 
-/** Fur colors for buddy bodies, keyed by shop item id; belly is the lighter middle. */
-export const BODY_COLORS: Record<string, { fur: string; belly: string }> = {
+/**
+ * Body colors, keyed by shop item id: fur (skin for people) and the lighter belly. People
+ * also come with everyday clothes, shown when nothing from Dress up is on instead.
+ */
+export interface BodyColors {
+  fur: string;
+  belly: string;
+  shirt?: string;
+  shoes?: string;
+}
+
+export const BODY_COLORS: Record<string, BodyColors> = {
   'buddy-pup': { fur: '#D7A86E', belly: '#F3DDBF' },
   'buddy-kitty': { fur: '#F4B183', belly: '#FCE3CF' },
   'buddy-bunny': { fur: '#B0BEC5', belly: '#ECEFF1' },
@@ -63,6 +73,14 @@ export const BODY_COLORS: Record<string, { fur: string; belly: string }> = {
   'buddy-dragon': { fur: '#4CAF50', belly: '#FFF59D' },
   'buddy-bluey': { fur: '#5C9BE0', belly: '#CFE3F7' },
   'buddy-stitch': { fur: '#4A7BD8', belly: '#BBD3F5' },
+  'buddy-girl': { fur: '#F9D5C0', belly: '#F9D5C0', shirt: '#EC407A', shoes: '#5D4037' },
+  'buddy-boy': { fur: '#A1694A', belly: '#A1694A', shirt: '#26A69A', shoes: '#37474F' },
+  'buddy-kid': { fur: '#C68E6A', belly: '#C68E6A', shirt: '#FFB300', shoes: '#1565C0' },
+  'buddy-mom': { fur: '#F1C9A5', belly: '#F1C9A5', shirt: '#7E57C2', shoes: '#4E342E' },
+  'buddy-dad': { fur: '#6D4532', belly: '#6D4532', shirt: '#1976D2', shoes: '#212121' },
+  'buddy-grandma': { fur: '#C68E6A', belly: '#C68E6A', shirt: '#AD1457', shoes: '#4E342E' },
+  'buddy-grandpa': { fur: '#F9D5C0', belly: '#F9D5C0', shirt: '#558B2F', shoes: '#3E2723' },
+  'buddy-baby': { fur: '#8D5A3B', belly: '#8D5A3B', shirt: '#FFF59D', shoes: '#FFFFFF' },
 };
 
-export const DEFAULT_BODY = { fur: '#C8A27C', belly: '#F1E3D3' };
+export const DEFAULT_BODY: BodyColors = { fur: '#C8A27C', belly: '#F1E3D3' };

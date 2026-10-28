@@ -223,6 +223,7 @@ Phases 1-6 deliver a complete single-player game before any native Bluetooth wor
 - [x] Things to play with in the home: kitchen cupboards, oven, fridge, freezer and a bedroom wardrobe open and shut, with shelves to keep small things on; front door and curtains open; lamps switch on; tapping things makes them do something
 - [x] Furniture to use: tables, coffee table, nightstand and dresser to set things on; couch, chair, stool, bench, beanbag and bed (naps) for buddies to sit on; buddies hold one small thing each
 - [x] 10 Thanksgiving things sold only in November (same rule as Halloween), with fall leaves outside
+- [x] People buddies (girl, boy, kid, mom, dad, grandma, grandpa, baby; several skin tones, everyday clothes) in the Shop
 - [x] Buddy bodies (face as the head, fur-colored body, arms that hold things, feet) and 22 clothes and accessories (hats, glasses, neck, shirts, shoes) in a Dress up tab; bought once, any buddy can wear them, each buddy keeps its own outfit (profile store version 9)
 
 ---
