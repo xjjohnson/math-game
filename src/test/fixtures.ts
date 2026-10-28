@@ -40,6 +40,7 @@ export const makeProfile = (overrides: Partial<Profile> = {}): Profile => ({
   week: null,
   buddyHearts: {},
   buddyCare: null,
+  room: { wall: 0, floor: 0, buddy: { x: 0.5, y: 0.9 }, things: [] },
   missed: {},
   ...overrides,
 });
