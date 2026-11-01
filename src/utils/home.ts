@@ -145,7 +145,15 @@ export interface Piece {
 export interface BuddyAt {
   id: string;
   spot: BuddySpot;
+  /** For a person: how tall they stand in their box (PersonLook.height). Holding follows their hand. */
+  personHeight?: number;
 }
+
+/**
+ * Where a person's hand is, from the middle of their box: sideways, and up from the feet,
+ * as shares of their drawn height. Matches the arm drawn in PersonFigure.
+ */
+export const PERSON_HAND = { side: 0.2, up: 0.35 } as const;
 
 function clampAround(x: number, center: number, half: number): number {
   return half <= 0 ? center : Math.min(center + half, Math.max(center - half, x));
@@ -232,11 +240,21 @@ export function layoutHome(room: Room, buddies: BuddyAt[], size: HomeSize, open:
     } else if (t.on?.startsWith(BUDDY_KEY)) {
       parent = place(t.on);
       if (parent) {
-        // In the buddy's paw, at the end of its arm.
-        h = Math.min(h, parent.height * 0.42);
-        w = h * (item.wide ?? 1);
-        x = parent.x + parent.width * 0.26;
-        y = parent.y - parent.height * 0.2;
+        const person = buddyAt.get(t.on)?.personHeight;
+        if (person !== undefined) {
+          // In a person's hand: the middle of the thing sits at the end of the arm.
+          const u = parent.height * person;
+          h = Math.min(h, u * 0.32);
+          w = h * (item.wide ?? 1);
+          x = parent.x + u * PERSON_HAND.side;
+          y = parent.y - u * PERSON_HAND.up + h * 0.4;
+        } else {
+          // In the buddy's paw, at the end of its arm.
+          h = Math.min(h, parent.height * 0.42);
+          w = h * (item.wide ?? 1);
+          x = parent.x + parent.width * 0.26;
+          y = parent.y - parent.height * 0.2;
+        }
       }
     } else if (t.on) {
       parent = place(t.on);

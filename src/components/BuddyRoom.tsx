@@ -284,7 +284,7 @@ export function BuddyRoom(props: Props) {
 
   const pieces = layoutHome(
     room,
-    buddies.map((b) => ({ id: b.id, spot: b.spot })),
+    buddies.map((b) => ({ id: b.id, spot: b.spot, personHeight: b.person?.look.height })),
     size,
     open,
   );
