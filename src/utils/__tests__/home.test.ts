@@ -215,6 +215,18 @@ describe('placing in the home', () => {
     expect(two.room.things.find((t) => t.key === 'duck')?.on).toBe(`${BUDDY_KEY}puppy`);
   });
 
+  it('puts what a person holds into their hand, in front of them', () => {
+    const p = withThings([{ key: 'leg', itemId: 'ball', x: 0.1, y: 0.9, on: `${BUDDY_KEY}puppy` }]);
+    const [buddy] = layoutHome(p.room, [{ id: 'puppy', spot: { x: 0.5, y: 0.9 }, personHeight: 1 }], size, new Set()).filter((q) => q.buddyId);
+    const held = layoutHome(p.room, [{ id: 'puppy', spot: { x: 0.5, y: 0.9 }, personHeight: 1 }], size, new Set()).find((q) => q.key === 'leg')!;
+    expect(held.x).toBeGreaterThan(buddy.x);
+    expect(held.x).toBeLessThan(buddy.x + buddy.width / 2);
+    expect(held.y).toBeLessThan(buddy.y);
+    expect(held.y).toBeGreaterThan(buddy.y - buddy.height * 0.6);
+    expect(held.height).toBeLessThanOrEqual(buddy.height * 0.33);
+    expect(held.depth).toBeGreaterThan(buddy.depth);
+  });
+
   it('keeps things in cupboards, and takes them out loose', () => {
     const p = withThings([{ key: 'milk', itemId: 'milk', x: 0.5, y: 0.9 }]);
     const kept = placeThing(p, 'milk', { x: 0.6, y: 0, in: 'fridge', shelf: 1 });
