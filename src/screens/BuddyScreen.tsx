@@ -1,6 +1,6 @@
 import { router, Stack } from 'expo-router';
 import { useEffect, useRef, useState, type ReactNode } from 'react';
-import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { PanResponder, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Text } from '@/components/AppText';
@@ -35,6 +35,7 @@ import {
   BODY_COLORS,
   DEFAULT_BODY,
   findWearable,
+  type Wearable,
   HAIR_COLOR_NAMES,
   HAIR_COLORS,
   HAIR_STYLES,
@@ -111,7 +112,7 @@ interface Game {
  */
 export function BuddyScreen() {
   const profile = useActiveProfile();
-  const { careForBuddy, equip, buyRoomItem, moveInRoom, setPlaced, paintRoom, setBuddyHome, wear, undress, setLook } =
+  const { careForBuddy, equip, buyRoomItem, moveInRoom, setPlaced, paintRoom, setBuddyHome, wear, undress, setLook, takeOff, moveWearable } =
     useProfiles();
   const insets = useSafeAreaInsets();
   const [line, setLine] = useState<string | null>(
@@ -127,6 +128,10 @@ export function BuddyScreen() {
   /** Bumped to make the buddy hop and wave, and to throw confetti on a new level. */
   const [cheers, setCheers] = useState(0);
   const [party, setParty] = useState(0);
+  /** Asks the home which buddy is under a spot on the screen, for dropping clothes on people. */
+  const findBuddy = useRef<((pageX: number, pageY: number) => string | null) | null>(null);
+  /** A piece of clothing being dragged from the Dress up tab, following the finger. */
+  const [carried, setCarried] = useState<{ item: Wearable; x: number; y: number } | null>(null);
   const rng = useRef(createRng(randomSeed()));
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -307,6 +312,7 @@ export function BuddyScreen() {
           room={profile.room}
           buddies={homeBuddies}
           area={area}
+          findBuddy={findBuddy}
           onAreaChange={setArea}
           onView={(at) => {
             viewAt.current = at;
@@ -485,6 +491,33 @@ export function BuddyScreen() {
                   }
                 }}
                 onLook={(change) => buddyId && setLook(profile.id, buddyId, change)}
+                onCarry={setCarried}
+                onTakeOff={(wearableId) => {
+                  if (!buddyId) return;
+                  const item = findWearable(wearableId);
+                  takeOff(profile.id, buddyId, wearableId);
+                  if (item) say(`${name} took off the ${item.name.toLowerCase()}. It's in your wardrobe.`);
+                }}
+                onDropOn={(wearableId, pageX, pageY) => {
+                  if (!buddyId) return;
+                  const item = findWearable(wearableId);
+                  const target = findBuddy.current?.(pageX, pageY) ?? null;
+                  if (!item || !target || target === buddyId) {
+                    say('Drop it on one of the people to give it to them!');
+                    return;
+                  }
+                  const result = moveWearable(profile.id, buddyId, target, wearableId);
+                  if (result.ok) {
+                    playSound('reward');
+                    say(
+                      result.swapped
+                        ? `${nameOf(target)} wears the ${item.name.toLowerCase()} now, and ${name} got the ${findWearable(result.swapped)?.name.toLowerCase() ?? 'old one'}.`
+                        : `${nameOf(target)} is wearing the ${item.name.toLowerCase()} now!`,
+                    );
+                  } else if (result.reason === 'cannotWear') {
+                    say(`${nameOf(target)} can't wear ${item.name.toLowerCase()}.`);
+                  }
+                }}
                 onUndress={() => {
                   if (!buddyId) return;
                   undress(profile.id, buddyId);
@@ -554,6 +587,14 @@ export function BuddyScreen() {
           );
         })}
       </View>
+      {carried ? (
+        <View
+          pointerEvents="none"
+          style={[styles.ghost, { left: carried.x - 36, top: carried.y - 80 }]}
+        >
+          <WearableFace item={carried.item} />
+        </View>
+      ) : null}
     </View>
   );
 }
@@ -647,8 +688,17 @@ function personOf(profile: Profile, buddyId: string): HomeBuddy['person'] {
   const look = lookOf(profile, buddyId);
   if (!look) return undefined;
   const outfit = outfitOf(profile, buddyId);
-  const { hat, face, neck, feet } = dressedOf(profile, buddyId);
-  return { look, dressed: { hat, face, neck, feet, top: clothOf(outfit.shirt), legs: clothOf(outfit.legs) } };
+  return {
+    look,
+    dressed: {
+      hat: outfit.hat,
+      face: outfit.face,
+      neck: outfit.neck,
+      feet: outfit.feet,
+      top: clothOf(outfit.shirt),
+      legs: clothOf(outfit.legs),
+    },
+  };
 }
 
 /** Dress up tabs: clothes spots, plus hair, beard and skin for people. */
@@ -668,13 +718,17 @@ interface DressDrawerProps {
   onWear: (wearableId: string) => void;
   onUndress: () => void;
   onLook: (change: Partial<PersonLook>) => void;
+  onTakeOff: (wearableId: string) => void;
+  /** Shows a piece following the finger, or null when it was let go. */
+  onCarry: (carried: { item: Wearable; x: number; y: number } | null) => void;
+  onDropOn: (wearableId: string, pageX: number, pageY: number) => void;
 }
 
 /**
  * Clothes and accessories for the buddy you're with: tap to buy and put on, tap again to
  * take off. People also get free hair, beard and skin choices.
  */
-function DressDrawer({ profile, name, buddyId, onWear, onUndress, onLook }: DressDrawerProps) {
+function DressDrawer({ profile, name, buddyId, onWear, onUndress, onLook, onTakeOff, onCarry, onDropOn }: DressDrawerProps) {
   const [picked, setTab] = useState<DressTab>('shirt');
   if (!buddyId) return <Text style={styles.hint}>Pick a buddy in 🐾 Buddies first.</Text>;
   const outfit = outfitOf(profile, buddyId);
@@ -765,8 +819,18 @@ function DressDrawer({ profile, name, buddyId, onWear, onUndress, onLook }: Dres
     ];
   }
   const lookTab = LOOK_TABS.some((t) => t.id === tab);
+  const worn = Object.values(outfit).flatMap((id) => {
+    const w = id ? findWearable(id) : undefined;
+    return w ? [w] : [];
+  });
   return (
     <>
+      <View style={styles.wornRow}>
+        <Text style={styles.wornLabel}>{worn.length ? `${name} is wearing (tap ✕ or drag to a person):` : `${name} isn't wearing anything.`}</Text>
+        {worn.map((w) => (
+          <WornPiece key={w.id} item={w} onTakeOff={onTakeOff} onCarry={onCarry} onDropOn={onDropOn} />
+        ))}
+      </View>
       <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chips}>
         {tabs.map((t) => (
           <Chip key={t.id} label={t.name} on={tab === t.id} onPress={() => setTab(t.id)} />
@@ -781,6 +845,73 @@ function DressDrawer({ profile, name, buddyId, onWear, onUndress, onLook }: Dres
           : 'Buy once, then any buddy can wear it. Tap again to take it off.'}
       </Text>
     </>
+  );
+}
+
+/** What a piece of clothing looks like as a little picture. */
+function WearableFace({ item }: { item: Wearable }) {
+  return item.color ? (
+    <View style={[styles.shirtSwatch, { backgroundColor: item.color }]}>
+      <Text style={styles.swatchEmoji}>{item.emoji}</Text>
+    </View>
+  ) : (
+    <Text style={styles.thingEmoji}>{item.emoji}</Text>
+  );
+}
+
+/**
+ * Something the buddy is wearing. Tap it to take it off, or drag it onto another person in
+ * the home to give it to them.
+ */
+function WornPiece({
+  item,
+  onTakeOff,
+  onCarry,
+  onDropOn,
+}: {
+  item: Wearable;
+  onTakeOff: (id: string) => void;
+  onCarry: (carried: { item: Wearable; x: number; y: number } | null) => void;
+  onDropOn: (id: string, pageX: number, pageY: number) => void;
+}) {
+  const latest = useRef({ item, onTakeOff, onCarry, onDropOn });
+  latest.current = { item, onTakeOff, onCarry, onDropOn };
+  const moved = useRef(false);
+  const responder = useRef(
+    PanResponder.create({
+      onStartShouldSetPanResponder: () => true,
+      onPanResponderTerminationRequest: () => false,
+      onPanResponderGrant: () => {
+        moved.current = false;
+      },
+      onPanResponderMove: (e, g) => {
+        if (!moved.current && Math.abs(g.dx) + Math.abs(g.dy) < 10) return;
+        moved.current = true;
+        latest.current.onCarry({ item: latest.current.item, x: e.nativeEvent.pageX, y: e.nativeEvent.pageY });
+      },
+      onPanResponderRelease: (e) => {
+        const l = latest.current;
+        if (moved.current) {
+          l.onCarry(null);
+          l.onDropOn(l.item.id, e.nativeEvent.pageX, e.nativeEvent.pageY);
+        } else {
+          l.onTakeOff(l.item.id);
+        }
+      },
+      onPanResponderTerminate: () => latest.current.onCarry(null),
+    }),
+  ).current;
+  return (
+    <View
+      {...responder.panHandlers}
+      accessible
+      accessibilityRole="button"
+      accessibilityLabel={`Take off ${item.name}`}
+      style={styles.worn}
+    >
+      <WearableFace item={item} />
+      <Text style={styles.wornX}>✕</Text>
+    </View>
   );
 }
 
@@ -1108,6 +1239,20 @@ const styles = StyleSheet.create({
   thingEmoji: { fontSize: 32 },
   thingPrice: { fontSize: 13, fontWeight: '800', color: colors.textMuted },
   locked: { opacity: 0.45 },
+  wornRow: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: spacing.sm },
+  wornLabel: { fontSize: 14, fontWeight: '800', color: colors.textMuted, width: '100%', textAlign: 'center' },
+  worn: {
+    width: 56,
+    height: 56,
+    borderRadius: radius.md,
+    borderWidth: 2,
+    borderColor: colors.primary,
+    backgroundColor: colors.surface,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  wornX: { position: 'absolute', top: -2, right: 2, fontSize: 13, fontWeight: '900', color: colors.textMuted },
+  ghost: { position: 'absolute', width: 72, height: 72, alignItems: 'center', justifyContent: 'center', opacity: 0.95 },
   seasonal: { backgroundColor: '#FFE0B2', borderColor: '#F57C00' },
   pressed: { transform: [{ scale: 0.96 }] },
   buddyCol: { alignItems: 'center', gap: 4 },
