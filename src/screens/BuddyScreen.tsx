@@ -365,6 +365,10 @@ export function BuddyScreen() {
               toilet: ['Lid up!', `${name} flushes the toilet. Whoosh!`],
               ballPit: [`${name} jumps in the ball pit! Boing!`, 'The balls settle down.'],
               chalkboard: [`${name} draws a ${CHALK_DRAWINGS[step]}!`, 'Wiped clean!'],
+              microwave: [`${name} heats a snack. Ding!`, 'The microwave stops.'],
+              dishwasher: ['The dishwasher is washing the dishes. Swish!', 'The dishes are clean!'],
+              aquarium: [`${name} feeds the fish. Blub, blub!`, 'The fish settle down.'],
+              fan: [`${name} turns on the fan. Whoosh, so breezy!`, 'The fan slows down.'],
             };
                     say(lines[a.kind][on ? 0 : 1]);
           }}
