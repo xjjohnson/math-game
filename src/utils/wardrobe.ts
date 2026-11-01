@@ -1,5 +1,5 @@
 import type { Cloth } from '@/components/PersonFigure';
-import { findWearable, PEOPLE, type PersonLook } from '@/constants/wardrobe';
+import { findWearable, isPerson, PEOPLE, type PersonLook } from '@/constants/wardrobe';
 import type { Outfit, Profile } from '@/types';
 
 export type WearResult = { ok: true; profile: Profile } | { ok: false; reason: 'unknown' | 'coins' };
@@ -61,4 +61,44 @@ export function setLook(profile: Profile, buddyId: string, change: Partial<Perso
 export function clothOf(wearableId?: string): Cloth | undefined {
   const w = wearableId ? findWearable(wearableId) : undefined;
   return w?.color ? { color: w.color, cut: w.cut, pattern: w.pattern, patternColor: w.patternColor } : undefined;
+}
+
+export type MoveResult =
+  | { ok: true; profile: Profile; swapped: string | null }
+  | { ok: false; reason: 'unknown' | 'same' | 'notWearing' | 'cannotWear' };
+
+/**
+ * Takes a piece off one buddy and puts it on another, free. If the other buddy already had
+ * something in that spot, it goes back to the first buddy. Animals can't wear bottoms.
+ */
+export function moveWearable(profile: Profile, fromId: string, toId: string, wearableId: string): MoveResult {
+  const item = findWearable(wearableId);
+  if (!item) return { ok: false, reason: 'unknown' };
+  if (fromId === toId) return { ok: false, reason: 'same' };
+  const from = { ...outfitOf(profile, fromId) };
+  if (from[item.slot] !== item.id) return { ok: false, reason: 'notWearing' };
+  if (item.slot === 'legs' && !isPerson(toId)) return { ok: false, reason: 'cannotWear' };
+  const to = { ...outfitOf(profile, toId) };
+  const displaced = to[item.slot] ?? null;
+  delete from[item.slot];
+  to[item.slot] = item.id;
+  if (displaced) from[item.slot] = displaced;
+  const wardrobe = profile.wardrobe.includes(item.id) ? profile.wardrobe : [...profile.wardrobe, item.id];
+  const kept = displaced && !wardrobe.includes(displaced) ? [...wardrobe, displaced] : wardrobe;
+  return {
+    ok: true,
+    swapped: displaced,
+    profile: { ...profile, wardrobe: kept, outfits: { ...profile.outfits, [fromId]: from, [toId]: to } },
+  };
+}
+
+/** Takes one piece off a buddy. It stays in the wardrobe, so it can be worn again. */
+export function takeOff(profile: Profile, buddyId: string, wearableId: string): Profile {
+  const item = findWearable(wearableId);
+  if (!item) return profile;
+  const outfit = { ...outfitOf(profile, buddyId) };
+  if (outfit[item.slot] !== item.id) return profile;
+  delete outfit[item.slot];
+  const wardrobe = profile.wardrobe.includes(item.id) ? profile.wardrobe : [...profile.wardrobe, item.id];
+  return { ...profile, wardrobe, outfits: { ...profile.outfits, [buddyId]: outfit } };
 }

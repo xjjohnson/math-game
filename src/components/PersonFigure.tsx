@@ -3,6 +3,7 @@ import Animated, { useAnimatedStyle } from 'react-native-reanimated';
 
 import { Text } from '@/components/AppText';
 import { useArmWave, useBlink } from '@/components/Motion';
+import { Glasses, Hat, Neckwear, shoeLook } from '@/components/PersonAccessories';
 import {
   HAIR_COLORS,
   SKIN_TONES,
@@ -20,7 +21,7 @@ export interface Cloth {
   patternColor?: string;
 }
 
-/** What a person has on, ready to draw. */
+/** What a person has on, ready to draw. Hat, glasses, neck and shoes are wearable ids. */
 export interface PersonDressed {
   hat?: string;
   face?: string;
@@ -47,7 +48,6 @@ interface Props {
 const LINE = '#3B2B25';
 const UNDERSHIRT = '#FAFAFA';
 const UNDERWEAR = '#E3E3E3';
-const SHOES = '#4E342E';
 
 /**
  * A person drawn in a simple cartoon style: big round head, dot eyes and rosy cheeks on a
@@ -74,6 +74,8 @@ export function PersonFigure({ look, size, dressed, gift, alive = false, asleep 
   const legTop = u * 0.64;
   const legH = u * 0.29;
   const eyeY = headCY + headD * 0.05;
+  const shoes = shoeLook(dressed.feet);
+  const fit = { u, cx, headD, headTop, eyeY, line, edge };
 
   const top = dressed.top;
   const legs = dressed.legs;
@@ -142,27 +144,37 @@ export function PersonFigure({ look, size, dressed, gift, alive = false, asleep 
             ]}
           />
         ) : null}
-        {[-1, 1].map((side) => (
-          <View
-            key={`shoe${side}`}
-            style={[
-              box(cx + (side < 0 ? -u * 0.125 : u * 0.005), u * 0.915, u * 0.12, u * 0.07),
-              edge,
-              { backgroundColor: SHOES, borderTopLeftRadius: u * 0.05, borderTopRightRadius: u * 0.05, borderRadius: u * 0.02 },
-            ]}
-          />
-        ))}
-        {dressed.feet
-          ? [-1, 1].map((side) => (
-              <Text
-                key={`feet${side}`}
-                style={[styles.part, { fontSize: Math.round(u * 0.1), top: u * 0.86, left: cx + (side < 0 ? -u * 0.135 : u * 0.0) }]}
-              >
-                {dressed.feet}
-              </Text>
-            ))
-          : null}
-
+        {[-1, 1].map((side) => {
+          const left = cx + (side < 0 ? -u * 0.125 : u * 0.005);
+          const lift = u * 0.07 * shoes.tall * 10;
+          return (
+            <View key={`shoe${side}`}>
+              {shoes.sock ? (
+                <View
+                  style={[
+                    box(left + u * 0.02, u * 0.8, legW + u * 0.01, u * 0.12),
+                    edge,
+                    { backgroundColor: shoes.sock, borderRadius: legW * 0.3 },
+                  ]}
+                />
+              ) : null}
+              <View
+                style={[
+                  box(left, u * 0.915 - lift, u * 0.12, u * 0.07 + lift),
+                  edge,
+                  {
+                    backgroundColor: shoes.color,
+                    borderTopLeftRadius: u * 0.05,
+                    borderTopRightRadius: u * 0.05,
+                    borderBottomLeftRadius: u * 0.02,
+                    borderBottomRightRadius: u * 0.02,
+                  },
+                ]}
+              />
+              <View style={[box(left + line, u * 0.915 + u * 0.07 - u * 0.02, u * 0.12 - line * 2, u * 0.02), { backgroundColor: shoes.sole }]} />
+            </View>
+          );
+        })}
         {/* Arms with sleeves, hands at the ends. */}
         {[-1, 1].map((side) => {
           const left = side < 0 ? cx - torsoW / 2 - armW + u * 0.012 : cx + torsoW / 2 - u * 0.012;
@@ -263,21 +275,9 @@ export function PersonFigure({ look, size, dressed, gift, alive = false, asleep 
           ]}
         />
 
-        {dressed.neck ? (
-          <Text style={[styles.part, styles.center, { fontSize: Math.round(u * 0.12), top: u * 0.43, width: u }]}>
-            {dressed.neck}
-          </Text>
-        ) : null}
-        {dressed.face ? (
-          <Text style={[styles.part, styles.center, { fontSize: Math.round(u * 0.2), top: eyeY - u * 0.13, width: u }]}>
-            {dressed.face}
-          </Text>
-        ) : null}
-        {dressed.hat ? (
-          <Text style={[styles.part, styles.center, { fontSize: Math.round(u * 0.28), top: headTop - u * 0.2, width: u }]}>
-            {dressed.hat}
-          </Text>
-        ) : null}
+        {dressed.neck ? <Neckwear id={dressed.neck} f={fit} /> : null}
+        {dressed.face ? <Glasses id={dressed.face} f={fit} /> : null}
+        {dressed.hat ? <Hat id={dressed.hat} f={fit} /> : null}
       </View>
       {gift ? (
         <Text style={[styles.part, { fontSize: Math.round(size * 0.18), top: size - u - size * 0.04, right: size * 0.06 }]}>
@@ -430,7 +430,6 @@ function PatternFill({ cloth, u }: { cloth: Cloth; u: number }) {
 const styles = StyleSheet.create({
   inner: { position: 'absolute', bottom: 0 },
   part: { position: 'absolute' },
-  center: { left: 0, textAlign: 'center' },
   clip: { overflow: 'hidden' },
   eye: { borderRadius: 999, backgroundColor: '#2A1E1A' },
   cheek: { borderRadius: 999, backgroundColor: '#F28B9B', opacity: 0.5 },

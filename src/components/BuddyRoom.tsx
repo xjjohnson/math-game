@@ -93,6 +93,8 @@ interface Props {
   onTapAppliance?: (appliance: Appliance, on: boolean, step: number, inside: string[]) => void;
   /** A washing machine started (`on`) or stopped; `done` when it finished by itself. */
   onWash?: (on: boolean, done: boolean) => void;
+  /** Filled in with a function that says which buddy (if any) is under a spot on the screen. */
+  findBuddy?: { current: ((pageX: number, pageY: number) => string | null) | null };
   /** Change `n` to have that buddy hop and wave, as when it levels up. */
   cheer?: { buddyId: string; n: number };
 }
@@ -418,6 +420,18 @@ export function BuddyRoom(props: Props) {
     x: pageX - frame.current.x + scrollX.current,
     y: pageY - frame.current.y,
   });
+
+  if (props.findBuddy) {
+    props.findBuddy.current = (pageX, pageY) => {
+      const at = toHome(pageX, pageY);
+      const hit = pieceAt(
+        latestPieces.current.filter((p) => p.buddyId),
+        at.x,
+        at.y,
+      );
+      return hit?.buddyId ?? null;
+    };
+  }
 
   const showMoving = () => {
     const next: Record<string, { dx: number; dy: number }> = {};

@@ -1,6 +1,6 @@
 import { WEARABLES } from '@/constants/wardrobe';
 import { makeProfile } from '@/test/fixtures';
-import { lookOf, outfitOf, setLook, undress, wear } from '@/utils/wardrobe';
+import { lookOf, moveWearable, outfitOf, setLook, takeOff, undress, wear } from '@/utils/wardrobe';
 
 describe('buddy clothes', () => {
   it('buys a piece once, then puts it on and takes it off for free', () => {
@@ -60,5 +60,29 @@ describe('people buddies', () => {
     expect(setLook(p, 'buddy-pup', { hair: 'long' })).toBe(p);
     const changed = setLook(p, 'buddy-dad', { hair: 'curly', beard: null });
     expect(lookOf(changed, 'buddy-dad')).toMatchObject({ hair: 'curly', beard: null, skin: lookOf(p, 'buddy-dad')!.skin });
+  });
+});
+
+describe('moving clothes between buddies', () => {
+  it('moves a worn piece for free, swapping what the other had on', () => {
+    const p = makeProfile({ coins: 0 });
+    const r = moveWearable(p, 'buddy-dad', 'buddy-mom', 'sweaterTan');
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    expect(outfitOf(r.profile, 'buddy-mom').shirt).toBe('sweaterTan');
+    expect(outfitOf(r.profile, 'buddy-dad').shirt).toBe('dressFlowers');
+    expect(r.profile.coins).toBe(0);
+  });
+
+  it('keeps animals out of bottoms and ignores pieces not being worn', () => {
+    const p = makeProfile({ coins: 0 });
+    expect(moveWearable(p, 'buddy-dad', 'buddy-pup', 'jeans')).toEqual({ ok: false, reason: 'cannotWear' });
+    expect(moveWearable(p, 'buddy-dad', 'buddy-mom', 'crown')).toEqual({ ok: false, reason: 'notWearing' });
+  });
+
+  it('takes one piece off and keeps it in the wardrobe', () => {
+    const off = takeOff(makeProfile(), 'buddy-dad', 'jeans');
+    expect(outfitOf(off, 'buddy-dad')).toEqual({ shirt: 'sweaterTan' });
+    expect(off.wardrobe).toContain('jeans');
   });
 });

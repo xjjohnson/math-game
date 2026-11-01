@@ -22,7 +22,7 @@ import {
   type RoomBuyResult,
 } from '@/utils/room';
 import { buyItem, equipItem, freeAvatars, type BuyResult } from '@/utils/shop';
-import { setLook, undress, wear, type WearResult } from '@/utils/wardrobe';
+import { moveWearable, setLook, takeOff, undress, wear, type MoveResult, type WearResult } from '@/utils/wardrobe';
 import type { PersonLook } from '@/constants/wardrobe';
 
 function emptyStats(): Profile['stats'] {
@@ -103,6 +103,10 @@ interface ProfilesState {
   /** Puts clothes on a buddy (buying them first if needed), or takes them off. */
   wear: (id: string, buddyId: string, wearableId: string) => WearResult;
   undress: (id: string, buddyId: string) => void;
+  /** Takes one piece off a buddy; it stays in the wardrobe. */
+  takeOff: (id: string, buddyId: string, wearableId: string) => void;
+  /** Moves a piece from one buddy to another for free. */
+  moveWearable: (id: string, fromId: string, toId: string, wearableId: string) => MoveResult;
   /** Changes a person buddy's hair, skin or beard. */
   setLook: (id: string, buddyId: string, change: Partial<PersonLook>) => void;
 }
@@ -205,6 +209,17 @@ export const useProfiles = create<ProfilesState>()(
       },
       undress: (id, buddyId) =>
         set((s) => ({ profiles: s.profiles.map((p) => (p.id === id ? undress(p, buddyId) : p)) })),
+      takeOff: (id, buddyId, wearableId) =>
+        set((s) => ({ profiles: s.profiles.map((p) => (p.id === id ? takeOff(p, buddyId, wearableId) : p)) })),
+      moveWearable: (id, fromId, toId, wearableId) => {
+        const current = get().profiles.find((p) => p.id === id);
+        if (!current) return { ok: false, reason: 'unknown' };
+        const result = moveWearable(current, fromId, toId, wearableId);
+        if (result.ok) {
+          set((s) => ({ profiles: s.profiles.map((p) => (p.id === id ? result.profile : p)) }));
+        }
+        return result;
+      },
       setLook: (id, buddyId, change) =>
         set((s) => ({ profiles: s.profiles.map((p) => (p.id === id ? setLook(p, buddyId, change) : p)) })),
     }),
