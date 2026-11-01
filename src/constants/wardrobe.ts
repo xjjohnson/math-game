@@ -96,6 +96,12 @@ export const BODY_COLORS: Record<string, BodyColors> = {
   'buddy-dragon': { fur: '#4CAF50', belly: '#FFF59D' },
   'buddy-bluey': { fur: '#5C9BE0', belly: '#CFE3F7' },
   'buddy-stitch': { fur: '#4A7BD8', belly: '#BBD3F5' },
+  'buddy-mickey': { fur: '#2B2B3D', belly: '#FFD9B5' },
+  'buddy-minnie': { fur: '#2B2B3D', belly: '#FFD9B5' },
+  'buddy-olaf': { fur: '#F5FAFF', belly: '#FFFFFF' },
+  'buddy-pooh': { fur: '#E8A33D', belly: '#F5C26B' },
+  'buddy-simba': { fur: '#E8B26A', belly: '#FFF1D6' },
+  'buddy-nemo': { fur: '#FB8C00', belly: '#FFFFFF' },
 };
 
 export const DEFAULT_BODY: BodyColors = { fur: '#C8A27C', belly: '#F1E3D3' };
