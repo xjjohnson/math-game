@@ -14,6 +14,12 @@ interface Art {
 export const ART: Record<string, Art> = {
   '@bluey': { source: require('../../assets/art/bluey.png'), standIn: '🐶' },
   '@stitch': { source: require('../../assets/art/stitch.png'), standIn: '👽' },
+  '@mickey': { source: require('../../assets/art/mickey.png'), standIn: '🐭' },
+  '@minnie': { source: require('../../assets/art/minnie.png'), standIn: '🎀' },
+  '@olaf': { source: require('../../assets/art/olaf.png'), standIn: '⛄' },
+  '@pooh': { source: require('../../assets/art/pooh.png'), standIn: '🐻' },
+  '@simba': { source: require('../../assets/art/simba.png'), standIn: '🦁' },
+  '@nemo': { source: require('../../assets/art/nemo.png'), standIn: '🐠' },
 };
 
 export function artFor(value: string): Art | undefined {
