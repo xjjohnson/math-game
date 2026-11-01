@@ -53,7 +53,7 @@ export function seasonOf(month: number): Season | null {
 }
 
 /** Shelves of the "Add things" shop. */
-export type RoomItemGroup = 'furniture' | 'living' | 'kitchen' | 'bedroom' | 'bathroom' | 'toys' | Season;
+export type RoomItemGroup = 'furniture' | 'living' | 'kitchen' | 'bedroom' | 'bathroom' | 'appliances' | 'toys' | Season;
 
 export const ROOM_ITEM_GROUPS: { id: RoomItemGroup; name: string }[] = [
   { id: 'thanksgiving', name: '🦃 Thanksgiving' },
@@ -63,11 +63,12 @@ export const ROOM_ITEM_GROUPS: { id: RoomItemGroup; name: string }[] = [
   { id: 'kitchen', name: '🍕 Kitchen' },
   { id: 'bedroom', name: '🪞 Bedroom' },
   { id: 'bathroom', name: '🧼 Bathroom' },
+  { id: 'appliances', name: '🔌 Appliances' },
   { id: 'toys', name: '⚽ Toys' },
 ];
 
 /** Furniture drawn with shapes, for the pieces with no good emoji. */
-export type FurnitureShape = 'table' | 'coffeeTable' | 'nightstand' | 'stool' | 'bench' | 'beanbag';
+export type FurnitureShape = 'table' | 'coffeeTable' | 'nightstand' | 'stool' | 'bench' | 'beanbag' | 'armchair' | 'ottoman' | 'sideTable' | 'desk' | 'bookshelf';
 
 /** Things a buddy's home can hold, bought with coins in the buddy's home. */
 export interface RoomItem {
@@ -142,6 +143,41 @@ export const ROOM_ITEMS: RoomItem[] = [
     wide: 1.4,
     seat: 0.65,
   },
+  {
+    id: 'armchair',
+    name: 'Armchair',
+    emoji: '🪑',
+    price: 40,
+    size: 0.25,
+    group: 'furniture',
+    draw: 'armchair',
+    wide: 1.15,
+    seat: 0.42,
+  },
+  { id: 'ottoman', name: 'Footstool', emoji: '🪑', price: 20, size: 0.1, group: 'furniture', draw: 'ottoman', wide: 1.5, seat: 0.9 },
+  {
+    id: 'sideTable',
+    name: 'Side table',
+    emoji: '🟫',
+    price: 25,
+    size: 0.15,
+    group: 'furniture',
+    draw: 'sideTable',
+    wide: 0.9,
+    top: 1,
+  },
+  { id: 'desk', name: 'Desk', emoji: '🟫', price: 45, size: 0.2, group: 'furniture', draw: 'desk', wide: 1.9, top: 1 },
+  {
+    id: 'bookshelf',
+    name: 'Bookshelf',
+    emoji: '📚',
+    price: 40,
+    size: 0.34,
+    group: 'furniture',
+    draw: 'bookshelf',
+    wide: 0.75,
+    top: 1,
+  },
   // Living room
   { id: 'tv', name: 'TV', emoji: '📺', price: 40, size: 0.2, group: 'living', fx: '🎬', says: 'loves this show' },
   { id: 'piano', name: 'Piano', emoji: '🎹', price: 50, size: 0.22, group: 'living', fx: '🎶', says: 'plays a song' },
@@ -153,6 +189,9 @@ export const ROOM_ITEMS: RoomItem[] = [
   { id: 'lamp', name: 'Lamp', emoji: '💡', price: 25, size: 0.16, group: 'living', light: true, lamp: true },
   { id: 'fish', name: 'Fish bowl', emoji: '🐠', price: 30, size: 0.12, group: 'living', fx: '🫧', says: 'waves at the fish' },
   { id: 'trophy', name: 'Trophy', emoji: '🏆', price: 60, size: 0.14, group: 'living', fx: '🌟' },
+  { id: 'globe', name: 'Globe', emoji: '🌍', price: 25, size: 0.13, group: 'living', fx: '✈️', says: 'spins the globe' },
+  { id: 'telescope', name: 'Telescope', emoji: '🔭', price: 30, size: 0.17, group: 'living', fx: '🌟', says: 'spots a star' },
+  { id: 'vase', name: 'Vase', emoji: '🏺', price: 20, size: 0.14, group: 'living' },
   // Kitchen
   { id: 'bowl', name: 'Food bowl', emoji: '🥣', price: 10, size: 0.12, group: 'kitchen' },
   { id: 'pan', name: 'Frying pan', emoji: '🍳', price: 15, size: 0.12, group: 'kitchen', fx: '🔥', says: 'cooks an egg' },
@@ -166,6 +205,9 @@ export const ROOM_ITEMS: RoomItem[] = [
   { id: 'cake', name: 'Cake', emoji: '🎂', price: 20, size: 0.13, group: 'kitchen', fx: '🕯️', says: 'makes a wish' },
   { id: 'honey', name: 'Honey jar', emoji: '🍯', price: 15, size: 0.1, group: 'kitchen' },
   { id: 'milk', name: 'Milk', emoji: '🥛', price: 10, size: 0.1, group: 'kitchen' },
+  { id: 'cocoa', name: 'Hot cocoa', emoji: '☕', price: 10, size: 0.09, group: 'kitchen', fx: '♨️', says: 'sips hot cocoa' },
+  { id: 'iceCream', name: 'Ice cream', emoji: '🍨', price: 15, size: 0.1, group: 'kitchen', fx: '😋', says: 'loves ice cream' },
+  { id: 'juice', name: 'Juice', emoji: '🧃', price: 10, size: 0.09, group: 'kitchen' },
   // Bedroom
   { id: 'bed', name: 'Bed', emoji: '🛏️', price: 40, size: 0.3, group: 'bedroom', seat: 0.45, sleep: true },
   { id: 'mirror', name: 'Mirror', emoji: '🪞', price: 30, size: 0.2, group: 'bedroom', fx: '✨', says: 'makes a silly face' },
@@ -176,6 +218,9 @@ export const ROOM_ITEMS: RoomItem[] = [
   { id: 'dolls', name: 'Nesting dolls', emoji: '🪆', price: 20, size: 0.12, group: 'bedroom' },
   { id: 'teddy', name: 'Teddy bear', emoji: '🧸', price: 15, size: 0.14, group: 'bedroom', fx: '💕', says: 'hugs the teddy' },
   { id: 'guitar', name: 'Guitar', emoji: '🎸', price: 30, size: 0.2, group: 'bedroom', fx: '🎵', says: 'strums the guitar' },
+  { id: 'alarm', name: 'Alarm clock', emoji: '⏰', price: 15, size: 0.1, group: 'bedroom', fx: '🔔', says: 'wakes up with a ring' },
+  { id: 'crown', name: 'Crown', emoji: '👑', price: 30, size: 0.1, group: 'bedroom', fx: '✨', says: 'feels like royalty' },
+  { id: 'slippers', name: 'Slippers', emoji: '🩴', price: 10, size: 0.08, group: 'bedroom' },
   // Bathroom
   { id: 'sponge', name: 'Sponge', emoji: '🧽', price: 10, size: 0.09, group: 'bathroom', fx: '🫧', says: 'scrubs up' },
   { id: 'looRoll', name: 'Toilet paper', emoji: '🧻', price: 10, size: 0.1, group: 'bathroom' },
@@ -183,6 +228,17 @@ export const ROOM_ITEMS: RoomItem[] = [
   { id: 'toothbrush', name: 'Toothbrush', emoji: '🪥', price: 10, size: 0.1, group: 'bathroom', fx: '😁', says: 'brushes teeth' },
   { id: 'soap', name: 'Soap', emoji: '🧼', price: 10, size: 0.08, group: 'bathroom', fx: '🫧', says: 'washes up' },
   { id: 'basket', name: 'Laundry basket', emoji: '🧺', price: 15, size: 0.14, group: 'bathroom', fx: '👕', says: 'folds the laundry' },
+  { id: 'bubbles', name: 'Bubbles', emoji: '🫧', price: 10, size: 0.1, group: 'bathroom', fx: '🫧', says: 'pops the bubbles' },
+  { id: 'boat', name: 'Toy boat', emoji: '⛵', price: 15, size: 0.11, group: 'bathroom', fx: '🌊', says: 'sails the toy boat' },
+  // Appliances and gadgets
+  { id: 'laptop', name: 'Laptop', emoji: '💻', price: 45, size: 0.1, group: 'appliances', fx: '⌨️', says: 'types a story' },
+  { id: 'computer', name: 'Computer', emoji: '🖥️', price: 50, size: 0.15, group: 'appliances', fx: '🖱️', says: 'plays on the computer' },
+  { id: 'phone', name: 'Phone', emoji: '☎️', price: 20, size: 0.1, group: 'appliances', fx: '📞', says: 'answers the phone' },
+  { id: 'camera', name: 'Camera', emoji: '📷', price: 30, size: 0.1, group: 'appliances', fx: '📸', says: 'says cheese' },
+  { id: 'headphones', name: 'Headphones', emoji: '🎧', price: 25, size: 0.1, group: 'appliances', fx: '🎵', says: 'listens to music' },
+  { id: 'printer', name: 'Printer', emoji: '🖨️', price: 35, size: 0.11, group: 'appliances', fx: '📄', says: 'prints a picture' },
+  { id: 'microphone', name: 'Microphone', emoji: '🎤', price: 25, size: 0.11, group: 'appliances', fx: '🎶', says: 'sings a song' },
+  { id: 'flashlight', name: 'Flashlight', emoji: '🔦', price: 15, size: 0.11, group: 'appliances', light: true },
   // Toys and fun
   { id: 'ball', name: 'Ball', emoji: '⚽', price: 10, size: 0.1, group: 'toys', fx: '💫', says: 'kicks the ball' },
   { id: 'duck', name: 'Rubber duck', emoji: '🦆', price: 10, size: 0.1, group: 'toys', fx: '💦', says: 'hears quack, quack' },
@@ -304,7 +360,7 @@ export interface Surface {
 
 export const SURFACES: Surface[] = [
   { id: 'livingSill', area: 'living', left: 0.5, width: 0.44, bottom: 0.27, depth: 0.04 },
-  { id: 'counter', area: 'kitchen', left: 0.06, width: 0.54, bottom: 0.26, depth: 0.2 },
+  { id: 'counter', area: 'kitchen', left: 0.06, width: 0.31, bottom: 0.26, depth: 0.2 },
   { id: 'bedSill', area: 'bedroom', left: 0.04, width: 0.34, bottom: 0.33, depth: 0.04 },
   { id: 'wallShelf', area: 'bedroom', left: 0.41, width: 0.19, bottom: 0.44, depth: 0.04 },
   { id: 'diningTable', area: 'kitchen', left: 1.2, width: 0.5, bottom: 0.2, depth: 0.08 },
@@ -318,7 +374,17 @@ export const SURFACES: Surface[] = [
 ];
 
 /** Built-in appliances drawn into a room that switch on and off, or (a chalkboard) change on each tap. */
-export type ApplianceKind = 'fireplace' | 'tv' | 'tub' | 'toilet' | 'ballPit' | 'chalkboard';
+export type ApplianceKind =
+  | 'fireplace'
+  | 'tv'
+  | 'tub'
+  | 'toilet'
+  | 'ballPit'
+  | 'chalkboard'
+  | 'microwave'
+  | 'dishwasher'
+  | 'aquarium'
+  | 'fan';
 
 export interface Appliance extends FixtureSpot {
   id: string;
@@ -334,6 +400,10 @@ export const APPLIANCES: Appliance[] = [
   { id: 'ballPit', name: 'ball pit', kind: 'ballPit', area: 'playroom', left: 0.55, width: 0.5, bottom: 0, height: 0.16 },
   { id: 'playTv', name: 'TV', kind: 'tv', area: 'playroom', left: 1.17, width: 0.26, bottom: 0.14, height: 0.17 },
   { id: 'chalkboard', name: 'chalkboard', kind: 'chalkboard', area: 'playroom', left: 1.6, width: 0.42, bottom: 0.18, height: 0.3 },
+  { id: 'microwave', name: 'microwave', kind: 'microwave', area: 'kitchen', left: 0.38, width: 0.21, bottom: 0.26, height: 0.15 },
+  { id: 'dishwasher', name: 'dishwasher', kind: 'dishwasher', area: 'kitchen', left: 1.74, width: 0.18, bottom: 0, height: 0.2 },
+  { id: 'aquarium', name: 'fish tank', kind: 'aquarium', area: 'living', left: 1.68, width: 0.34, bottom: 0, height: 0.22 },
+  { id: 'fan', name: 'fan', kind: 'fan', area: 'bedroom', left: 0.99, width: 0.16, bottom: 0, height: 0.27 },
 ];
 
 /**

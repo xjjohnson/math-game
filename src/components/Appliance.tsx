@@ -1,6 +1,6 @@
 import { Pressable, StyleSheet, View, type ViewStyle } from 'react-native';
 
-import { Bob, Flicker } from '@/components/Motion';
+import { Bob, Flicker, Spin } from '@/components/Motion';
 import type { Appliance } from '@/constants/room';
 
 const OUTLINE = '#5B3A24';
@@ -39,6 +39,10 @@ export function ApplianceView({ appliance: a, left, top, width: w, height: h, on
       {a.kind === 'toilet' ? <Toilet w={w} h={h} on={on} /> : null}
       {a.kind === 'ballPit' ? <BallPit w={w} h={h} on={on} /> : null}
       {a.kind === 'chalkboard' ? <Chalkboard w={w} h={h} step={step} /> : null}
+      {a.kind === 'microwave' ? <Microwave w={w} h={h} on={on} /> : null}
+      {a.kind === 'dishwasher' ? <Dishwasher w={w} h={h} on={on} /> : null}
+      {a.kind === 'aquarium' ? <Aquarium w={w} h={h} on={on} /> : null}
+      {a.kind === 'fan' ? <Fan w={w} h={h} on={on} /> : null}
     </Pressable>
   );
 }
@@ -253,6 +257,103 @@ function Chalkboard({ w, h, step }: { w: number; h: number; step: number }) {
   );
 }
 
+/** A microwave: switched on, the light comes on and the snack goes round. */
+function Microwave({ w, h, on }: Drawn) {
+  const win = { left: w * 0.07, top: h * 0.14, width: w * 0.62, height: h * 0.66 };
+  const plate = win.width * 0.5;
+  return (
+    <>
+      <View style={[styles.microBody, at(0, 0, w, h * 0.92)]} />
+      <View style={[styles.microWindow, on && styles.microLit, { ...win, position: 'absolute' }]}>
+        <Spin active={on} style={at(win.width / 2 - plate / 2 - 3, win.height / 2 - plate / 2 - 3, plate, plate)}>
+          <View style={[styles.snack, { borderRadius: plate }]}>
+            <View style={styles.snackDot} />
+          </View>
+        </Spin>
+      </View>
+      {[0.2, 0.45, 0.7].map((y) => (
+        <View key={y} style={[styles.microButton, at(w * 0.77, h * y, w * 0.16, h * 0.12)]} />
+      ))}
+      <View style={[styles.foot, at(w * 0.1, h * 0.92, w * 0.1, h * 0.08)]} />
+      <View style={[styles.foot, at(w * 0.8, h * 0.92, w * 0.1, h * 0.08)]} />
+    </>
+  );
+}
+
+/** A dishwasher with a porthole; switched on, bubbles slosh about and water drips down. */
+function Dishwasher({ w, h, on }: Drawn) {
+  const win = { left: w * 0.12, top: h * 0.2, width: w * 0.76, height: h * 0.36 };
+  return (
+    <>
+      <View style={[styles.dishBody, at(0, 0, w, h)]} />
+      <View style={[styles.dishHandle, at(w * 0.15, h * 0.07, w * 0.7, h * 0.06)]} />
+      <View style={[styles.dishWindow, on && styles.dishWet, { ...win, position: 'absolute' }]}>
+        {[0.15, 0.4, 0.62].map((x, i) => (
+          <Bob key={x} seed={`dish-${i}`} rise={win.height * 0.4} active={on} style={at(win.width * x, win.height * 0.45, win.height * 0.28, win.height * 0.28)}>
+            <View style={[styles.bubble, { flex: 1, borderRadius: h }, !on && { opacity: 0.35 }]} />
+          </Bob>
+        ))}
+      </View>
+      {on
+        ? [0.25, 0.5, 0.75].map((x) => <View key={x} style={[styles.spray, at(w * x, h * 0.6, 3, h * 0.16)]} />)
+        : null}
+      <View style={[styles.dishLight, on && styles.dishLightOn, at(w * 0.42, h * 0.84, w * 0.16, h * 0.06)]} />
+    </>
+  );
+}
+
+const FISH_COLORS = ['#FF7043', '#FFCA28', '#EC407A', '#7E57C2'];
+
+/** A fish tank on a stand: fish drift about, and when it is on, the light shines and bubbles rise. */
+function Aquarium({ w, h, on }: Drawn) {
+  const tank = { left: 0, top: 0, width: w, height: h * 0.78 };
+  const fish = h * 0.12;
+  return (
+    <>
+      <View style={[styles.tankStand, at(w * 0.04, h * 0.78, w * 0.92, h * 0.22)]} />
+      <View style={[styles.tank, on && styles.tankLit, { ...tank, position: 'absolute' }]}>
+        <View style={[styles.sand, at(0, tank.height * 0.8, w, tank.height * 0.2)]} />
+        <View style={[styles.weed, at(w * 0.12, tank.height * 0.35, w * 0.05, tank.height * 0.5)]} />
+        <View style={[styles.weed, at(w * 0.8, tank.height * 0.45, w * 0.05, tank.height * 0.4)]} />
+        {FISH_COLORS.map((color, i) => (
+          <Bob key={color} seed={`fish-${i}`} rise={h * (on ? 0.18 : 0.06)} active={on} style={at(w * (0.18 + i * 0.17), tank.height * (0.18 + (i % 2) * 0.25), fish * 1.6, fish)}>
+            <View style={{ flex: 1, flexDirection: i % 2 ? 'row-reverse' : 'row', alignItems: 'center' }}>
+              <View style={{ flex: 1, height: '100%', backgroundColor: color, borderRadius: fish, borderWidth: 1.5, borderColor: OUTLINE }} />
+              <View style={{ width: fish * 0.5, height: fish * 0.7, backgroundColor: color, borderRadius: 4, borderWidth: 1.5, borderColor: OUTLINE }} />
+            </View>
+          </Bob>
+        ))}
+        {on
+          ? [0.3, 0.55, 0.78].map((x, i) => (
+              <Bob key={x} seed={`air-${i}`} rise={tank.height * 0.6} active style={at(w * x, tank.height * 0.7, fish * 0.45, fish * 0.45)}>
+                <View style={[styles.bubble, { flex: 1, borderRadius: h }]} />
+              </Bob>
+            ))
+          : null}
+      </View>
+    </>
+  );
+}
+
+/** A standing fan; switched on, the blades whirl. */
+function Fan({ w, h, on }: Drawn) {
+  const head = w * 0.96;
+  return (
+    <>
+      <View style={[styles.fanPole, at(w * 0.46, head * 0.8, w * 0.08, h - head * 0.8 - h * 0.05)]} />
+      <View style={[styles.fanBase, at(w * 0.12, h * 0.94, w * 0.76, h * 0.06)]} />
+      <View style={[styles.fanCage, at(w * 0.02, 0, head, head), { borderRadius: head }]}>
+        <Spin active={on} style={styles.fanBlades}>
+          {[0, 60, 120].map((d) => (
+            <View key={d} style={[at(head * 0.5 - head * 0.1, head * 0.08, head * 0.2, head * 0.8), styles.blade, { transform: [{ rotate: `${d}deg` }] }]} />
+          ))}
+        </Spin>
+        <View style={[styles.fanHub, at(head * 0.44, head * 0.44, head * 0.12, head * 0.12), { borderRadius: head }]} />
+      </View>
+    </>
+  );
+}
+
 const styles = StyleSheet.create({
   flame: { flex: 1, transform: [{ rotate: '-8deg' }] },
   glow: { borderRadius: 999, backgroundColor: 'rgba(255, 183, 77, 0.35)' },
@@ -288,5 +389,28 @@ const styles = StyleSheet.create({
   seatUp: { backgroundColor: '#E0E0E0', borderWidth: 3, borderColor: OUTLINE },
   leg: { backgroundColor: TRIM, borderWidth: 2, borderColor: OUTLINE },
   board: { backgroundColor: '#2E5E4E', borderWidth: 6, borderColor: TRIM, borderRadius: 4, overflow: 'hidden' },
+  microBody: { backgroundColor: '#ECEFF1', borderWidth: 3, borderColor: OUTLINE, borderRadius: 8 },
+  microWindow: { backgroundColor: '#37474F', borderWidth: 3, borderColor: OUTLINE, borderRadius: 4, overflow: 'hidden' },
+  microLit: { backgroundColor: '#FFF59D' },
+  snack: { flex: 1, backgroundColor: '#FFFFFF', borderWidth: 2, borderColor: OUTLINE, alignItems: 'center', justifyContent: 'flex-start' },
+  snackDot: { width: '28%', height: '28%', marginTop: '8%', borderRadius: 99, backgroundColor: '#EF5350' },
+  microButton: { backgroundColor: '#90A4AE', borderWidth: 2, borderColor: OUTLINE, borderRadius: 3 },
+  dishBody: { backgroundColor: '#CFD8DC', borderWidth: 3, borderColor: OUTLINE, borderRadius: 6 },
+  dishHandle: { backgroundColor: '#78909C', borderWidth: 2, borderColor: OUTLINE, borderRadius: 4 },
+  dishWindow: { backgroundColor: '#455A64', borderWidth: 3, borderColor: OUTLINE, borderRadius: 6, overflow: 'hidden' },
+  dishWet: { backgroundColor: '#4FC3F7' },
+  dishLight: { backgroundColor: '#90A4AE', borderRadius: 3, borderWidth: 1.5, borderColor: OUTLINE },
+  dishLightOn: { backgroundColor: '#66BB6A' },
+  tankStand: { backgroundColor: TRIM, borderWidth: 3, borderColor: OUTLINE, borderRadius: 4 },
+  tank: { backgroundColor: 'rgba(129, 212, 250, 0.55)', borderWidth: 4, borderColor: OUTLINE, borderRadius: 8, overflow: 'hidden' },
+  tankLit: { backgroundColor: 'rgba(79, 195, 247, 0.85)' },
+  sand: { backgroundColor: '#FFE082' },
+  weed: { backgroundColor: '#43A047', borderRadius: 6 },
+  fanPole: { backgroundColor: '#B0BEC5', borderWidth: 2, borderColor: OUTLINE },
+  fanBase: { backgroundColor: '#78909C', borderWidth: 2, borderColor: OUTLINE, borderRadius: 6 },
+  fanCage: { backgroundColor: 'rgba(255,255,255,0.35)', borderWidth: 3, borderColor: OUTLINE, overflow: 'hidden' },
+  fanBlades: { position: 'absolute', left: 0, top: 0, right: 0, bottom: 0 },
+  blade: { backgroundColor: '#42A5F5', borderRadius: 99, borderWidth: 1.5, borderColor: OUTLINE },
+  fanHub: { backgroundColor: '#FFCA28', borderWidth: 2, borderColor: OUTLINE },
   tray: { backgroundColor: TRIM, borderWidth: 2, borderColor: OUTLINE, borderRadius: 3 },
 });

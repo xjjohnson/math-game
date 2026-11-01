@@ -10,6 +10,7 @@ interface Props {
 
 const WOOD = '#B07A4F';
 const DARK = '#5B3A24';
+const BOOK_COLORS = ['#EF5350', '#42A5F5', '#FFCA28', '#66BB6A', '#AB47BC', '#FF7043', '#26C6DA', '#EC407A'];
 
 /** Furniture with no good emoji, drawn in the home's flat style. */
 export function Furniture({ shape, width, height }: Props) {
@@ -69,6 +70,55 @@ export function Furniture({ shape, width, height }: Props) {
           <View style={[styles.dent, { borderRadius: width * 0.3 }]} />
         </View>
       ) : null}
+      {shape === 'armchair' ? (
+        <>
+          <View style={[styles.slab, edge, styles.chairBack, { top: 0, height: height * 0.8 }]} />
+          <View style={[styles.arm, edge, { left: 0, top: height * 0.38, width: width * 0.2, height: height * 0.48 }]} />
+          <View style={[styles.arm, edge, { right: 0, top: height * 0.38, width: width * 0.2, height: height * 0.48 }]} />
+          <View style={[styles.slab, edge, styles.chairBack, { left: width * 0.16, right: width * 0.16, top: height * 0.5, height: height * 0.36 }]} />
+          <View style={[styles.legPeg, edge, { left: width * 0.08, bottom: 0, height: height * 0.16 }]} />
+          <View style={[styles.legPeg, edge, { right: width * 0.08, bottom: 0, height: height * 0.16 }]} />
+        </>
+      ) : null}
+      {shape === 'ottoman' ? (
+        <>
+          <View style={[styles.slab, edge, styles.chairBack, { top: 0, height: height * 0.82, borderRadius: 14 }]} />
+          <View style={[styles.legPeg, edge, { left: width * 0.1, bottom: 0, height: height * 0.22 }]} />
+          <View style={[styles.legPeg, edge, { right: width * 0.1, bottom: 0, height: height * 0.22 }]} />
+        </>
+      ) : null}
+      {shape === 'sideTable' ? (
+        <>
+          {legs(height * 0.1, width * 0.12)}
+          <View style={[styles.slab, edge, { top: 0, height: height * 0.14 }]} />
+          <View style={[styles.slab, edge, { left: width * 0.14, right: width * 0.14, top: height * 0.62, height: height * 0.08 }]} />
+        </>
+      ) : null}
+      {shape === 'desk' ? (
+        <>
+          <View style={[styles.slab, edge, { top: 0, height: height * 0.16 }]} />
+          <View style={[styles.leg, edge, { top: height * 0.12, bottom: 0, left: width * 0.05, width: leg }]} />
+          <View style={[styles.slab, edge, styles.box, { top: height * 0.12, bottom: 0, left: width * 0.62, right: width * 0.04, borderRadius: 4 }]}>
+            <View style={[styles.drawer, { borderWidth: line }]}>
+              <View style={styles.knob} />
+            </View>
+            <View style={[styles.drawer, { borderWidth: line }]}>
+              <View style={styles.knob} />
+            </View>
+          </View>
+        </>
+      ) : null}
+      {shape === 'bookshelf' ? (
+        <View style={[styles.slab, edge, styles.shelfBox, { top: 0, bottom: 0 }]}>
+          {[0, 1, 2].map((row) => (
+            <View key={row} style={[styles.shelfRow, { borderBottomWidth: line }]}>
+              {BOOK_COLORS.slice(row * 2, row * 2 + 4).map((color, i) => (
+                <View key={i} style={[styles.book, { backgroundColor: color, height: `${62 + ((i + row) % 3) * 12}%` }]} />
+              ))}
+            </View>
+          ))}
+        </View>
+      ) : null}
     </View>
   );
 }
@@ -86,6 +136,12 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   knob: { width: 8, height: 8, borderRadius: 4, backgroundColor: '#F2C14E', borderWidth: 1, borderColor: DARK },
+  chairBack: { backgroundColor: '#8E6BBF' },
+  arm: { position: 'absolute', backgroundColor: '#7B58AE', borderRadius: 10 },
+  legPeg: { position: 'absolute', width: 8, backgroundColor: WOOD, borderRadius: 3 },
+  shelfBox: { padding: '6%', justifyContent: 'space-between' },
+  shelfRow: { flex: 1, flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'center', gap: 3, borderColor: DARK },
+  book: { width: '16%', borderRadius: 2, borderWidth: 1, borderColor: DARK },
   cushion: { backgroundColor: '#E57373', borderRadius: 999 },
   bag: { position: 'absolute', left: 0, right: 0, top: 0, bottom: 0, backgroundColor: '#7E57C2' },
   dent: {
