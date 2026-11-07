@@ -94,7 +94,7 @@ export function roundRewards(
 export function dailyChallengeConfig(today: string, level: Level): GameConfig {
   const seed = dateSeed(today);
   return {
-    mode: { kind: 'operation', operation: pick(createRng(seed), GRADES[level.grade].taught) },
+    mode: { kind: 'operation', operation: pick(createRng(seed), GRADES[level.grade].daily ?? GRADES[level.grade].taught) },
     difficulty: level.difficulty,
     grade: level.grade,
     timer: 30,
