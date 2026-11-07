@@ -2,7 +2,7 @@ import { isGrade } from '@/constants/grades';
 import type { Difficulty, Grade, Operation } from '@/types';
 
 /** Bump when messages change shape, so phones on different builds say so instead of misbehaving. */
-export const PROTOCOL_VERSION = 5;
+export const PROTOCOL_VERSION = 6;
 
 /**
  * The oldest version that can still play matches with this one. v5 only added
@@ -18,9 +18,14 @@ export const TOWN_VERSION = 5;
 export type TownPlace = 'street' | 'shop' | 'bakery' | 'library' | 'park';
 export const TOWN_PLACES: readonly TownPlace[] = ['street', 'shop', 'bakery', 'library', 'park'];
 
-/** One visitor and where they are right now. */
+/** The first version that lets everyone drag the people around a shared scene. */
+export const SCENE_VERSION = 6;
+
+/** One visitor and where they are right now. x and y (0 to 1 across the scene) are where they were put, if anyone has moved them. */
 export interface TownPerson extends PlayerInfo {
   place: TownPlace;
+  x?: number;
+  y?: number;
 }
 
 /** The host phone plus up to 7 friends. */
@@ -72,7 +77,9 @@ export type GameMessage =
   /** Community (v5): the host tells everyone who is where. Only people in the community are listed. */
   | { type: 'town'; people: TownPerson[] }
   /** Community (v5): a wave. Guests send it to the host, who passes it on with the sender's id. */
-  | { type: 'hi'; playerId?: string };
+  | { type: 'hi'; playerId?: string }
+  /** Scene (v6): anyone drags anyone; the host keeps the spot and passes it on. x and y run 0 to 1. */
+  | { type: 'move'; id: string; x: number; y: number };
 
 export function encodeMessage(message: GameMessage): string {
   return JSON.stringify(message);
@@ -96,6 +103,7 @@ function parsePlayers(v: unknown): PlayerInfo[] | null {
   return players;
 }
 
+const isUnit = (v: unknown): v is number => typeof v === 'number' && v >= 0 && v <= 1;
 const isPlace = (v: unknown): v is TownPlace => TOWN_PLACES.includes(v as TownPlace);
 
 /** Parses a message from another phone, or returns null if it isn't one we understand. */
@@ -164,8 +172,17 @@ export function parseMessage(text: string): GameMessage | null {
       if (!players) return null;
       const places = (m.people as Record<string, unknown>[]).map((p) => p.place);
       if (!places.every(isPlace)) return null;
-      return { type: 'town', people: players.map((p, i) => ({ ...p, place: places[i] as TownPlace })) };
+      const raw = m.people as Record<string, unknown>[];
+      return {
+        type: 'town',
+        people: players.map((p, i) => {
+          const { x, y } = raw[i];
+          return { ...p, place: places[i] as TownPlace, ...(isUnit(x) && isUnit(y) ? { x, y } : {}) };
+        }),
+      };
     }
+    case 'move':
+      return isId(m.id) && isUnit(m.x) && isUnit(m.y) ? { type: 'move', id: m.id, x: m.x, y: m.y } : null;
     case 'hi':
       return { type: 'hi', ...(isId(m.playerId) ? { playerId: m.playerId } : {}) };
     default:

@@ -184,7 +184,7 @@ Phases 1-6 deliver a complete single-player game before any native Bluetooth wor
 - [ ] LAN WebSocket fallback if WebRTC pairing is flaky (only if needed)
 - [ ] Keep MockTransport for solo testing of multiplayer logic
 - [ ] More co-op modes: Monster Battle and Relay on several phones, Team Up on one phone (protocol v3)
-- [x] Community visits over Nearby: see friends on the street and inside the same building, wave hello (protocol v5)
+- [x] Community visits over Nearby: shared scene per place (street, shop, bakery, library, park) where everyone appears and anyone can drag anyone, live; wave hello (protocol v6, v5 phones still see presence)
 
 ### Profiles
 - [ ] Multiple kid profiles on one device, each with its own coins and progress (Phase 1 store design)

@@ -1,5 +1,6 @@
 import { createMockNetwork } from '@/services/mockTransport';
 import { TownSession } from '@/services/townSession';
+import { clampSpot, defaultSpot, spotFor } from '@/utils/multiplayer/scene';
 import { encodeMessage, type GameMessage, HOST_ID, MIN_GAME_VERSION, parseMessage, PROTOCOL_VERSION } from '@/utils/multiplayer/protocol';
 
 const tick = () => new Promise((r) => setTimeout(r, 0));
@@ -105,5 +106,48 @@ describe('protocol v5 messages', () => {
     expect(parseMessage(JSON.stringify({ type: 'visit', place: 'moon' }))).toBeNull();
     expect(parseMessage(JSON.stringify({ type: 'town', people: [{ id: 'x', name: 'A', avatar: 'a', place: 'moon' }] }))).toBeNull();
     expect(parseMessage(encodeMessage({ type: 'hi', playerId: 'x' }))).toEqual({ type: 'hi', playerId: 'x' });
+  });
+});
+
+describe('shared scene', () => {
+  it('lets anyone drag anyone and every phone sees it', async () => {
+    const { sessions } = setup(3);
+    const [host, a, b] = sessions;
+    await joinAll(sessions, ['H', 'A', 'B']);
+    host.setPlace('bakery');
+    a.setPlace('bakery');
+    b.setPlace('bakery');
+    await tick();
+    const bId = b.getState().myId;
+    a.moveTo(bId, 0.25, 0.5); // A drags B
+    await tick();
+    for (const s of sessions) expect(s.getState().spots[bId]).toEqual({ x: 0.25, y: 0.5 });
+    host.moveTo(a.getState().myId, 0.9, 0.2);
+    await tick();
+    expect(b.getState().spots[a.getState().myId]).toEqual({ x: 0.9, y: 0.2 });
+  });
+
+  it('gives late arrivals the current spots and resets a spot when someone changes place', async () => {
+    const { sessions } = setup(2);
+    const [host, guest] = sessions;
+    await joinAll(sessions, ['H', 'G']);
+    host.setPlace('park');
+    guest.setPlace('park');
+    host.moveTo(HOST_ID, 0.3, 0.4);
+    await tick();
+    guest.setPlace('shop');
+    guest.setPlace('park');
+    await tick();
+    expect(guest.getState().spots[HOST_ID]).toEqual({ x: 0.3, y: 0.4 });
+    host.setPlace('bakery');
+    await tick();
+    expect(host.getState().spots[HOST_ID]).toBeUndefined();
+  });
+
+  it('keeps tokens inside the scene and parses move messages', () => {
+    expect(clampSpot(-1, 2)).toEqual({ x: 0.08, y: 0.92 });
+    expect(spotFor(undefined, 0, 2)).toEqual(defaultSpot(0, 2));
+    expect(parseMessage(encodeMessage({ type: 'move', id: 'x', x: 0.5, y: 1 }))).toEqual({ type: 'move', id: 'x', x: 0.5, y: 1 });
+    expect(parseMessage(JSON.stringify({ type: 'move', id: 'x', x: 3, y: 0 }))).toBeNull();
   });
 });

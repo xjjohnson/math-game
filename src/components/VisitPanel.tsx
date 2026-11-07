@@ -31,9 +31,9 @@ export function VisitPanel() {
       {notice ? <Text style={styles.notice}>{notice}</Text> : null}
       {status === 'off' ? (
         <>
-          <Text style={styles.text}>👫 Visit with friends nearby and see each other in the community.</Text>
-          <BigButton label="📣 Host a visit" color={colors.primary} onPress={() => go(true)} />
-          <BigButton label="🔍 Join a visit" color={colors.accent} onPress={() => go(false)} />
+          <Text style={styles.text}>👫 Visit with friends nearby: one phone taps Host, the others tap Join. Then move around the community together!</Text>
+          <BigButton label="📣 Host" color={colors.primary} onPress={() => go(true)} />
+          <BigButton label="🔍 Join" color={colors.accent} onPress={() => go(false)} />
         </>
       ) : null}
       {status === 'finding' ? (
@@ -54,7 +54,7 @@ export function VisitPanel() {
       ) : null}
       {status === 'hosting' || status === 'joined' ? (
         <Text style={styles.text}>
-          {status === 'hosting' ? 'Hosting a visit. Friends tap “Join a visit”. ' : 'Visiting. '}
+          {status === 'hosting' ? 'Hosting a visit. Friends tap “Join”. ' : 'Visiting. '}
           {people.length > 1 ? `${people.length} of you are out here.` : ''}
         </Text>
       ) : null}
