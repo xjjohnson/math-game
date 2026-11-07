@@ -53,7 +53,7 @@ export function seasonOf(month: number): Season | null {
 }
 
 /** Shelves of the "Add things" shop. */
-export type RoomItemGroup = 'furniture' | 'living' | 'kitchen' | 'bedroom' | 'bathroom' | 'appliances' | 'toys' | Season;
+export type RoomItemGroup = 'furniture' | 'living' | 'kitchen' | 'bedroom' | 'bathroom' | 'appliances' | 'toys' | 'stitch' | 'bluey' | Season;
 
 export const ROOM_ITEM_GROUPS: { id: RoomItemGroup; name: string }[] = [
   { id: 'thanksgiving', name: '🦃 Thanksgiving' },
@@ -65,6 +65,8 @@ export const ROOM_ITEM_GROUPS: { id: RoomItemGroup; name: string }[] = [
   { id: 'bathroom', name: '🧼 Bathroom' },
   { id: 'appliances', name: '🔌 Appliances' },
   { id: 'toys', name: '⚽ Toys' },
+  { id: 'stitch', name: '👽 Stitch' },
+  { id: 'bluey', name: '🐶 Bluey' },
 ];
 
 /** Furniture drawn with shapes, for the pieces with no good emoji. */
@@ -74,6 +76,7 @@ export type FurnitureShape = 'table' | 'coffeeTable' | 'nightstand' | 'stool' | 
 export interface RoomItem {
   id: string;
   name: string;
+  /** An emoji, or an "@key" drawing from constants/art. */
   emoji: string;
   price: number;
   /** Drawn height in the room, as a share of the room's size unit. */
@@ -254,6 +257,20 @@ export const ROOM_ITEMS: RoomItem[] = [
   { id: 'unicorn', name: 'Unicorn', emoji: '🦄', price: 25, size: 0.15, group: 'toys', fx: '🌈', says: 'rides the unicorn' },
   { id: 'dice', name: 'Dice', emoji: '🎲', price: 10, size: 0.08, group: 'toys', fx: '🎲', says: 'rolls a six' },
   { id: 'skateboard', name: 'Skateboard', emoji: '🛹', price: 25, size: 0.12, group: 'toys', fx: '💨', says: 'does a trick' },
+  // Stitch, drawn as our own fan-style pictures
+  { id: 'stitchPlush', name: 'Stitch plush', emoji: '@stitch', price: 40, size: 0.16, group: 'stitch', fx: '💙', says: 'hugs Stitch. Ohana!' },
+  { id: 'stitchUkulele', name: 'Ukulele', emoji: '@stitch-ukulele', price: 30, size: 0.18, group: 'stitch', fx: '🎶', says: 'strums the ukulele' },
+  { id: 'stitchShip', name: 'Spaceship', emoji: '@stitch-ship', price: 40, size: 0.16, group: 'stitch', fx: '🚀', says: 'zooms off in the spaceship' },
+  { id: 'stitchSurf', name: 'Surfboard', emoji: '@stitch-surfboard', price: 30, size: 0.22, group: 'stitch', fx: '🌊', says: 'rides a wave' },
+  { id: 'hibiscus', name: 'Hibiscus flower', emoji: '@hibiscus', price: 15, size: 0.1, group: 'stitch' },
+  { id: 'stitchTiki', name: 'Hawaiian lei', emoji: '🌺', price: 20, size: 0.1, group: 'stitch', fx: '🌺', says: 'says Aloha!' },
+  // Bluey
+  { id: 'blueyPlush', name: 'Bluey plush', emoji: '@bluey', price: 40, size: 0.16, group: 'bluey', fx: '💙', says: 'plays a game with Bluey' },
+  { id: 'bingoPlush', name: 'Bingo plush', emoji: '@bingo', price: 40, size: 0.16, group: 'bluey', fx: '🧡', says: 'plays with Bingo' },
+  { id: 'keepyUppy', name: 'Keepy uppy balloon', emoji: '@keepy-uppy', price: 20, size: 0.18, group: 'bluey', fx: '🎈', says: 'plays keepy uppy' },
+  { id: 'xylophone', name: 'Magic xylophone', emoji: '@magic-xylophone', price: 30, size: 0.13, group: 'bluey', fx: '🎶', says: 'plays the magic xylophone' },
+  { id: 'heelerSign', name: 'Heeler home sign', emoji: '@heeler-sign', price: 25, size: 0.2, group: 'bluey' },
+  { id: 'pawprint', name: 'Paw print', emoji: '@pawprint', price: 10, size: 0.1, group: 'bluey' },
   // Halloween, sold in October only
   { id: 'pumpkin', name: 'Jack-o’-lantern', emoji: '🎃', price: 15, size: 0.14, group: 'halloween', month: OCTOBER, light: true },
   { id: 'ghost', name: 'Friendly ghost', emoji: '👻', price: 20, size: 0.16, group: 'halloween', month: OCTOBER, fx: '💬', says: 'hears the ghost say Boo!' },

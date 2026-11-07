@@ -75,6 +75,7 @@ export function FlashCard({ problem, reveal = false, column, cardStyle, onSpeak 
       accessible
       accessibilityLabel={spokenProblem(problem)}
     >
+      {look.corners ? <Corners pair={look.corners} /> : null}
       {problem.story ? (
         <>
           <Text style={[styles.story, ink]}>{problem.story}</Text>
@@ -124,7 +125,20 @@ export function FlashCard({ problem, reveal = false, column, cardStyle, onSpeak 
   );
 }
 
+/** Two little pictures drawn in three of the card's corners (the top right is the speaker's). */
+function Corners({ pair }: { pair: [string, string] }) {
+  const [first, second] = pair;
+  return (
+    <>
+      <Text style={[styles.corner, { top: 4, left: 8 }]}>{first}</Text>
+      <Text style={[styles.corner, { bottom: 4, left: 8 }]}>{second}</Text>
+      <Text style={[styles.corner, { bottom: 4, right: 8 }]}>{first}</Text>
+    </>
+  );
+}
+
 const styles = StyleSheet.create({
+  corner: { position: 'absolute', fontSize: 22 },
   card: {
     borderWidth: 6,
     borderRadius: radius.lg,
