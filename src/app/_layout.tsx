@@ -37,6 +37,7 @@ export default function RootLayout() {
         <Stack.Screen name="shop" options={{ title: 'Shop' }} />
         <Stack.Screen name="buddy" options={{ title: 'My buddy' }} />
         <Stack.Screen name="town" options={{ title: 'Community' }} />
+        <Stack.Screen name="place" options={{ title: "Community" }} />
         <Stack.Screen name="shift" options={{ title: 'Job' }} />
         <Stack.Screen name="settings" options={{ title: 'Settings' }} />
         <Stack.Screen name="parent" options={{ title: 'Parent area' }} />

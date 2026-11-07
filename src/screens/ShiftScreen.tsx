@@ -5,7 +5,6 @@ import { StyleSheet } from 'react-native';
 import { Text } from '@/components/AppText';
 import { BigButton } from '@/components/BigButton';
 import { ChoiceButtons } from '@/components/ChoiceButtons';
-import { TownScene } from '@/components/TownScene';
 import { Screen } from '@/components/Screen';
 import { colors, fontSizes, spacing } from '@/constants/theme';
 import { usePlace } from '@/hooks/usePlace';
@@ -38,13 +37,12 @@ export function ShiftScreen() {
     const pay = paid ?? shiftPay(profile, building.id, correct);
     return (
       <Screen title={`${building.emoji} ${building.name}`}>
-        <TownScene place={building.id} height={170} />
-      <Text style={styles.big}>Shift over!</Text>
+        <Text style={styles.big}>Shift over!</Text>
         <Text style={styles.text}>You got {correct} out of {SHIFT_QUESTIONS}.</Text>
         <Text style={styles.big}>
           {alreadyDone ? 'Today’s pay was already given. Come back tomorrow!' : pay.hearts > 0 ? `❤️ +${pay.hearts} for your buddy` : `🪙 +${pay.coins}`}
         </Text>
-        <BigButton label="Back to the community" onPress={() => router.replace('/town')} />
+        <BigButton label="Back to the community" onPress={() => router.back()} />
       </Screen>
     );
   }
@@ -53,7 +51,6 @@ export function ShiftScreen() {
   const answered = selected !== null;
   return (
     <Screen title={`${building.emoji} ${building.name}`}>
-      <TownScene place={building.id} height={170} />
       {alreadyDone && index === 0 ? (
         <Text style={styles.text}>You already worked here today, so this is just practice (no pay).</Text>
       ) : null}
