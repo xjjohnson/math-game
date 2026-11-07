@@ -18,7 +18,10 @@ function Box({ w, h, x, y, children, style }: { w: number; h: number; x: number;
 
 interface Props {
   place: TownPlace;
+  /** The whole room, which scrolls. */
   width: number;
+  /** One screen's width: furniture is sized by this and placed in the middle of the room. */
+  viewWidth: number;
   height: number;
   /** Tap a building's door on the street. */
   onDoor: (id: BuildingId) => void;
@@ -30,7 +33,9 @@ interface Props {
  * The drawn side-view backdrop for one place, in the buddy home's flat style:
  * wall, floor, and a few built-in things. People are drawn on top by the room.
  */
-export function Interior({ place, width: w, height: h, onDoor, onExit }: Props) {
+export function Interior({ place, width: roomW, viewWidth, height: h, onDoor, onExit }: Props) {
+  const w = place === 'street' ? roomW : viewWidth;
+  const offset = place === 'street' ? 0 : (roomW - viewWidth) / 2;
   const floorY = h * FLOOR;
   const tones: Record<TownPlace, { wall: string; floor: string }> = {
     street: { wall: '#9BD4F5', floor: '#B0BEC5' },
@@ -48,11 +53,21 @@ export function Interior({ place, width: w, height: h, onDoor, onExit }: Props) 
         <View style={{ position: 'absolute', left: 0, right: 0, top: floorY - 8, height: 10, backgroundColor: '#A86B45' }} />
       ) : null}
 
-      {place === 'street' ? <Street w={w} h={h} floorY={floorY} onDoor={onDoor} /> : null}
-      {place === 'bakery' ? <Bakery w={w} h={h} floorY={floorY} /> : null}
-      {place === 'shop' ? <Shop w={w} h={h} floorY={floorY} /> : null}
-      {place === 'library' ? <Library w={w} h={h} floorY={floorY} /> : null}
-      {place === 'park' ? <Park w={w} h={h} floorY={floorY} /> : null}
+      {place === 'street' ? <Street w={w} h={h} floorY={floorY} screenW={viewWidth} onDoor={onDoor} /> : null}
+      {place !== 'street' ? (
+        <View style={{ position: 'absolute', left: offset, top: 0, width: viewWidth, height: h }} pointerEvents="box-none">
+          {place === 'bakery' ? <Bakery w={w} h={h} floorY={floorY} /> : null}
+          {place === 'shop' ? <Shop w={w} h={h} floorY={floorY} /> : null}
+          {place === 'library' ? <Library w={w} h={h} floorY={floorY} /> : null}
+          {place === 'park' ? <Park w={w} h={h} floorY={floorY} /> : null}
+        </View>
+      ) : null}
+      {place !== 'street' ? (
+        <>
+          <Text style={[styles.plant, { left: offset * 0.4, top: floorY - 56 }]}>🪴</Text>
+          <Text style={[styles.plant, { right: offset * 0.4, top: floorY - 56 }]}>🪴</Text>
+        </>
+      ) : null}
 
       {place !== 'street' ? (
         <Pressable
@@ -74,17 +89,21 @@ interface Part {
   floorY: number;
 }
 
-function Street({ w, h, floorY, onDoor }: Part & { onDoor: (id: BuildingId) => void }) {
-  const gap = w / BUILDINGS.length;
+function Street({ w, h, floorY, screenW, onDoor }: Part & { screenW: number; onDoor: (id: BuildingId) => void }) {
+  const gap = w / (BUILDINGS.length + 0.5);
   return (
     <>
-      <Box w={w} h={h} x={0.05} y={0.06}><Text style={styles.sun}>☀️</Text></Box>
-      <Box w={w} h={h} x={0.62} y={0.05}><Text style={styles.cloud}>☁️</Text></Box>
+      {[0.04, 0.3, 0.55, 0.8].map((x, i) => (
+        <Box key={x} w={w} h={h} x={x} y={0.06 + (i % 2) * 0.05}><Text style={i === 0 ? styles.sun : styles.cloud}>{i === 0 ? '☀️' : '☁️'}</Text></Box>
+      ))}
+      {Array.from({ length: BUILDINGS.length + 1 }, (_, i) => (
+        <Text key={i} style={[styles.tree, { left: i * gap + gap * 0.02, top: floorY - h * 0.1 }]}>{i % 2 ? '🌳' : '🌷'}</Text>
+      ))}
       {BUILDINGS.map((b, i) => {
-        const bw = gap * 0.82;
+        const bw = Math.min(gap * 0.7, screenW * 0.5);
         const bh = h * 0.42;
         return (
-          <View key={b.id} style={{ position: 'absolute', left: i * gap + gap * 0.09, top: floorY - bh, width: bw, height: bh }}>
+          <View key={b.id} style={{ position: 'absolute', left: (i + 0.5) * gap + gap * 0.15, top: floorY - bh, width: bw, height: bh }}>
             <View style={[edge, { flex: 1, backgroundColor: b.color, borderRadius: 8, alignItems: 'center' }]}>
               <View style={[styles.awning, { backgroundColor: '#fff' }]} />
               <Text style={styles.streetEmoji}>{b.emoji}</Text>
@@ -211,6 +230,8 @@ function Park({ w, h, floorY }: Part) {
 
 const styles = StyleSheet.create({
   sun: { fontSize: 44 },
+  plant: { position: 'absolute', fontSize: 44 },
+  tree: { position: 'absolute', fontSize: 40 },
   cloud: { fontSize: 44, opacity: 0.9 },
   exit: { position: 'absolute', backgroundColor: '#C68B5E', borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
   exitText: { fontSize: 15, fontWeight: '800', color: '#fff', textAlign: 'center' },

@@ -50,7 +50,16 @@ export interface PlayerInfo {
   id: string;
   name: string;
   avatar: string;
+  /** Community: buddies (emoji or "@key" drawings) walking with this player, up to MAX_BUDDIES. */
+  buddies?: string[];
+  /** Community: an accessory (emoji) this player is wearing, if any. */
+  acc?: string;
 }
+
+export const MAX_BUDDIES = 3;
+
+/** Starts the name a phone advertises when it hosts a community visit, so games and visits don't mix in the finder. */
+export const TOWN_MARK = '🏘️';
 
 /**
  * The only things phones say to each other. Kept tiny on purpose. Guests only
@@ -58,7 +67,7 @@ export interface PlayerInfo {
  */
 export type GameMessage =
   /** A guest introduces itself to the host. */
-  | { type: 'hello'; version: number; name: string; avatar: string }
+  | { type: 'hello'; version: number; name: string; avatar: string; buddies?: string[]; acc?: string }
   /** The host tells one guest its player id. */
   | { type: 'welcome'; version: number; you: string }
   /** The host's list of who is in the game, host first. */
@@ -78,6 +87,8 @@ export type GameMessage =
   | { type: 'town'; people: TownPerson[] }
   /** Community (v5): a wave. Guests send it to the host, who passes it on with the sender's id. */
   | { type: 'hi'; playerId?: string }
+  /** Community: a guest changed its buddies or accessory. */
+  | { type: 'look'; buddies: string[]; acc?: string }
   /** Scene (v6): anyone drags anyone; the host keeps the spot and passes it on. x and y run 0 to 1. */
   | { type: 'move'; id: string; x: number; y: number };
 
@@ -92,13 +103,25 @@ const DIFFICULTIES: readonly string[] = ['easy', 'medium', 'hard'];
 const isInt = (v: unknown): v is number => typeof v === 'number' && Number.isInteger(v);
 const isId = (v: unknown): v is string => typeof v === 'string' && v.length > 0 && v.length <= 64;
 
+const parseBuddies = (v: unknown): string[] =>
+  Array.isArray(v) ? v.filter((b): b is string => typeof b === 'string' && b.length > 0).map((b) => b.slice(0, 16)).slice(0, MAX_BUDDIES) : [];
+const parseAcc = (v: unknown): string | undefined => (typeof v === 'string' && v.length > 0 ? v.slice(0, 8) : undefined);
+
 function parsePlayers(v: unknown): PlayerInfo[] | null {
   if (!Array.isArray(v) || v.length === 0 || v.length > MAX_PLAYERS) return null;
   const players: PlayerInfo[] = [];
   for (const p of v as Record<string, unknown>[]) {
     if (typeof p !== 'object' || p === null || !isId(p.id)) return null;
     if (typeof p.name !== 'string' || typeof p.avatar !== 'string') return null;
-    players.push({ id: p.id, name: p.name.slice(0, 40), avatar: p.avatar.slice(0, 8) });
+    const buddies = parseBuddies(p.buddies);
+    const acc = parseAcc(p.acc);
+    players.push({
+      id: p.id,
+      name: p.name.slice(0, 40),
+      avatar: p.avatar.slice(0, 8),
+      ...(buddies.length ? { buddies } : {}),
+      ...(acc ? { acc } : {}),
+    });
   }
   return players;
 }
@@ -119,7 +142,14 @@ export function parseMessage(text: string): GameMessage | null {
   switch (m.type) {
     case 'hello':
       return isInt(m.version) && typeof m.name === 'string' && typeof m.avatar === 'string'
-        ? { type: 'hello', version: m.version, name: m.name.slice(0, 40), avatar: m.avatar.slice(0, 8) }
+        ? {
+            type: 'hello',
+            version: m.version,
+            name: m.name.slice(0, 40),
+            avatar: m.avatar.slice(0, 8),
+            ...(parseBuddies(m.buddies).length ? { buddies: parseBuddies(m.buddies) } : {}),
+            ...(parseAcc(m.acc) ? { acc: parseAcc(m.acc) } : {}),
+          }
         : null;
     case 'welcome':
       return isInt(m.version) && isId(m.you) ? { type: 'welcome', version: m.version, you: m.you } : null;
@@ -181,6 +211,8 @@ export function parseMessage(text: string): GameMessage | null {
         }),
       };
     }
+    case 'look':
+      return { type: 'look', buddies: parseBuddies(m.buddies), ...(parseAcc(m.acc) ? { acc: parseAcc(m.acc) } : {}) };
     case 'move':
       return isId(m.id) && isUnit(m.x) && isUnit(m.y) ? { type: 'move', id: m.id, x: m.x, y: m.y } : null;
     case 'hi':

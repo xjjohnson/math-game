@@ -33,6 +33,22 @@ export interface TownQuestion {
   prompt: string;
   answer: number;
   choices: number[];
+  /** Money jobs: the player hands back change with coins and bills instead of picking an answer. */
+  change?: { price: number; paid: number };
+}
+
+/** The coins and bills offered for giving change, bigger ones for older kids. */
+export function changeCoins(grade: Grade): number[] {
+  if (grade <= 1) return [1, 2, 5, 10];
+  if (grade <= 3) return [1, 5, 10, 20, 50];
+  return [1, 5, 10, 20, 50, 100];
+}
+
+/** Adds up what was handed back. */
+export const handedBack = (hand: number[]): number => hand.reduce((a, b) => a + b, 0);
+
+function changeQuestion(prompt: string, price: number, paid: number): TownQuestion {
+  return { prompt, answer: paid - price, choices: [], change: { price, paid } };
 }
 
 /** The biggest numbers used at a grade: kindergarten stays within 10, then it grows. */
@@ -66,7 +82,15 @@ export function shiftQuestions(building: BuildingId, grade: Grade, rng: Rng): To
         const [e2, n2] = pick(rng, SHOP_ITEMS);
         const a = randInt(rng, 1, Math.max(1, Math.floor(max / 2)));
         const b = randInt(rng, 1, Math.max(1, Math.floor(max / 2)));
-        out.push(question(`A customer buys a ${e1} ${n1} for ${a} and a ${e2} ${n2} for ${b}. How many coins is that?`, a + b, rng));
+        if (grade === 0) {
+          out.push(question(`A customer buys a ${e1} ${n1} for ${a} and a ${e2} ${n2} for ${b}. How many coins is that?`, a + b, rng));
+        } else {
+          // Grown-ups' shop: add it up, take the money, give the change.
+          const paid = a + b + randInt(rng, 1, Math.max(1, Math.floor(max / 4)));
+          out.push(
+            changeQuestion(`A customer buys a ${e1} ${n1} for ${a} and a ${e2} ${n2} for ${b}. They pay ${paid}. Give them their change.`, a + b, paid),
+          );
+        }
         break;
       }
       case 'bakery': {
@@ -78,7 +102,7 @@ export function shiftQuestions(building: BuildingId, grade: Grade, rng: Rng): To
           out.push(question(`One ${label} costs ${price} and another costs ${second}. How much for both?`, price + second, rng));
         } else {
           const paid = Math.min(max, price + randInt(rng, 1, Math.max(1, Math.floor(max / 2))));
-          out.push(question(`A ${label} costs ${price}. The customer pays ${paid}. How much change?`, paid - price, rng));
+          out.push(changeQuestion(`A ${label} costs ${price}. The customer pays ${paid}. Give them their change.`, price, paid));
         }
         break;
       }

@@ -151,3 +151,47 @@ describe('shared scene', () => {
     expect(parseMessage(JSON.stringify({ type: 'move', id: 'x', x: 3, y: 0 }))).toBeNull();
   });
 });
+
+describe('automatic connecting and what players bring', () => {
+  beforeEach(() => jest.useFakeTimers());
+  afterEach(() => jest.useRealTimers());
+
+  it('joins a visit that is already hosted instead of hosting another', async () => {
+    const { sessions } = setup(2);
+    const [first, second] = sessions;
+    await first.host({ name: 'H', avatar: '🐼' });
+    void second.auto({ name: 'G', avatar: '🦊' });
+    await jest.advanceTimersByTimeAsync(8000);
+    expect(second.getState().status).toBe('joined');
+    expect(first.getState().status).toBe('hosting');
+    second.stop();
+  });
+
+  it('hosts when nobody else is', async () => {
+    const { sessions } = setup(1);
+    void sessions[0].auto({ name: 'Solo', avatar: '🐼' });
+    await jest.advanceTimersByTimeAsync(8000);
+    expect(sessions[0].getState().status).toBe('hosting');
+    sessions[0].stop();
+  });
+
+  it('shows the buddies and accessory a player brings, and updates them live', async () => {
+    jest.useRealTimers();
+    const { sessions } = setup(2);
+    const [host, guest] = sessions;
+    guest.setLook(['🐶', '@bluey'], '🎩');
+    await joinAll(sessions, ['H', 'G']);
+    host.setPlace('park');
+    guest.setPlace('park');
+    await tick();
+    const g = host.getState().people.find((p) => p.name === 'G');
+    expect(g?.buddies).toEqual(['🐶', '@bluey']);
+    expect(g?.acc).toBe('🎩');
+    guest.setLook([], '👑');
+    await tick();
+    const after = host.getState().people.find((p) => p.name === 'G');
+    expect(after?.buddies).toBeUndefined();
+    expect(after?.acc).toBe('👑');
+    expect(guest.getState().people.find((p) => p.name === 'G')?.acc).toBe('👑');
+  });
+});

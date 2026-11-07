@@ -184,7 +184,9 @@ Phases 1-6 deliver a complete single-player game before any native Bluetooth wor
 - [ ] LAN WebSocket fallback if WebRTC pairing is flaky (only if needed)
 - [ ] Keep MockTransport for solo testing of multiplayer logic
 - [ ] More co-op modes: Monster Battle and Relay on several phones, Team Up on one phone (protocol v3)
-- [x] Community: full-screen Toca-style side-view street and building interiors (bakery, shop, library, park); with a Nearby visit everyone stands in the room as their character and anyone can drag anyone, live (protocol v6)
+- [x] Community: full-screen scrolling Toca-style street and building interiors (bakery, shop, library, park); opening it auto-joins a nearby visit or hosts one; everyone in a building stands in the room as their character with their buddies and an accessory, and anyone can drag anyone, live (protocol v6)
+- [x] Shop and Bakery jobs: hand back change with coins and bills (grade 1 up)
+- [ ] Open idea: visit a friend's buddy home
 
 ### Profiles
 - [ ] Multiple kid profiles on one device, each with its own coins and progress (Phase 1 store design)

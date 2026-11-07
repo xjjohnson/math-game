@@ -17,12 +17,13 @@ interface Props {
   place: TownPlace;
   /** Buttons along the bottom edge. */
   actions: ReactNode;
+  needsPermission?: boolean;
 }
 
 export const goInside = (id: BuildingId) => router.push({ pathname: '/place', params: { building: id } });
 
 /** The full-screen community: the room fills the screen, with the coin count, a Visit button and action buttons floating on it. */
-export function CommunityView({ place, actions }: Props) {
+export function CommunityView({ place, actions, needsPermission = false }: Props) {
   const profile = useActiveProfile();
   const { status, people } = useTownState();
   const [open, setOpen] = useState(false);
@@ -39,12 +40,12 @@ export function CommunityView({ place, actions }: Props) {
           accessibilityLabel="Visit with friends"
           style={({ pressed }) => [styles.pill, styles.visit, pressed && { opacity: 0.8 }]}
         >
-          <Text style={styles.visitText}>{status === 'off' ? '👫 Visit' : `👫 ${people.length} here`}</Text>
+          <Text style={styles.visitText}>{status === 'off' ? '👫 Friends' : `👫 ${people.length} here`}</Text>
         </Pressable>
       </View>
       {open ? (
         <View style={styles.panel}>
-          <VisitPanel />
+          <VisitPanel needsPermission={needsPermission} />
           <Pressable onPress={() => setOpen(false)} accessibilityRole="button" style={styles.close}>
             <Text style={styles.visitText}>Close</Text>
           </Pressable>

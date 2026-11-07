@@ -52,6 +52,7 @@ import {
   MAX_PLAYERS,
   MIN_GAME_VERSION,
   PROTOCOL_VERSION,
+  TOWN_MARK,
   type GameMessage,
   type MatchMode,
   type MatchSetup,
@@ -140,7 +141,7 @@ export function NearbyPlayScreen() {
 
   useEffect(() => {
     // Only one Nearby link at a time: a community visit ends when a match screen opens.
-    townSession().leave();
+    townSession().stop();
     const t = createNearbyTransport();
     transport.current = t;
     if (!t) return;
@@ -151,7 +152,8 @@ export function NearbyPlayScreen() {
     };
 
     const offs = [
-      t.on('peerFound', (peer) => setFound((f) => [...f.filter((p) => p.id !== peer.id), peer])),
+      // Community visits advertise too; only games belong in this list.
+      t.on('peerFound', (peer) => !peer.name.startsWith(TOWN_MARK) && setFound((f) => [...f.filter((p) => p.id !== peer.id), peer])),
       t.on('peerLost', ({ id }) => setFound((f) => f.filter((p) => p.id !== id))),
       t.on('connected', ({ id, code: digits }) => {
         if (isHostRef.current) {

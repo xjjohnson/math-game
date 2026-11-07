@@ -7,6 +7,7 @@ import {
   HOST_ID,
   MAX_PLAYERS,
   PROTOCOL_VERSION,
+  TOWN_MARK,
   TOWN_VERSION,
   type GameMessage,
   type PlayerInfo,
@@ -28,9 +29,11 @@ export interface TownState {
   /** Where people were put in their scene (0 to 1), by player id. People nobody moved aren't listed. */
   spots: Record<string, { x: number; y: number }>;
   notice: string | null;
+  /** What this player brings: buddies and an accessory. Kept between visits. */
+  look: { buddies: string[]; acc?: string; chosen: boolean };
 }
 
-const OFF: TownState = { status: 'off', found: [], myId: HOST_ID, people: [], waves: {}, spots: {}, notice: null };
+const OFF: TownState = { status: 'off', found: [], myId: HOST_ID, people: [], waves: {}, spots: {}, notice: null, look: { buddies: [], chosen: false } };
 
 /** How long a wave stays on screen. */
 export const WAVE_MS = 3000;
@@ -77,7 +80,7 @@ export class TownSession {
   async host(me: Omit<PlayerInfo, 'id'>) {
     if (!this.begin(me, true)) return;
     try {
-      await this.transport!.host(`${stickerText(me.avatar)} ${me.name}`);
+      await this.transport!.host(`${TOWN_MARK} ${stickerText(me.avatar)} ${me.name}`);
     } catch (e) {
       this.leave(errorText(e));
       return;
@@ -118,7 +121,91 @@ export class TownSession {
     this.roster = [];
     this.places.clear();
     this.spots.clear();
-    this.set({ ...OFF, notice });
+    this.set({ ...OFF, look: this.state.look, notice });
+  }
+
+  /** Change the buddies and accessory this player shows in the community. */
+  setLook(buddies: string[], acc?: string) {
+    this.set({ look: { buddies, acc, chosen: true } });
+    this.me = { ...this.me, buddies: buddies.length ? buddies : undefined, acc };
+    if (this.state.status === 'hosting') {
+      this.roster = this.roster.map((p) => (p.id === HOST_ID ? { ...p, buddies: this.me.buddies, acc } : p));
+      this.publish();
+    } else if (this.state.status === 'joined') {
+      this.send({ type: 'look', buddies, ...(acc ? { acc } : {}) });
+    }
+  }
+
+  // --- connecting by itself ---
+  private autoRun = 0;
+
+  /**
+   * Opens the community with no choices to make: look for a visit someone is
+   * already hosting and join it, otherwise host one. A phone left hosting alone
+   * looks again now and then, so two phones that opened at the same moment
+   * still end up together.
+   */
+  async auto(me: Omit<PlayerInfo, 'id'>) {
+    const run = ++this.autoRun;
+    const { buddies, acc } = this.state.look;
+    this.me = { id: HOST_ID, ...me, buddies: buddies.length ? buddies : undefined, acc };
+    const alive = () => this.autoRun === run;
+    while (alive()) {
+      if (!(await this.discoverOnce(alive))) return;
+      // Give hosts a moment to be found; the wait differs per phone so two phones don't decide together.
+      await sleep(3000 + Math.random() * 3000);
+      if (!alive()) return;
+      const host = this.state.found.find((p) => p.name.startsWith(TOWN_MARK));
+      if (host) {
+        await this.join(host.id);
+        for (let i = 0; i < 12 && alive() && this.state.status !== 'joined'; i++) await sleep(500);
+        if (this.state.status === 'joined') return this.watchGuest(run);
+        continue;
+      }
+      if (!(await this.hostOnce(alive))) return;
+      // Hosting: stay while friends are with us, otherwise look around again soon.
+      for (let waited = 0; alive() && waited < 20000 + Math.random() * 10000; waited += 1000) {
+        await sleep(1000);
+        if (this.roster.length > 1) return this.watchHost(run);
+      }
+    }
+  }
+
+  /** Stops looking for or hosting a visit and leaves; it stays off until `auto` is called again. */
+  stop() {
+    this.autoRun++;
+    this.leave();
+  }
+
+  private async watchGuest(run: number) {
+    // If the host goes away, try again from the top.
+    while (this.autoRun === run && this.state.status === 'joined') await sleep(1000);
+    if (this.autoRun === run) void this.auto(this.me);
+  }
+
+  private async watchHost(run: number) {
+    // A host with nobody left becomes a searcher again.
+    while (this.autoRun === run && this.state.status === 'hosting' && this.roster.length > 1) await sleep(1000);
+    if (this.autoRun === run && this.state.status === 'hosting') void this.auto(this.me);
+  }
+
+  private async discoverOnce(alive: () => boolean): Promise<boolean> {
+    this.begin(this.me, false);
+    if (!this.transport) return false;
+    try {
+      await this.transport.discover();
+    } catch (e) {
+      this.leave(errorText(e));
+      return false;
+    }
+    if (!alive()) return false;
+    this.set({ status: 'finding' });
+    return true;
+  }
+
+  private async hostOnce(alive: () => boolean): Promise<boolean> {
+    await this.host(this.me);
+    return alive() && this.state.status === 'hosting';
   }
 
   // --- where this phone is ---
@@ -164,8 +251,9 @@ export class TownSession {
       return false;
     }
     this.transport = t;
-    this.me = { id: HOST_ID, ...me };
-    this.set({ ...OFF, myId: HOST_ID });
+    const { buddies, acc } = this.state.look;
+    this.me = { id: HOST_ID, ...me, buddies: buddies.length ? buddies : undefined, acc };
+    this.set({ ...OFF, look: this.state.look, myId: HOST_ID });
     this.listen(t, asHost);
     return true;
   }
@@ -181,7 +269,14 @@ export class TownSession {
           return; // otherwise wait for its hello
         }
         this.set({ status: 'joined' });
-        this.send({ type: 'hello', version: PROTOCOL_VERSION, name: this.me.name, avatar: this.me.avatar });
+        this.send({
+          type: 'hello',
+          version: PROTOCOL_VERSION,
+          name: this.me.name,
+          avatar: this.me.avatar,
+          ...(this.me.buddies?.length ? { buddies: this.me.buddies } : {}),
+          ...(this.me.acc ? { acc: this.me.acc } : {}),
+        });
       }),
       t.on('disconnected', ({ id }) => {
         if (!asHost) {
@@ -205,7 +300,16 @@ export class TownSession {
           return;
         }
         if (this.roster.length >= MAX_PLAYERS) return;
-        this.roster = [...this.roster.filter((p) => p.id !== id), { id, name: message.name, avatar: message.avatar }];
+        this.roster = [
+          ...this.roster.filter((p) => p.id !== id),
+          {
+            id,
+            name: message.name,
+            avatar: message.avatar,
+            ...(message.buddies ? { buddies: message.buddies } : {}),
+            ...(message.acc ? { acc: message.acc } : {}),
+          },
+        ];
         this.publish();
         break;
       case 'visit':
@@ -213,6 +317,12 @@ export class TownSession {
         if (this.places.get(id) !== message.place) this.spots.delete(id);
         if (message.place) this.places.set(id, message.place);
         else this.places.delete(id);
+        this.publish();
+        break;
+      case 'look':
+        this.roster = this.roster.map((p) =>
+          p.id === id ? { ...p, buddies: message.buddies.length ? message.buddies : undefined, acc: message.acc } : p,
+        );
         this.publish();
         break;
       case 'move':
@@ -307,6 +417,7 @@ export class TownSession {
   }
 }
 
+const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
 const errorText = (e: unknown) => (e instanceof Error ? e.message : String(e));
 
 let shared: TownSession | null = null;
