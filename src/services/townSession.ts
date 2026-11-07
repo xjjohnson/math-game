@@ -3,6 +3,8 @@ import { useSyncExternalStore } from 'react';
 import { stickerText } from '@/constants/art';
 import type { Peer, Transport } from '@/services/multiplayer';
 import { createNearbyTransport } from '@/services/nearbyTransport';
+import type { HomeSnapshot } from '@/utils/homeVisit';
+import { isSharedPiece } from '@/utils/multiplayer/placeProps';
 import {
   HOST_ID,
   MAX_PLAYERS,
@@ -32,9 +34,21 @@ export interface TownState {
   notice: string | null;
   /** What this player brings: buddies and an accessory. Kept between visits. */
   look: { buddies: string[]; acc?: string; chosen: boolean };
+  /** A friend's buddy home this player asked to see: loading, shown, or not available. */
+  home: HomeVisit | null;
 }
 
-const OFF: TownState = { status: 'off', found: [], myId: HOST_ID, people: [], waves: {}, spots: {}, notice: null, look: { buddies: [], chosen: false } };
+export interface HomeVisit {
+  of: string;
+  name: string;
+  status: 'loading' | 'ready' | 'none';
+  snap: HomeSnapshot | null;
+}
+
+/** How long to wait for a friend's phone to send its home. */
+export const HOME_WAIT_MS = 8000;
+
+const OFF: TownState = { status: 'off', found: [], myId: HOST_ID, people: [], waves: {}, spots: {}, notice: null, look: { buddies: [], chosen: false }, home: null };
 
 /** How long a wave stays on screen. */
 export const WAVE_MS = 3000;
@@ -59,6 +73,10 @@ export class TownSession {
   private roster: PlayerInfo[] = [];
   private places = new Map<string, TownPlace>();
   private spots = new Map<string, { x: number; y: number }>();
+
+  /** This player's buddy home, for friends who ask to see it. */
+  private homeSource: (() => HomeSnapshot | null) | null = null;
+  private homeTimer: ReturnType<typeof setTimeout> | null = null;
 
   constructor(private readonly makeTransport: () => Transport | null) {}
 
@@ -228,14 +246,57 @@ export class TownSession {
 
   /** Drag your own person, or one of your buddies, to a spot in the scene. */
   moveTo(id: string, x: number, y: number) {
-    // Only your own person and buddies can be moved.
-    if (ownerOf(id) !== this.state.myId) return;
+    // Only your own person and buddies can be moved, plus the things in the rooms, which are everyone's.
+    if (ownerOf(id) !== this.state.myId && !isSharedPiece(id)) return;
     this.set({ spots: { ...this.state.spots, [id]: { x, y } } });
     if (this.state.status === 'hosting') {
       this.spots.set(id, { x, y });
       this.sendToGuests({ type: 'move', id, x, y });
     } else if (this.state.status === 'joined') {
       this.send({ type: 'move', id, x, y });
+    }
+  }
+
+  // --- friends' homes ---
+  /** Tells the session how to get this player's home when a friend asks to see it. */
+  setHomeSource(source: (() => HomeSnapshot | null) | null) {
+    this.homeSource = source;
+  }
+
+  /** Asks to see another player's buddy home; it shows up in `home` when it arrives. */
+  askHome(of: string, name: string) {
+    if (!this.active || of === this.state.myId) return;
+    this.set({ home: { of, name, status: 'loading', snap: null } });
+    if (this.state.status === 'hosting') this.send({ type: 'home-ask', of }, of);
+    else this.send({ type: 'home-ask', of });
+    if (this.homeTimer) clearTimeout(this.homeTimer);
+    this.homeTimer = setTimeout(() => {
+      this.homeTimer = null;
+      const h = this.state.home;
+      if (h && h.of === of && h.status === 'loading') this.set({ home: { ...h, status: 'none' } });
+    }, HOME_WAIT_MS);
+  }
+
+  closeHome() {
+    if (this.homeTimer) clearTimeout(this.homeTimer);
+    this.homeTimer = null;
+    this.set({ home: null });
+  }
+
+  private myHome(): HomeSnapshot | null {
+    try {
+      return this.homeSource?.() ?? null;
+    } catch {
+      return null;
+    }
+  }
+
+  private gotHome(of: string, snap: HomeSnapshot | null) {
+    const h = this.state.home;
+    if (h && h.of === of && h.status === 'loading') {
+      if (this.homeTimer) clearTimeout(this.homeTimer);
+      this.homeTimer = null;
+      this.set({ home: { ...h, status: snap ? 'ready' : 'none', snap } });
     }
   }
 
@@ -329,11 +390,23 @@ export class TownSession {
         this.publish();
         break;
       case 'move':
-        // A phone can only move its own pieces.
-        if (ownerOf(message.id) !== id || !this.roster.some((p) => p.id === id)) return;
+        // A phone can only move its own pieces, and the things in the rooms.
+        if ((ownerOf(message.id) !== id && !isSharedPiece(message.id)) || !this.roster.some((p) => p.id === id)) return;
         this.spots.set(message.id, { x: message.x, y: message.y });
         this.set({ spots: { ...this.state.spots, [message.id]: { x: message.x, y: message.y } } });
         this.sendToGuests(message, id);
+        break;
+      case 'home-ask':
+        if (!this.roster.some((p) => p.id === id)) return;
+        if (message.of === HOST_ID) this.send({ type: 'home', of: HOST_ID, home: this.myHome() }, id);
+        else if (message.of !== id && this.roster.some((p) => p.id === message.of)) this.send({ type: 'home-ask', of: message.of, for: id }, message.of);
+        break;
+      case 'home':
+        // A phone can only send its own home.
+        if (message.of !== id) return;
+        if (message.for && message.for !== HOST_ID) {
+          if (this.roster.some((p) => p.id === message.for)) this.send(message, message.for);
+        } else this.gotHome(id, message.home);
         break;
       case 'hi':
         if (!this.roster.some((p) => p.id === id)) return;
@@ -365,6 +438,14 @@ export class TownSession {
         break;
       case 'hi':
         if (message.playerId) this.markWave(message.playerId);
+        break;
+      case 'home-ask':
+        if (message.of === this.state.myId) {
+          this.send({ type: 'home', of: this.state.myId, ...(message.for ? { for: message.for } : {}), home: this.myHome() });
+        }
+        break;
+      case 'home':
+        this.gotHome(message.of, message.home);
         break;
       case 'bye':
         this.leave('The host closed the visit.');
@@ -399,8 +480,10 @@ export class TownSession {
       const spot = this.spots.get(p.id);
       if (place) people.push({ ...p, place, ...(spot ?? {}) });
     }
+    // People first: older phones only read the first few spots.
     const spots: TownState['spots'] = {};
     for (const [id, spot] of this.spots) if (this.places.has(ownerOf(id))) spots[id] = spot;
+    for (const [id, spot] of this.spots) if (isSharedPiece(id)) spots[id] = spot;
     this.set({ people, spots });
     this.send({ type: 'town', people, spots: Object.entries(spots).map(([id, spot]) => ({ id, ...spot })) });
   }

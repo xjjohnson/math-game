@@ -5,7 +5,8 @@ import { BigButton } from '@/components/BigButton';
 import { CommunityView } from '@/components/community/CommunityView';
 import { colors } from '@/constants/theme';
 import { townSession } from '@/services/townSession';
-import { useActiveProfile } from '@/store/profiles';
+import { useActiveProfile, useProfiles } from '@/store/profiles';
+import { homeSnapshot } from '@/utils/homeVisit';
 import { allGranted, checkPermissions, devicePermissions } from '@/utils/nearbyPermissions';
 import { Nearby } from '../../modules/math-nearby';
 
@@ -29,7 +30,16 @@ export function TownScreen() {
 
   useEffect(() => {
     void connect();
-    return () => townSession().stop();
+    // Friends can ask to see this player's buddy home while the visit is on.
+    townSession().setHomeSource(() => {
+      const s = useProfiles.getState();
+      const me = s.profiles.find((p) => p.id === s.activeProfileId);
+      return me ? homeSnapshot(me) : null;
+    });
+    return () => {
+      townSession().setHomeSource(null);
+      townSession().stop();
+    };
     // Only when the player changes; coming back from the permission screen is handled below.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [profile?.id]);

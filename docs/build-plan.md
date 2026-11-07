@@ -187,7 +187,9 @@ Phases 1-6 deliver a complete single-player game before any native Bluetooth wor
 - [x] Community: full-screen scrolling Toca-style street and building interiors (bakery, shop, library, park); opening it auto-joins a nearby visit or hosts one; everyone in a building stands in the room as their character with their buddies and an accessory, and each player moves only their own person and buddies, live (protocol v6; the host ignores moves for anyone else's pieces)
 - [x] Shop and Bakery jobs: customer scene, "Give back: ?", tap green US dollar bills ($1-$100, no $2) onto the counter, hint and a second try (grade 1 up)
 - [x] Community jobs always pay: first play of the day full pay plus bonus (5 coins or 2 hearts), same-day replays 1 coin per right answer
-- [ ] Open idea: visit a friend's buddy home
+- [x] Community buildings 3 screens long (park 3.4) with 100+ movable things that land on shelves; shared over Nearby (ids starting "~"; anyone may move them)
+- [x] Tap-to-use things: shop fridge and till, bakery mixer and oven (bakes batter and dough), library lamp and math computers, park swings
+- [x] Visit a friend's buddy home over Nearby (read-only copy, moves not saved; protocol v7 home-ask and home messages, relayed through the host)
 
 ### Profiles
 - [ ] Multiple kid profiles on one device, each with its own coins and progress (Phase 1 store design)

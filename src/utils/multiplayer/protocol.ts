@@ -1,8 +1,9 @@
 import { isGrade } from '@/constants/grades';
 import type { Difficulty, Grade, Operation } from '@/types';
+import { parseHomeSnapshot, type HomeSnapshot } from '@/utils/homeVisit';
 
 /** Bump when messages change shape, so phones on different builds say so instead of misbehaving. */
-export const PROTOCOL_VERSION = 6;
+export const PROTOCOL_VERSION = 7;
 
 /**
  * The oldest version that can still play matches with this one. v5 only added
@@ -17,6 +18,9 @@ export const TOWN_VERSION = 5;
 /** Where a visitor is in the community: the street, or inside one building. */
 export type TownPlace = 'street' | 'shop' | 'bakery' | 'library' | 'park';
 export const TOWN_PLACES: readonly TownPlace[] = ['street', 'shop', 'bakery', 'library', 'park'];
+
+/** The first version that can show a friend's buddy home (and move things in the community rooms). */
+export const HOME_VERSION = 7;
 
 /** The first version that lets everyone drag the people around a shared scene. */
 export const SCENE_VERSION = 6;
@@ -57,6 +61,9 @@ export interface PlayerInfo {
 }
 
 export const MAX_BUDDIES = 3;
+
+/** People, their buddies, and the things in the rooms (and their switches) that anyone can move. */
+export const MAX_SPOTS = 240;
 
 /** Where a piece was put in its scene: a player's id, or `${playerId}:b${n}` for one of their buddies. */
 export interface SpotEntry {
@@ -100,8 +107,15 @@ export type GameMessage =
   | { type: 'hi'; playerId?: string }
   /** Community: a guest changed its buddies or accessory. */
   | { type: 'look'; buddies: string[]; acc?: string }
-  /** Scene (v6): anyone drags anyone; the host keeps the spot and passes it on. x and y run 0 to 1. */
-  | { type: 'move'; id: string; x: number; y: number };
+  /** Scene (v6): a phone moves its own person or buddies, or (v7) a thing in a room (ids starting "~"); the host keeps the spot and passes it on. x and y run 0 to 1. */
+  | { type: 'move'; id: string; x: number; y: number }
+  /**
+   * Homes (v7): ask to see player `of`'s buddy home. Guests ask the host; the host
+   * passes the ask on to `of`, saying who it is `for`.
+   */
+  | { type: 'home-ask'; of: string; for?: string }
+  /** Homes (v7): player `of`'s home, or null if it can't be shown. The host passes it on to `for`. */
+  | { type: 'home'; of: string; for?: string; home: HomeSnapshot | null };
 
 export function encodeMessage(message: GameMessage): string {
   return JSON.stringify(message);
@@ -143,7 +157,7 @@ const parseSpotList = (v: unknown): SpotEntry[] =>
     ? v
         .filter((e): e is Record<string, unknown> => typeof e === 'object' && e !== null)
         .filter((e) => isId(e.id) && isUnit(e.x) && isUnit(e.y))
-        .slice(0, MAX_PLAYERS * (MAX_BUDDIES + 1))
+        .slice(0, MAX_SPOTS)
         .map((e) => ({ id: e.id as string, x: e.x as number, y: e.y as number }))
     : [];
 const isPlace = (v: unknown): v is TownPlace => TOWN_PLACES.includes(v as TownPlace);
@@ -238,6 +252,14 @@ export function parseMessage(text: string): GameMessage | null {
       return isId(m.id) && isUnit(m.x) && isUnit(m.y) ? { type: 'move', id: m.id, x: m.x, y: m.y } : null;
     case 'hi':
       return { type: 'hi', ...(isId(m.playerId) ? { playerId: m.playerId } : {}) };
+    case 'home-ask':
+      return isId(m.of) ? { type: 'home-ask', of: m.of, ...(isId(m.for) ? { for: m.for } : {}) } : null;
+    case 'home': {
+      if (!isId(m.of)) return null;
+      const home = m.home === null ? null : parseHomeSnapshot(m.home);
+      if (m.home !== null && !home) return null;
+      return { type: 'home', of: m.of, ...(isId(m.for) ? { for: m.for } : {}), home };
+    }
     default:
       return null;
   }
