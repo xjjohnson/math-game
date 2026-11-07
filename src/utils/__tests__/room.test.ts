@@ -55,7 +55,7 @@ describe('buddy home', () => {
   });
 
   it('moves things and buddies anywhere in the home, kept inside it', () => {
-    const bought = buyRoomItem(makeProfile({ coins: 50 }), 'ball', 'k1', 0, MARCH);
+    const bought = buyRoomItem(makeProfile({ coins: 50, homeRooms: ['backyard', 'study', 'garage'] }), 'ball', 'k1', 0, MARCH);
     if (!bought.ok) throw new Error('buy failed');
     const moved = moveInRoom(bought.profile, 'k1', { x: 2, y: -1 });
     expect(moved.room.things[0].x).toBeGreaterThan(0.98);
