@@ -8,6 +8,8 @@ export interface GradeConfig {
   name: string;
   /** Operations taught in this grade; the others still work, just gently. */
   taught: Operation[];
+  /** Operations the daily challenge picks from (defaults to `taught`). */
+  daily?: Operation[];
   levels: Record<Difficulty, DifficultyConfig>;
 }
 
@@ -32,6 +34,8 @@ export const GRADES: Record<Grade, GradeConfig> = {
     short: 'K',
     name: 'Kindergarten',
     taught: ['add', 'subtract'],
+    // The daily challenge is addition only in kindergarten.
+    daily: ['add'],
     levels: {
       easy: {
         label: 'Easy',
@@ -49,10 +53,10 @@ export const GRADES: Record<Grade, GradeConfig> = {
       },
       hard: {
         label: 'Hard',
-        description: 'Make 10, take from 10',
+        description: 'Adding 2-digit numbers',
         allowNegatives: false,
-        maxSum: 10,
-        ranges: ops(pair([3, 9], [1, 9]), pair([5, 10], [1, 9]), pair([1, 5], [1, 2]), pair([1, 2], [1, 5])),
+        maxSum: 40,
+        ranges: ops(pair([10, 19], [10, 19]), pair([5, 10], [1, 9]), pair([1, 5], [1, 2]), pair([1, 2], [1, 5])),
       },
     },
   },
