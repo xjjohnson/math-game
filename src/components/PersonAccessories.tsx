@@ -270,7 +270,7 @@ export function shoeLook(id?: string): ShoeLook {
     case 'ballet':
       return { color: '#F8BBD0', sole: '#F48FB1', tall: 0 };
     case 'socks':
-      return { color: '#4E342E', sole: '#4E342E', tall: 0, sock: '#FFFFFF' };
+      return { color: '#FFFFFF', sole: '#CFD8DC', tall: 0, sock: '#FFFFFF' };
     default:
       return BARE_SHOES;
   }
