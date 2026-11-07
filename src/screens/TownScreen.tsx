@@ -3,7 +3,7 @@ import { Pressable, StyleSheet, View } from 'react-native';
 
 import { Text } from '@/components/AppText';
 import { BigButton } from '@/components/BigButton';
-import { PeopleBadges, PeopleHere } from '@/components/PeopleHere';
+import { PeopleBadges, TownScene } from '@/components/TownScene';
 import { VisitPanel } from '@/components/VisitPanel';
 import { Screen } from '@/components/Screen';
 import { colors, fontSizes, radius, spacing, TAP_TARGET } from '@/constants/theme';
@@ -24,7 +24,7 @@ export function TownScreen() {
       <Text style={styles.intro}>Visit a building and do a quick job. Come back every day!</Text>
       <Text style={styles.coins}>🪙 {profile.coins}</Text>
       <VisitPanel />
-      <PeopleHere place="street" wave />
+      <TownScene place="street" />
       <View style={styles.street}>
         {BUILDINGS.map((b) => {
           const done = shiftDone(profile, b.id, today);

@@ -25,10 +25,12 @@ export interface TownState {
   people: TownPerson[];
   /** Who waved lately, by player id, so the screens can show a 👋. */
   waves: Record<string, number>;
+  /** Where people were put in their scene (0 to 1), by player id. People nobody moved aren't listed. */
+  spots: Record<string, { x: number; y: number }>;
   notice: string | null;
 }
 
-const OFF: TownState = { status: 'off', found: [], myId: HOST_ID, people: [], waves: {}, notice: null };
+const OFF: TownState = { status: 'off', found: [], myId: HOST_ID, people: [], waves: {}, spots: {}, notice: null };
 
 /** How long a wave stays on screen. */
 export const WAVE_MS = 3000;
@@ -52,6 +54,7 @@ export class TownSession {
   /** Host only: who is in the group, and where each one is. */
   private roster: PlayerInfo[] = [];
   private places = new Map<string, TownPlace>();
+  private spots = new Map<string, { x: number; y: number }>();
 
   constructor(private readonly makeTransport: () => Transport | null) {}
 
@@ -114,6 +117,7 @@ export class TownSession {
     }
     this.roster = [];
     this.places.clear();
+    this.spots.clear();
     this.set({ ...OFF, notice });
   }
 
@@ -132,6 +136,17 @@ export class TownSession {
   /** Leaves `place` only if this phone is still there, so screens can clean up in any order. */
   clearPlace(place: TownPlace) {
     if (this.place === place) this.setPlace(null);
+  }
+
+  /** Drag a person (anyone, not just yourself) to a spot in the scene. */
+  moveTo(id: string, x: number, y: number) {
+    this.set({ spots: { ...this.state.spots, [id]: { x, y } } });
+    if (this.state.status === 'hosting') {
+      this.spots.set(id, { x, y });
+      this.sendToGuests({ type: 'move', id, x, y });
+    } else if (this.state.status === 'joined') {
+      this.send({ type: 'move', id, x, y });
+    }
   }
 
   wave() {
@@ -195,9 +210,16 @@ export class TownSession {
         break;
       case 'visit':
         if (!this.roster.some((p) => p.id === id)) return;
+        if (this.places.get(id) !== message.place) this.spots.delete(id);
         if (message.place) this.places.set(id, message.place);
         else this.places.delete(id);
         this.publish();
+        break;
+      case 'move':
+        if (!this.roster.some((p) => p.id === message.id)) return;
+        this.spots.set(message.id, { x: message.x, y: message.y });
+        this.set({ spots: { ...this.state.spots, [message.id]: { x: message.x, y: message.y } } });
+        this.sendToGuests(message, id);
         break;
       case 'hi':
         if (!this.roster.some((p) => p.id === id)) return;
@@ -217,8 +239,14 @@ export class TownSession {
         // Tell the host where we are as soon as we're in.
         if (this.place) this.send({ type: 'visit', place: this.place });
         break;
-      case 'town':
-        this.set({ people: message.people });
+      case 'town': {
+        const spots: TownState['spots'] = {};
+        for (const p of message.people) if (p.x !== undefined && p.y !== undefined) spots[p.id] = { x: p.x, y: p.y };
+        this.set({ people: message.people, spots });
+        break;
+      }
+      case 'move':
+        this.set({ spots: { ...this.state.spots, [message.id]: { x: message.x, y: message.y } } });
         break;
       case 'hi':
         if (message.playerId) this.markWave(message.playerId);
@@ -232,10 +260,12 @@ export class TownSession {
   private drop(id: string) {
     this.roster = this.roster.filter((p) => p.id !== id);
     this.places.delete(id);
+    this.spots.delete(id);
     this.publish();
   }
 
   private setHostPlace() {
+    if (this.places.get(HOST_ID) !== (this.place ?? undefined)) this.spots.delete(HOST_ID);
     if (this.place) this.places.set(HOST_ID, this.place);
     else this.places.delete(HOST_ID);
   }
@@ -246,9 +276,12 @@ export class TownSession {
     const people: TownPerson[] = [];
     for (const p of this.roster) {
       const place = this.places.get(p.id);
-      if (place) people.push({ ...p, place });
+      const spot = this.spots.get(p.id);
+      if (place) people.push({ ...p, place, ...(spot ?? {}) });
     }
-    this.set({ people });
+    const spots: TownState['spots'] = {};
+    for (const [id, spot] of this.spots) if (this.places.has(id)) spots[id] = spot;
+    this.set({ people, spots });
     this.send({ type: 'town', people });
   }
 
@@ -262,6 +295,11 @@ export class TownSession {
         this.set({ waves: rest });
       }
     }, WAVE_MS);
+  }
+
+  /** Host: to every guest except `except`. */
+  private sendToGuests(message: GameMessage, except?: string) {
+    for (const p of this.roster) if (p.id !== HOST_ID && p.id !== except) this.send(message, p.id);
   }
 
   private send(message: GameMessage, to?: string) {
