@@ -18,6 +18,7 @@ import { usePalette } from '@/hooks/useAccessibility';
 import { useTimer } from '@/hooks/useTimer';
 import type { Peer, Transport } from '@/services/multiplayer';
 import { createNearbyTransport } from '@/services/nearbyTransport';
+import { townSession } from '@/services/townSession';
 import { useActiveProfile, useProfiles } from '@/store/profiles';
 import type { AnswerRecord, Level, Operation, Problem } from '@/types';
 import { resolveInputStyle } from '@/utils/inputStyle';
@@ -49,6 +50,7 @@ import {
 import {
   HOST_ID,
   MAX_PLAYERS,
+  MIN_GAME_VERSION,
   PROTOCOL_VERSION,
   type GameMessage,
   type MatchMode,
@@ -137,6 +139,8 @@ export function NearbyPlayScreen() {
   );
 
   useEffect(() => {
+    // Only one Nearby link at a time: a community visit ends when a match screen opens.
+    townSession().leave();
     const t = createNearbyTransport();
     transport.current = t;
     if (!t) return;
@@ -180,7 +184,7 @@ export function NearbyPlayScreen() {
           case 'hello':
             if (!isHostRef.current || phaseRef.current !== 'lobby') return;
             t.send({ type: 'welcome', version: PROTOCOL_VERSION, you: id }, id).catch(() => undefined);
-            if (message.version !== PROTOCOL_VERSION) {
+            if (message.version < MIN_GAME_VERSION) {
               setNotice(VERSION_MISMATCH);
               return;
             }
@@ -191,7 +195,7 @@ export function NearbyPlayScreen() {
             ]);
             break;
           case 'welcome':
-            if (message.version !== PROTOCOL_VERSION) setNotice(VERSION_MISMATCH);
+            if (message.version < MIN_GAME_VERSION) setNotice(VERSION_MISMATCH);
             setMyId(message.you);
             break;
           case 'lobby':

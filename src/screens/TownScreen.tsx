@@ -3,8 +3,11 @@ import { Pressable, StyleSheet, View } from 'react-native';
 
 import { Text } from '@/components/AppText';
 import { BigButton } from '@/components/BigButton';
+import { PeopleBadges, PeopleHere } from '@/components/PeopleHere';
+import { VisitPanel } from '@/components/VisitPanel';
 import { Screen } from '@/components/Screen';
 import { colors, fontSizes, radius, spacing, TAP_TARGET } from '@/constants/theme';
+import { usePlace } from '@/hooks/usePlace';
 import { useActiveProfile } from '@/store/profiles';
 import { dateKey } from '@/utils/dates';
 import { BUILDINGS, shiftDone } from '@/utils/town';
@@ -13,12 +16,15 @@ import { BUILDINGS, shiftDone } from '@/utils/town';
 export function TownScreen() {
   const profile = useActiveProfile();
   const today = dateKey();
+  usePlace('street');
   if (!profile) return <Screen title="Community"><Text style={styles.intro}>Make a player first.</Text></Screen>;
 
   return (
     <Screen title="🏘️ Community">
       <Text style={styles.intro}>Visit a building and do a quick job. Come back every day!</Text>
       <Text style={styles.coins}>🪙 {profile.coins}</Text>
+      <VisitPanel />
+      <PeopleHere place="street" wave />
       <View style={styles.street}>
         {BUILDINGS.map((b) => {
           const done = shiftDone(profile, b.id, today);
@@ -34,6 +40,7 @@ export function TownScreen() {
               <Text style={styles.emoji}>{b.emoji}</Text>
               <Text style={styles.name}>{b.name}</Text>
               <Text style={styles.job}>{b.job}</Text>
+              <PeopleBadges place={b.id} />
               <Text style={[styles.badge, done && styles.badgeDone]}>
                 {done ? '✓ Done today' : b.reward === 'coins' ? 'Earn coins' : 'Earn buddy hearts'}
               </Text>
