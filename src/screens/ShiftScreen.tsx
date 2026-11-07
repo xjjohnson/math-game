@@ -5,8 +5,10 @@ import { StyleSheet } from 'react-native';
 import { Text } from '@/components/AppText';
 import { BigButton } from '@/components/BigButton';
 import { ChoiceButtons } from '@/components/ChoiceButtons';
+import { PeopleHere } from '@/components/PeopleHere';
 import { Screen } from '@/components/Screen';
 import { colors, fontSizes, spacing } from '@/constants/theme';
+import { usePlace } from '@/hooks/usePlace';
 import { useActiveProfile, useProfiles } from '@/store/profiles';
 import { dateKey } from '@/utils/dates';
 import { createRng, randomSeed } from '@/utils/seededRandom';
@@ -27,6 +29,7 @@ export function ShiftScreen() {
   const [selected, setSelected] = useState<number | null>(null);
   const [correct, setCorrect] = useState(0);
   const [paid, setPaid] = useState<ShiftPay | null>(null);
+  usePlace(building ? building.id : null);
 
   if (!building || !profile) return <Screen title="Community"><Text style={styles.text}>Nothing here.</Text></Screen>;
   const alreadyDone = shiftDone(profile, building.id, dateKey()) && !paid;
@@ -35,7 +38,8 @@ export function ShiftScreen() {
     const pay = paid ?? shiftPay(profile, building.id, correct);
     return (
       <Screen title={`${building.emoji} ${building.name}`}>
-        <Text style={styles.big}>Shift over!</Text>
+        <PeopleHere place={building.id} wave />
+      <Text style={styles.big}>Shift over!</Text>
         <Text style={styles.text}>You got {correct} out of {SHIFT_QUESTIONS}.</Text>
         <Text style={styles.big}>
           {alreadyDone ? 'Today’s pay was already given. Come back tomorrow!' : pay.hearts > 0 ? `❤️ +${pay.hearts} for your buddy` : `🪙 +${pay.coins}`}
@@ -49,6 +53,7 @@ export function ShiftScreen() {
   const answered = selected !== null;
   return (
     <Screen title={`${building.emoji} ${building.name}`}>
+      <PeopleHere place={building.id} wave />
       {alreadyDone && index === 0 ? (
         <Text style={styles.text}>You already worked here today, so this is just practice (no pay).</Text>
       ) : null}

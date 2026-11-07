@@ -2,7 +2,26 @@ import { isGrade } from '@/constants/grades';
 import type { Difficulty, Grade, Operation } from '@/types';
 
 /** Bump when messages change shape, so phones on different builds say so instead of misbehaving. */
-export const PROTOCOL_VERSION = 4;
+export const PROTOCOL_VERSION = 5;
+
+/**
+ * The oldest version that can still play matches with this one. v5 only added
+ * community visits (new message types that older phones ignore), so v4 phones
+ * can still join a game; they just don't show up in the community.
+ */
+export const MIN_GAME_VERSION = 4;
+
+/** The first version that understands community visits. */
+export const TOWN_VERSION = 5;
+
+/** Where a visitor is in the community: the street, or inside one building. */
+export type TownPlace = 'street' | 'shop' | 'bakery' | 'library' | 'park';
+export const TOWN_PLACES: readonly TownPlace[] = ['street', 'shop', 'bakery', 'library', 'park'];
+
+/** One visitor and where they are right now. */
+export interface TownPerson extends PlayerInfo {
+  place: TownPlace;
+}
 
 /** The host phone plus up to 7 friends. */
 export const MAX_PLAYERS = 8;
@@ -47,7 +66,13 @@ export type GameMessage =
   | { type: 'left'; playerId: string }
   /** The host's final call: a race winner, or a team result. */
   | { type: 'end'; winner?: string; result?: 'won' | 'lost' }
-  | { type: 'bye' };
+  | { type: 'bye' }
+  /** Community (v5): a guest says where it is now, or null when it left the community. */
+  | { type: 'visit'; place: TownPlace | null }
+  /** Community (v5): the host tells everyone who is where. Only people in the community are listed. */
+  | { type: 'town'; people: TownPerson[] }
+  /** Community (v5): a wave. Guests send it to the host, who passes it on with the sender's id. */
+  | { type: 'hi'; playerId?: string };
 
 export function encodeMessage(message: GameMessage): string {
   return JSON.stringify(message);
@@ -70,6 +95,8 @@ function parsePlayers(v: unknown): PlayerInfo[] | null {
   }
   return players;
 }
+
+const isPlace = (v: unknown): v is TownPlace => TOWN_PLACES.includes(v as TownPlace);
 
 /** Parses a message from another phone, or returns null if it isn't one we understand. */
 export function parseMessage(text: string): GameMessage | null {
@@ -129,6 +156,18 @@ export function parseMessage(text: string): GameMessage | null {
     }
     case 'bye':
       return { type: 'bye' };
+    case 'visit':
+      return m.place === null ? { type: 'visit', place: null } : isPlace(m.place) ? { type: 'visit', place: m.place } : null;
+    case 'town': {
+      if (Array.isArray(m.people) && m.people.length === 0) return { type: 'town', people: [] };
+      const players = parsePlayers(m.people);
+      if (!players) return null;
+      const places = (m.people as Record<string, unknown>[]).map((p) => p.place);
+      if (!places.every(isPlace)) return null;
+      return { type: 'town', people: players.map((p, i) => ({ ...p, place: places[i] as TownPlace })) };
+    }
+    case 'hi':
+      return { type: 'hi', ...(isId(m.playerId) ? { playerId: m.playerId } : {}) };
     default:
       return null;
   }
