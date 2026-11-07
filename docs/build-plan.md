@@ -185,7 +185,7 @@ Phases 1-6 deliver a complete single-player game before any native Bluetooth wor
 - [ ] Keep MockTransport for solo testing of multiplayer logic
 - [ ] More co-op modes: Monster Battle and Relay on several phones, Team Up on one phone (protocol v3)
 - [x] Community: full-screen scrolling Toca-style street and building interiors (bakery, shop, library, park); opening it auto-joins a nearby visit or hosts one; everyone in a building stands in the room as their character with their buddies and an accessory, and anyone can drag anyone, live (protocol v6)
-- [x] Shop and Bakery jobs: hand back change with coins and bills (grade 1 up)
+- [x] Shop and Bakery jobs: customer scene, "Give back: ?", tap coins and bills onto the counter, hint and a second try (grade 1 up)
 - [ ] Open idea: visit a friend's buddy home
 
 ### Profiles

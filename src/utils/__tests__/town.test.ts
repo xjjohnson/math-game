@@ -1,6 +1,6 @@
 import { makeProfile } from '@/test/fixtures';
 import { createRng } from '@/utils/seededRandom';
-import { BUILDINGS, changeCoins, finishShift, handedBack, shiftDone, shiftQuestions, SHIFT_QUESTIONS } from '@/utils/town';
+import { BUILDINGS, changeCoins, changeHint, finishShift, handedBack, shiftDone, shiftQuestions, SHIFT_QUESTIONS } from '@/utils/town';
 
 const today = '2026-11-07';
 const withPup = makeProfile({ unlocks: ['buddy-pup'], equipped: { background: 'bg-cream', cardStyle: 'card-classic', companion: 'buddy-pup' } });
@@ -29,6 +29,13 @@ describe('community shifts', () => {
     }
     expect(shiftQuestions('shop', 0, createRng(3)).every((q) => !q.change)).toBe(true);
     expect(handedBack([5, 2, 1])).toBe(8);
+  });
+
+  it('gives a gentle hint: count up for little ones, subtract for bigger kids', () => {
+    expect(changeHint(3, 10, 2, 1)).toMatch(/count up/);
+    expect(changeHint(3, 10, 2, 4)).toMatch(/10 − 3/);
+    expect(changeHint(3, 10, 9, 4)).toMatch(/too much/);
+    expect(changeHint(3, 10, 2, 4)).toMatch(/enough/);
   });
 
   it('keeps kindergarten to addition within 20', () => {
