@@ -66,7 +66,7 @@ import {
 } from '@/utils/buddy';
 import { dateKey } from '@/utils/dates';
 import { generate } from '@/utils/mathEngine';
-import { BUDDY_KEY, buddiesHome, FIXTURE_KEY } from '@/utils/room';
+import { BUDDY_KEY, buddiesHome, FIXTURE_KEY, ownsArea } from '@/utils/room';
 import { createRng, pick, randomSeed } from '@/utils/seededRandom';
 import { owns } from '@/utils/shop';
 import { canWear, clothOf, lookOf, outfitOf } from '@/utils/wardrobe';
@@ -112,7 +112,7 @@ interface Game {
  */
 export function BuddyScreen() {
   const profile = useActiveProfile();
-  const { careForBuddy, equip, buyRoomItem, moveInRoom, setPlaced, paintRoom, setBuddyHome, wear, undress, setLook, takeOff, moveWearable } =
+  const { careForBuddy, equip, buyRoomItem, buyHomeRoom, moveInRoom, setPlaced, paintRoom, setBuddyHome, wear, undress, setLook, takeOff, moveWearable } =
     useProfiles();
   const insets = useSafeAreaInsets();
   const [line, setLine] = useState<string | null>(
@@ -313,6 +313,16 @@ export function BuddyScreen() {
           buddies={homeBuddies}
           area={area}
           findBuddy={findBuddy}
+          forSale={HOME_AREAS.filter((_, i) => !ownsArea(profile, i)).map((a) => a.id)}
+          coins={profile.coins}
+          onBuyRoom={(areaId) => {
+            const r = buyHomeRoom(profile.id, areaId);
+            const room = HOME_AREAS.find((a) => a.id === areaId);
+            if (r.ok && room) {
+              setParty((n) => n + 1);
+              say(`You bought the ${room.name.toLowerCase()}! ${name} can't wait to decorate it.`);
+            }
+          }}
           onAreaChange={setArea}
           onView={(at) => {
             viewAt.current = at;
@@ -385,7 +395,7 @@ export function BuddyScreen() {
             >
               <Text style={styles.roundText}>⬅️</Text>
             </Pressable>
-            <View style={styles.rooms}>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.roomsScroll} contentContainerStyle={styles.rooms}>
               {HOME_AREAS.map((a, i) => (
                 <Pressable
                   key={a.id}
@@ -395,10 +405,10 @@ export function BuddyScreen() {
                   accessibilityState={{ selected: area === i }}
                   style={({ pressed }) => [styles.round, styles.roomButton, area === i && styles.roundOn, pressed && styles.pressed]}
                 >
-                  <Text style={styles.roomText}>{a.emoji}</Text>
+                  <Text style={styles.roomText}>{ownsArea(profile, i) ? a.emoji : '🔒'}</Text>
                 </Pressable>
               ))}
-            </View>
+            </ScrollView>
             <View style={styles.coins}>
               <Text style={styles.coinText} numberOfLines={1} accessibilityLabel={`${profile.coins} coins`}>
                 {`🪙 ${profile.coins}`}
@@ -1133,7 +1143,8 @@ const styles = StyleSheet.create({
   line: { fontSize: fontSizes.body, fontWeight: '700', color: colors.text, textAlign: 'center' },
   top: { position: 'absolute', left: 0, right: 0, top: 0, paddingHorizontal: spacing.sm, gap: spacing.xs, alignItems: 'center' },
   topRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', alignSelf: 'stretch' },
-  rooms: { flexDirection: 'row', gap: spacing.xs },
+  rooms: { flexDirection: 'row', gap: spacing.xs, alignItems: 'center' },
+  roomsScroll: { flexGrow: 0, flexShrink: 1 },
   round: {
     width: 48,
     height: 48,

@@ -1,5 +1,5 @@
 /** The parts of the buddy's home, left to right. The home scrolls sideways through them. */
-export type AreaId = 'living' | 'kitchen' | 'bedroom' | 'bathroom' | 'playroom';
+export type AreaId = 'living' | 'kitchen' | 'bedroom' | 'bathroom' | 'playroom' | 'backyard' | 'study' | 'garage';
 
 export interface HomeArea {
   id: AreaId;
@@ -7,6 +7,8 @@ export interface HomeArea {
   emoji: string;
   /** Paint it starts with, as indexes into WALL_COLORS and FLOOR_COLORS. */
   paint: { wall: number; floor: number };
+  /** Coins to buy it. Without a price the room is there from the start. */
+  price?: number;
 }
 
 export const HOME_AREAS: HomeArea[] = [
@@ -15,6 +17,10 @@ export const HOME_AREAS: HomeArea[] = [
   { id: 'bedroom', name: 'Bedroom', emoji: '🛏️', paint: { wall: 0, floor: 0 } },
   { id: 'bathroom', name: 'Bathroom', emoji: '🛁', paint: { wall: 2, floor: 6 } },
   { id: 'playroom', name: 'Playroom', emoji: '🧸', paint: { wall: 5, floor: 3 } },
+  // Extra rooms, bought with coins. They start bare, ready to fill with things from the shop.
+  { id: 'backyard', name: 'Backyard', emoji: '🌳', paint: { wall: 2, floor: 3 }, price: 100 },
+  { id: 'study', name: 'Study', emoji: '📖', paint: { wall: 4, floor: 5 }, price: 120 },
+  { id: 'garage', name: 'Garage', emoji: '🚗', paint: { wall: 6, floor: 2 }, price: 150 },
 ];
 
 /** How many screens wide each area is. */

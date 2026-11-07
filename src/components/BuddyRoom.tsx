@@ -97,6 +97,11 @@ interface Props {
   findBuddy?: { current: ((pageX: number, pageY: number) => string | null) | null };
   /** Change `n` to have that buddy hop and wave, as when it levels up. */
   cheer?: { buddyId: string; n: number };
+  /** Extra rooms not bought yet; each shows a for-sale sign instead of the room. */
+  forSale?: AreaId[];
+  coins?: number;
+  /** The Buy button of a for-sale room was confirmed. */
+  onBuyRoom?: (areaId: AreaId) => void;
 }
 
 const TRIM = '#A86B45';
@@ -167,7 +172,7 @@ interface Pop {
  */
 export function BuddyRoom(props: Props) {
   const { room, buddies, area, onAreaChange, onView, tidying, season, onPlaceThing, onPlaceBuddy } = props;
-  const { onTapThing, onTapBuddy, onToggle, onTapGadget, onTapAppliance, onWash, cheer } = props;
+  const { onTapThing, onTapBuddy, onToggle, onTapGadget, onTapAppliance, onWash, cheer, forSale = [], coins = 0, onBuyRoom } = props;
   const [view, setView] = useState({ width: 0, height: 0 });
   const [open, setOpen] = useState<ReadonlySet<string>>(new Set());
   const [lit, setLit] = useState<ReadonlySet<string>>(new Set());
@@ -762,6 +767,11 @@ export function BuddyRoom(props: Props) {
             />
           ) : null,
         )}
+        {HOME_AREAS.map((a, i) =>
+          forSale.includes(a.id) ? (
+            <ForSale key={a.id} index={i} size={size} name={a.name} emoji={a.emoji} price={a.price ?? 0} coins={coins} onBuy={() => onBuyRoom?.(a.id)} />
+          ) : null,
+        )}
         {/* Fires, candles and lamps light up the dark around them. */}
         {lightPools().map((l) => (
           <Flicker
@@ -821,6 +831,50 @@ function Area({ id, index, size, wall, floor }: AreaProps) {
         />
       ) : null}
       {index > 0 ? <View style={[styles.divider, { height: size.floorY }]} /> : null}
+    </View>
+  );
+}
+
+interface ForSaleProps {
+  index: number;
+  size: HomeSize;
+  name: string;
+  emoji: string;
+  price: number;
+  coins: number;
+  onBuy: () => void;
+}
+
+/** Covers a room that is not bought yet with a sign; the first tap on Buy asks, the second buys. */
+function ForSale({ index, size, name, emoji, price, coins, onBuy }: ForSaleProps) {
+  const [sure, setSure] = useState(false);
+  const can = coins >= price;
+  return (
+    <View style={[styles.forSale, { left: index * size.areaWidth, width: size.areaWidth }]}>
+      <View style={[styles.saleCard, { top: size.height * 0.2 }]}>
+        <Text style={styles.saleEmoji}>{emoji}</Text>
+        <Text style={styles.saleTitle}>{`${name} for sale!`}</Text>
+        <Text style={styles.saleText}>
+          {can ? 'A new room for your buddies to play in.' : `Earn ${price - coins} more coins to buy it.`}
+        </Text>
+        <Pressable
+          onPress={() => {
+            if (!can) return;
+            if (sure) {
+              setSure(false);
+              onBuy();
+            } else {
+              setSure(true);
+            }
+          }}
+          accessibilityRole="button"
+          accessibilityLabel={`Buy the ${name.toLowerCase()} for ${price} coins`}
+          accessibilityState={{ disabled: !can }}
+          style={({ pressed }) => [styles.saleButton, !can && styles.saleLocked, pressed && { opacity: 0.8 }]}
+        >
+          <Text style={styles.saleButtonText}>{sure ? 'Tap again to buy' : `Buy for 🪙 ${price}`}</Text>
+        </Pressable>
+      </View>
     </View>
   );
 }
@@ -1407,6 +1461,24 @@ const styles = StyleSheet.create({
   fill: { width: '100%', height: '100%', alignItems: 'center', justifyContent: 'flex-end' },
   layer: { position: 'absolute', left: 0, top: 0, right: 0, bottom: 0 },
   dark: { position: 'absolute', top: 0, bottom: 0, backgroundColor: DARK },
+  forSale: { position: 'absolute', top: 0, bottom: 0, backgroundColor: '#8F8A9E', alignItems: 'center', borderLeftWidth: 10, borderLeftColor: TRIM },
+  saleCard: {
+    width: 260,
+    maxWidth: '80%',
+    alignItems: 'center',
+    padding: 16,
+    borderRadius: 20,
+    backgroundColor: '#FFF8E7',
+    borderWidth: 3,
+    borderColor: OUTLINE,
+    gap: 6,
+  },
+  saleEmoji: { fontSize: 44 },
+  saleTitle: { fontSize: 20, fontWeight: '800', color: OUTLINE, textAlign: 'center' },
+  saleText: { fontSize: 14, color: OUTLINE, textAlign: 'center' },
+  saleButton: { marginTop: 6, paddingVertical: 12, paddingHorizontal: 18, borderRadius: 16, backgroundColor: '#2E9E5B', minHeight: 48, justifyContent: 'center' },
+  saleLocked: { backgroundColor: '#9AA0A6' },
+  saleButtonText: { fontSize: 16, fontWeight: '800', color: '#FFFFFF' },
   pool: { position: 'absolute', backgroundColor: 'rgba(255, 205, 120, 0.05)' },
   poolBox: { position: 'absolute' },
   gadget: { position: 'absolute', alignItems: 'center', justifyContent: 'flex-end' },

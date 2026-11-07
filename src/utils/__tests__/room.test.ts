@@ -2,7 +2,10 @@ import { findRoomItem, HOME_AREAS, MAX_ROOM_THINGS, ROOM_SPAN } from '@/constant
 import type { Room } from '@/types';
 import { makeProfile } from '@/test/fixtures';
 import {
+  addExtraRooms,
   areaAt,
+  buyRoom,
+  ownsArea,
   BUDDY_KEY,
   buddiesHome,
   buyRoomItem,
@@ -123,5 +126,40 @@ describe('buddy home', () => {
     expect(areaAt(home.things[0].x)).toBe(2);
     // Things on cupboard shelves keep their spot along the shelf.
     expect(home.things[1]).toEqual(old.things[1]);
+  });
+
+  describe('extra rooms', () => {
+    const backyard = HOME_AREAS.findIndex((a) => a.id === 'backyard');
+
+    it('sells extra rooms for coins, once', () => {
+      expect(ownsArea(makeProfile(), backyard)).toBe(false);
+      expect(ownsArea(makeProfile(), 0)).toBe(true);
+      expect(buyRoom(makeProfile({ coins: 10 }), 'backyard')).toEqual({ ok: false, reason: 'coins' });
+      expect(buyRoom(makeProfile({ coins: 500 }), 'kitchen')).toEqual({ ok: false, reason: 'unknown' });
+      const r = buyRoom(makeProfile({ coins: 130 }), 'backyard');
+      expect(r.ok).toBe(true);
+      if (!r.ok) return;
+      expect(r.profile.coins).toBe(30);
+      expect(ownsArea(r.profile, backyard)).toBe(true);
+      expect(buyRoom(r.profile, 'backyard')).toEqual({ ok: false, reason: 'owned' });
+    });
+
+    it('keeps things out of a room that is not bought', () => {
+      const bought = buyRoomItem(makeProfile({ coins: 100 }), 'bed', 'k1', backyard, MARCH);
+      expect(bought.ok && areaAt(bought.profile.room.things[0].x)).toBe(0);
+      if (!bought.ok) return;
+      const shut = moveInRoom(bought.profile, 'k1', { x: (backyard + 0.5) / HOME_AREAS.length, y: 0.9 });
+      expect(shut).toBe(bought.profile);
+      const open = moveInRoom({ ...bought.profile, homeRooms: ['backyard'] }, 'k1', { x: (backyard + 0.5) / HOME_AREAS.length, y: 0.9 });
+      expect(areaAt(open.room.things[0].x)).toBe(backyard);
+    });
+
+    it('keeps things where they were when rooms are added to the end', () => {
+      const old: Room = { paint: HOME_AREAS.slice(0, 5).map((a) => ({ ...a.paint })), buddies: {}, things: [{ key: 'a', itemId: 'bed', x: 0.5, y: 0.9, placed: true }] };
+      const home = addExtraRooms(old);
+      expect(home.paint).toHaveLength(HOME_AREAS.length);
+      expect(home.things[0].x).toBeCloseTo((0.5 * 5) / HOME_AREAS.length);
+      expect(areaAt(home.things[0].x)).toBe(2);
+    });
   });
 });

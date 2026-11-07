@@ -61,17 +61,57 @@ export function upgradeRoom(room: Room | OneRoom | undefined, buddyId: string | 
  * Version 11 made each area ROOM_SPAN screens wide and added more areas. Everything keeps
  * its spot in the first screen of its area, next to the built-ins it was by.
  */
-export function widenHome(room: Room): Room {
+export function widenHome(room: Room, areas = AREA_COUNT): Room {
   const widen = (x: number) => {
     const area = Math.min(OLD_AREAS - 1, Math.max(0, Math.floor(x * OLD_AREAS)));
-    return (area + (x * OLD_AREAS - area) / ROOM_SPAN) / AREA_COUNT;
+    return (area + (x * OLD_AREAS - area) / ROOM_SPAN) / areas;
   };
   const buddies: Room['buddies'] = {};
   for (const [id, spot] of Object.entries(room.buddies)) buddies[id] = { ...spot, x: widen(spot.x) };
   return {
-    paint: HOME_AREAS.map((a, i) => room.paint[i] ?? { ...a.paint }),
+    paint: HOME_AREAS.slice(0, areas).map((a, i) => room.paint[i] ?? { ...a.paint }),
     buddies,
     things: room.things.map((t) => (t.in ? t : { ...t, x: widen(t.x) })),
+  };
+}
+
+/** Areas the home had from version 11 until the extra rooms came in version 12. */
+export const AREAS_BEFORE_EXTRA_ROOMS = 5;
+
+/**
+ * Version 12 added areas on the end. Positions are a share of the home's width, so they
+ * shrink to keep everything where it was, and the new areas get their starting paint.
+ */
+export function addExtraRooms(room: Room, from = AREAS_BEFORE_EXTRA_ROOMS): Room {
+  const scale = (x: number) => (x * from) / AREA_COUNT;
+  const buddies: Room['buddies'] = {};
+  for (const [id, spot] of Object.entries(room.buddies)) buddies[id] = { ...spot, x: scale(spot.x) };
+  return {
+    paint: HOME_AREAS.map((a, i) => room.paint[i] ?? { ...a.paint }),
+    buddies,
+    things: room.things.map((t) => (t.in ? t : { ...t, x: scale(t.x) })),
+  };
+}
+
+/** Rooms the profile can use: the ones everyone has plus the extra ones bought. */
+export function ownsArea(profile: Profile, area: number): boolean {
+  const a = HOME_AREAS[area];
+  return !!a && (a.price === undefined || profile.homeRooms.includes(a.id));
+}
+
+export type HomeRoomBuyResult =
+  | { ok: true; profile: Profile }
+  | { ok: false; reason: 'unknown' | 'owned' | 'coins' };
+
+/** Buys an extra room for the home with coins. */
+export function buyRoom(profile: Profile, areaId: string): HomeRoomBuyResult {
+  const area = HOME_AREAS.find((a) => a.id === areaId);
+  if (!area || area.price === undefined) return { ok: false, reason: 'unknown' };
+  if (profile.homeRooms.includes(area.id)) return { ok: false, reason: 'owned' };
+  if (profile.coins < area.price) return { ok: false, reason: 'coins' };
+  return {
+    ok: true,
+    profile: { ...profile, coins: profile.coins - area.price, homeRooms: [...profile.homeRooms, area.id] },
   };
 }
 
@@ -111,6 +151,10 @@ export function buyRoomItem(
   at?: number,
 ): RoomBuyResult {
   const item = findRoomItem(itemId);
+  if (!ownsArea(profile, area)) {
+    area = 0;
+    at = undefined;
+  }
   if (!item) return { ok: false, reason: 'unknown' };
   if (!inSeason(item, month)) return { ok: false, reason: 'season' };
   if (profile.room.things.length >= MAX_ROOM_THINGS) return { ok: false, reason: 'full' };
@@ -216,6 +260,8 @@ export function placeBuddy(profile: Profile, buddyId: string, place: Placement):
 
 /** Moves a thing, or a buddy when `key` is BUDDY_KEY plus its id. */
 export function moveInRoom(profile: Profile, key: string, place: Placement): Profile {
+  // A room not bought yet is shut: nothing can be set down there.
+  if (!place.in && !ownsArea(profile, areaAt(place.x))) return profile;
   if (key.startsWith(BUDDY_KEY)) return placeBuddy(profile, key.slice(BUDDY_KEY.length), place);
   return placeThing(profile, key, place);
 }
@@ -224,6 +270,10 @@ export function moveInRoom(profile: Profile, key: string, place: Placement): Pro
 export function setPlaced(profile: Profile, key: string, placed: boolean, area = 0, at?: number): Profile {
   const thing = profile.room.things.find((t) => t.key === key);
   if (!thing) return profile;
+  if (!ownsArea(profile, area)) {
+    area = 0;
+    at = undefined;
+  }
   const room = placed ? profile.room : dropRiders(profile.room, key, thing);
   const spot = placed ? floorSpot(area, 1, at) : thing;
   return withRoom(profile, {
@@ -256,6 +306,10 @@ export function setBuddyHome(profile: Profile, buddyId: string, home: boolean, a
     return withRoom(profile, { ...dropRiders(profile.room, BUDDY_KEY + buddyId, spot), buddies: others });
   }
   if (spot) return profile;
+  if (!ownsArea(profile, area)) {
+    area = 0;
+    at = undefined;
+  }
   const n = Object.keys(profile.room.buddies).length + 2;
   return withRoom(profile, { buddies: { ...profile.room.buddies, [buddyId]: { ...floorSpot(area, n, at), y: 0.92 } } });
 }
