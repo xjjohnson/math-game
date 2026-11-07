@@ -60,7 +60,7 @@ describe('buddy home', () => {
     const moved = moveInRoom(bought.profile, 'k1', { x: 2, y: -1 });
     expect(moved.room.things[0].x).toBeGreaterThan(0.98);
     expect(moved.room.things[0].y).toBe(0.2);
-    expect(moveInRoom(moved, `${BUDDY_KEY}puppy`, { x: 0.7, y: 0.7 }).room.buddies.puppy).toEqual({ x: 0.7, y: 0.7 });
+    expect(moveInRoom(moved, `${BUDDY_KEY}puppy`, { x: 0.3, y: 0.7 }).room.buddies.puppy).toEqual({ x: 0.3, y: 0.7 });
     expect(clampSpot({ x: 0.5, y: 0.5 })).toEqual({ x: 0.5, y: 0.5 });
   });
 

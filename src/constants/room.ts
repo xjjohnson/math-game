@@ -1,5 +1,5 @@
 /** The parts of the buddy's home, left to right. The home scrolls sideways through them. */
-export type AreaId = 'living' | 'kitchen' | 'bedroom' | 'bathroom' | 'playroom' | 'backyard' | 'study' | 'garage';
+export type AreaId = 'living' | 'kitchen' | 'bedroom' | 'bathroom' | 'playroom' | 'backyard' | 'study' | 'garage' | 'bedroom2' | 'bedroom3';
 
 export interface HomeArea {
   id: AreaId;
@@ -20,6 +20,8 @@ export const HOME_AREAS: HomeArea[] = [
   // Extra rooms, bought with coins. They start bare, ready to fill with things from the shop.
   { id: 'backyard', name: 'Backyard', emoji: '🌳', paint: { wall: 2, floor: 3 }, price: 100 },
   { id: 'study', name: 'Study', emoji: '📖', paint: { wall: 4, floor: 5 }, price: 120 },
+  { id: 'bedroom2', name: 'Bedroom 2', emoji: '🛌', paint: { wall: 1, floor: 1 }, price: 80 },
+  { id: 'bedroom3', name: 'Bedroom 3', emoji: '🌙', paint: { wall: 2, floor: 4 }, price: 100 },
   { id: 'garage', name: 'Garage', emoji: '🚗', paint: { wall: 6, floor: 2 }, price: 150 },
 ];
 

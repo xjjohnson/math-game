@@ -822,10 +822,10 @@ function Area({ id, index, size, wall, floor }: AreaProps) {
     <View style={[styles.area, { left: index * size.areaWidth, width: size.areaWidth, backgroundColor: wall }]}>
       <View style={[styles.floor, { top: size.floorY, backgroundColor: floor }]} />
       <View style={[styles.baseboard, { top: size.floorY - 8 }]} />
-      {id === 'bedroom' || id === 'bathroom' || id === 'playroom' ? (
+      {id === 'bedroom' || id === 'bedroom2' || id === 'bedroom3' || id === 'bathroom' || id === 'playroom' ? (
         <View
           style={[
-            id === 'bedroom' ? styles.rug : id === 'bathroom' ? styles.bathMat : styles.playMat,
+            id === 'bedroom' || id === 'bedroom2' || id === 'bedroom3' ? styles.rug : id === 'bathroom' ? styles.bathMat : styles.playMat,
             { top: size.floorY + (size.height - size.floorY) * 0.45, height: (size.height - size.floorY) * 0.25 },
           ]}
         />

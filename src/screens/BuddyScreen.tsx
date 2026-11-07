@@ -944,7 +944,15 @@ function ShopDrawer({ coins, month, area, full, onBuy }: ShopDrawerProps) {
   const [picked, setShelf] = useState<RoomItemGroup | null>(null);
   const holiday = groups.find((g) => ROOM_ITEMS.some((i) => i.group === g.id && i.month === month));
   const here = HOME_AREAS[area]?.id ?? 'living';
-  const shelf = picked ?? holiday?.id ?? (here === 'playroom' ? 'toys' : here);
+  const shelfOf: Partial<Record<string, RoomItemGroup>> = {
+    playroom: 'toys',
+    bedroom2: 'bedroom',
+    bedroom3: 'bedroom',
+    backyard: 'toys',
+    study: 'furniture',
+    garage: 'toys',
+  };
+  const shelf = picked ?? holiday?.id ?? shelfOf[here] ?? (here as RoomItemGroup);
   const areaName = HOME_AREAS[area]?.name.toLowerCase() ?? 'room';
   return (
     <>
