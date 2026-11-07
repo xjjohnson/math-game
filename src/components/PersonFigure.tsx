@@ -3,7 +3,7 @@ import Animated, { useAnimatedStyle } from 'react-native-reanimated';
 
 import { Text } from '@/components/AppText';
 import { useArmWave, useBlink } from '@/components/Motion';
-import { Glasses, Hat, Neckwear, shoeLook } from '@/components/PersonAccessories';
+import { BARE_SHOES, Glasses, Hat, Neckwear, shoeLook } from '@/components/PersonAccessories';
 import {
   HAIR_COLORS,
   SKIN_TONES,
@@ -75,6 +75,7 @@ export function PersonFigure({ look, size, dressed, gift, alive = false, asleep 
   const legH = u * 0.29;
   const eyeY = headCY + headD * 0.05;
   const shoes = shoeLook(dressed.feet);
+  const shod = shoes !== BARE_SHOES;
   const fit = { u, cx, headD, headTop, eyeY, line, edge };
 
   const top = dressed.top;
@@ -93,6 +94,9 @@ export function PersonFigure({ look, size, dressed, gift, alive = false, asleep 
     width,
     height,
   });
+
+  // Where the top of the shoe sits; the bare leg stops here so no foot pokes out behind it.
+  const shoeTop = u * 0.915 - u * 0.07 * shoes.tall * 10 + line;
 
   const legsCover = (side: number) => {
     if (!legs || legs.cut === 'skirt') return null;
@@ -119,9 +123,9 @@ export function PersonFigure({ look, size, dressed, gift, alive = false, asleep 
           <View key={`leg${side}`}>
             <View
               style={[
-                box(cx + (side < 0 ? -legW - u * 0.008 : u * 0.008), legTop, legW, legH),
+                box(cx + (side < 0 ? -legW - u * 0.008 : u * 0.008), legTop, legW, shod ? shoeTop - legTop : legH),
                 edge,
-                { backgroundColor: skin, borderRadius: legW * 0.3 },
+                { backgroundColor: skin, borderRadius: legW * 0.3, ...(shod ? { borderBottomWidth: 0, borderBottomLeftRadius: 0, borderBottomRightRadius: 0 } : null) },
               ]}
             />
             {legsCover(side)}
@@ -152,9 +156,9 @@ export function PersonFigure({ look, size, dressed, gift, alive = false, asleep 
               {shoes.sock ? (
                 <View
                   style={[
-                    box(left + u * 0.02, u * 0.8, legW + u * 0.01, u * 0.12),
+                    box(cx + (side < 0 ? -legW - u * 0.008 : u * 0.008) - u * 0.004, u * 0.8, legW + u * 0.008, u * 0.12),
                     edge,
-                    { backgroundColor: shoes.sock, borderRadius: legW * 0.3 },
+                    { backgroundColor: shoes.sock, borderRadius: legW * 0.3, borderBottomWidth: 0, borderBottomLeftRadius: 0, borderBottomRightRadius: 0 },
                   ]}
                 />
               ) : null}

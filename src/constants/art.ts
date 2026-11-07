@@ -20,6 +20,16 @@ export const ART: Record<string, Art> = {
   '@pooh': { source: require('../../assets/art/pooh.png'), standIn: '🐻' },
   '@simba': { source: require('../../assets/art/simba.png'), standIn: '🦁' },
   '@nemo': { source: require('../../assets/art/nemo.png'), standIn: '🐠' },
+  // Toys and decorations
+  '@stitch-ukulele': { source: require('../../assets/art/stitch-ukulele.png'), standIn: '🎸' },
+  '@stitch-ship': { source: require('../../assets/art/stitch-ship.png'), standIn: '🛸' },
+  '@stitch-surfboard': { source: require('../../assets/art/stitch-surfboard.png'), standIn: '🏄' },
+  '@hibiscus': { source: require('../../assets/art/hibiscus.png'), standIn: '🌺' },
+  '@bingo': { source: require('../../assets/art/bingo.png'), standIn: '🐶' },
+  '@keepy-uppy': { source: require('../../assets/art/keepy-uppy.png'), standIn: '🎈' },
+  '@magic-xylophone': { source: require('../../assets/art/magic-xylophone.png'), standIn: '🎶' },
+  '@heeler-sign': { source: require('../../assets/art/heeler-sign.png'), standIn: '🏠' },
+  '@pawprint': { source: require('../../assets/art/pawprint.png'), standIn: '🐾' },
 };
 
 export function artFor(value: string): Art | undefined {

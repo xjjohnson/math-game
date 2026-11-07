@@ -97,6 +97,14 @@ export interface Profile {
   looks: Record<string, PersonLook>;
   /** Ids of the extra rooms (HomeArea.price) bought for the buddies' home. */
   homeRooms: string[];
+  /** Community buildings whose daily job is done, for today only. */
+  town: TownVisits;
+}
+
+export interface TownVisits {
+  /** Local date, "YYYY-MM-DD". */
+  date: string;
+  done: string[];
 }
 
 /** Wearable ids a buddy has on, one per spot. */

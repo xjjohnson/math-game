@@ -12,6 +12,7 @@ import { Furniture } from '@/components/Furniture';
 import { Confetti } from '@/components/Motion';
 import { Screen } from '@/components/Screen';
 import { Sticker } from '@/components/Sticker';
+import { stickerText } from '@/constants/art';
 import {
   CHALK_DRAWINGS,
   findCupboard,
@@ -275,10 +276,10 @@ export function BuddyScreen() {
     }
     const holder = thing.on?.startsWith(BUDDY_KEY) ? nameOf(thing.on.slice(BUDDY_KEY.length)) : null;
     if (holder && FOOD_GROUPS.includes(item.group) && !item.says) say(`${holder} takes a bite of the ${what}. Yum! 😋`);
-    else if (item.light) say(`Click! ${item.emoji}`);
+    else if (item.light) say(`Click! ${stickerText(item.emoji)}`);
     else if (item.says) say(`${holder ?? name} ${item.says}! ${item.fx ?? ''}`);
     else if (holder) say(`${holder} holds the ${what} tight.`);
-    else say(`${name} likes the ${what}! ${item.emoji}`);
+    else say(`${name} likes the ${what}! ${stickerText(item.emoji)}`);
   };
 
   const tapBuddy = (id: string) => {
@@ -292,7 +293,7 @@ export function BuddyScreen() {
     const result = buyRoomItem(profile.id, itemId, area, viewAt.current);
     if (result.ok) {
       playSound('reward');
-      say(`${item?.emoji} New ${item?.name.toLowerCase()} in the ${areaName}! Drag it where you like.`);
+      say(`${stickerText(item?.emoji ?? '')} New ${item?.name.toLowerCase()} in the ${areaName}! Drag it where you like.`);
     } else if (result.reason === 'coins' && item) {
       say(`You need ${item.price - profile.coins} more coins for the ${item.name.toLowerCase()}.`);
     } else if (result.reason === 'full') {
@@ -988,7 +989,7 @@ function ShopDrawer({ coins, month, area, full, onBuy }: ShopDrawerProps) {
 
 /** An emoji, or a small drawing for furniture without one. */
 function ItemPicture({ item }: { item: RoomItem }) {
-  if (!item.draw) return <Text style={styles.thingEmoji}>{item.emoji}</Text>;
+  if (!item.draw) return <Sticker value={item.emoji} size={32} />;
   const height = 30;
   const width = Math.min(52, height * (item.wide ?? 1));
   return <Furniture shape={item.draw} width={width} height={Math.min(height, width / (item.wide ?? 1))} />;

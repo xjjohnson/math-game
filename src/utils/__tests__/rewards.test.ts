@@ -79,8 +79,17 @@ describe('rewards', () => {
       const date = `2026-02-${String(day).padStart(2, '0')}`;
       const config = dailyChallengeConfig(date, { grade: 0, difficulty: 'easy' });
       expect(config.mode).toMatchObject({ kind: 'operation' });
-      expect(['add', 'subtract']).toContain((config.mode as { operation: string }).operation);
+      expect((config.mode as { operation: string }).operation).toBe('add');
     }
+  });
+
+  it('mixes subtraction into the 1st grade daily challenge but not kindergarten', () => {
+    const ops = new Set<string>();
+    for (let day = 1; day <= 28; day++) {
+      const config = dailyChallengeConfig(`2026-02-${String(day).padStart(2, '0')}`, { grade: 1, difficulty: 'easy' });
+      ops.add((config.mode as { operation: string }).operation);
+    }
+    expect([...ops].sort()).toEqual(['add', 'subtract']);
   });
 });
 

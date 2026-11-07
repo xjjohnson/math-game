@@ -150,5 +150,103 @@ def nemo():
     smile(d, 196, 150, 18, 12, '#7A3B00', 4)
     save(im, 'nemo')
 
-for f in (stitch, mickey, minnie, olaf, pooh, simba, nemo):
+
+def rect(d, x0, y0, x1, y1, fill, ink=INK, w=6):
+    d.rounded_rectangle([x0 * S, y0 * S, x1 * S, y1 * S], radius=10 * S, fill=fill, outline=ink, width=w * S)
+
+def line(d, pts, color, w):
+    d.line([(x * S, y * S) for x, y in pts], fill=color, width=w * S, joint='curve')
+
+# ---- Stitch things ----
+def stitch_ukulele():
+    im, d = new()
+    line(d, [(120, 120), (210, 36)], '#7A4B12', 14)            # neck
+    rect(d, 196, 20, 232, 52, '#5B3A0C', '#3A2408', 4)         # head
+    e(d, 92, 168, 56, 52, '#E8A33D', '#7A4B12')                # lower bout
+    e(d, 118, 128, 36, 34, '#E8A33D', '#7A4B12')               # upper bout
+    e(d, 98, 160, 18, 18, '#3A2408', '#3A2408', 0)             # sound hole
+    for dx in (-5, 0, 5):
+        line(d, [(98 + dx, 162), (206 + dx * .3, 40)], '#F5F0E0', 2)
+    poly(d, [(40, 226), (60, 196), (76, 214)], '#FF8FB1', '#B84D6C', 4)   # flower-ish bow
+    save(im, 'stitch-ukulele')
+
+def stitch_ship():
+    im, d = new()
+    e(d, 128, 150, 100, 52, '#B7C0D8', '#4A5578')
+    e(d, 128, 112, 54, 50, '#8FD3FF', '#4A5578')               # dome
+    e(d, 112, 96, 14, 10, '#FFFFFF', '#FFFFFF', 0)
+    for x in (62, 128, 194):
+        e(d, x, 160, 12, 12, '#FFD54F', '#8A6A00', 4)
+    poly(d, [(60, 190), (96, 214), (80, 232), (44, 206)], '#E53935', '#8E1B1B', 4)
+    poly(d, [(196, 190), (160, 214), (176, 232), (212, 206)], '#E53935', '#8E1B1B', 4)
+    save(im, 'stitch-ship')
+
+def stitch_surfboard():
+    im, d = new()
+    d2 = [(128, 14), (176, 70), (184, 150), (166, 232), (128, 246), (90, 232), (72, 150), (80, 70)]
+    poly(d, d2, '#4A7BD8', '#1B2A5E', 6)
+    line(d, [(128, 30), (128, 236)], '#FFFFFF', 7)
+    for y, c in ((100, '#FF8FB1'), (150, '#FFD54F'), (200, '#FF8FB1')):
+        e(d, 150, y, 12, 12, c, c, 0)
+    save(im, 'stitch-surfboard')
+
+def hibiscus():
+    im, d = new()
+    import math
+    for i in range(5):
+        a = math.radians(-90 + i * 72)
+        e(d, 128 + 52 * math.cos(a), 128 + 52 * math.sin(a), 44, 44, '#FF6F91', '#B03A5B', 5)
+    e(d, 128, 128, 20, 20, '#FFD54F', '#8A6A00', 4)
+    line(d, [(128, 128), (176, 76)], '#E53935', 6)
+    save(im, 'hibiscus')
+
+# ---- Bluey things ----
+def bingo():
+    im, d = new()
+    poly(d, [(34, 44), (104, 88), (70, 128)], '#E8944A', '#7A3D12', 6)
+    poly(d, [(222, 44), (152, 88), (186, 128)], '#E8944A', '#7A3D12', 6)
+    e(d, 128, 150, 88, 78, '#F0A15A', '#7A3D12')
+    e(d, 128, 182, 52, 38, '#FBE3C4', '#FBE3C4', 0)
+    e(d, 92, 138, 24, 24, '#FBE3C4', '#FBE3C4', 0)
+    e(d, 164, 138, 24, 24, '#FBE3C4', '#FBE3C4', 0)
+    eyes(d, 92, 164, 138, 14, '#7A3D12')
+    e(d, 128, 166, 14, 10, '#7A3D12', '#7A3D12', 0)
+    smile(d, 128, 178, 26, 18, '#7A3D12')
+    blush(d, 66, 190, 170)
+    save(im, 'bingo')
+
+def keepy_uppy():
+    im, d = new()
+    e(d, 128, 100, 72, 84, '#B388F5', '#5E35B1')
+    e(d, 100, 66, 14, 22, '#E6D9FF', '#E6D9FF', 0)
+    poly(d, [(116, 180), (140, 180), (128, 196)], '#5E35B1', '#5E35B1', 3)
+    line(d, [(128, 196), (110, 222), (140, 240)], '#5E35B1', 4)
+    save(im, 'keepy-uppy')
+
+def magic_xylophone():
+    im, d = new()
+    rect(d, 20, 190, 236, 214, '#8D5524', '#4A2A0C', 5)
+    cols = ['#E53935', '#FB8C00', '#FDD835', '#43A047', '#1E88E5', '#8E24AA']
+    for i, c in enumerate(cols):
+        h = 150 - i * 14
+        rect(d, 30 + i * 35, 200 - h, 56 + i * 35, 200, c, INK, 4)
+    save(im, 'magic-xylophone')
+
+def heeler_sign():
+    im, d = new()
+    line(d, [(128, 150), (128, 246)], '#8D5524', 14)
+    rect(d, 28, 30, 228, 160, '#FFF3C4', '#7A4B12', 7)
+    poly(d, [(60, 110), (128, 56), (196, 110)], '#E8944A', '#7A3D12', 5)   # roof
+    rect(d, 84, 108, 172, 146, '#5C9BE0', '#1B2A5E', 5)
+    save(im, 'heeler-sign')
+
+def pawprint():
+    im, d = new()
+    e(d, 128, 168, 56, 46, '#5C9BE0', '#1B2A5E')
+    for x, y in ((62, 108), (104, 70), (152, 70), (194, 108)):
+        e(d, x, y, 24, 30, '#5C9BE0', '#1B2A5E')
+    save(im, 'pawprint')
+
+for f in (stitch, mickey, minnie, olaf, pooh, simba, nemo, stitch_ukulele, stitch_ship, stitch_surfboard,
+          hibiscus, bingo, keepy_uppy, magic_xylophone, heeler_sign, pawprint):
     f()

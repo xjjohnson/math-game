@@ -20,6 +20,7 @@ import { Furniture } from '@/components/Furniture';
 import { Lamp } from '@/components/Lamp';
 import { Bob, Drifting, Flicker, FloatUp, Lively, Rumble, Spin, type BounceKind } from '@/components/Motion';
 import { PopIn } from '@/components/PopIn';
+import { Sticker } from '@/components/Sticker';
 import { ApplianceView } from '@/components/Appliance';
 import {
   APPLIANCES,
@@ -741,9 +742,13 @@ export function BuddyRoom(props: Props) {
                       ) : piece.item?.candle ? (
                         <Candle width={piece.width} height={piece.height} wax={piece.item.candle} lit={lit.has(piece.key)} seed={piece.key} />
                       ) : (
-                        <Text style={{ fontSize: Math.round(piece.height * 0.85), lineHeight: tall }}>
-                          {piece.item?.emoji}
-                        </Text>
+                        piece.item?.emoji.startsWith('@') ? (
+                          <Sticker value={piece.item.emoji} size={Math.round(piece.height * 0.85)} />
+                        ) : (
+                          <Text style={{ fontSize: Math.round(piece.height * 0.85), lineHeight: tall }}>
+                            {piece.item?.emoji}
+                          </Text>
+                        )
                       )}
                     </Lively>
                   </PopIn>
