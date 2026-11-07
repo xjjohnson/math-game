@@ -4,6 +4,7 @@ import { StyleSheet } from 'react-native';
 
 import { Text } from '@/components/AppText';
 import { BigButton } from '@/components/BigButton';
+import { ChangeGiving } from '@/components/ChangeGiving';
 import { ChoiceButtons } from '@/components/ChoiceButtons';
 import { Screen } from '@/components/Screen';
 import { colors, fontSizes, spacing } from '@/constants/theme';
@@ -11,7 +12,7 @@ import { usePlace } from '@/hooks/usePlace';
 import { useActiveProfile, useProfiles } from '@/store/profiles';
 import { dateKey } from '@/utils/dates';
 import { createRng, randomSeed } from '@/utils/seededRandom';
-import { BUILDINGS, shiftDone, shiftPay, shiftQuestions, SHIFT_QUESTIONS, type BuildingId, type ShiftPay } from '@/utils/town';
+import { BUILDINGS, changeCoins, shiftDone, shiftPay, shiftQuestions, SHIFT_QUESTIONS, type BuildingId, type ShiftPay } from '@/utils/town';
 
 /** One job at a community building: five questions, then pay (once a day). */
 export function ShiftScreen() {
@@ -56,15 +57,30 @@ export function ShiftScreen() {
       ) : null}
       <Text style={styles.text}>Question {index + 1} of {SHIFT_QUESTIONS}</Text>
       <Text style={styles.prompt}>{q.prompt}</Text>
-      <ChoiceButtons
-        choices={q.choices}
-        answer={q.answer}
-        selected={selected}
-        onSelect={(c) => {
-          setSelected(c);
-          if (c === q.answer) setCorrect((n) => n + 1);
-        }}
-      />
+      {q.change ? (
+        <ChangeGiving
+          key={index}
+          price={q.change.price}
+          paid={q.change.paid}
+          answer={q.answer}
+          coins={changeCoins(profile.grade)}
+          given={selected}
+          onGive={(total) => {
+            setSelected(total);
+            if (total === q.answer) setCorrect((n) => n + 1);
+          }}
+        />
+      ) : (
+        <ChoiceButtons
+          choices={q.choices}
+          answer={q.answer}
+          selected={selected}
+          onSelect={(c) => {
+            setSelected(c);
+            if (c === q.answer) setCorrect((n) => n + 1);
+          }}
+        />
+      )}
       {answered ? (
         <BigButton
           label={index + 1 >= SHIFT_QUESTIONS ? 'Finish shift' : 'Next'}

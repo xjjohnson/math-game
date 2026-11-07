@@ -1,6 +1,6 @@
 import { makeProfile } from '@/test/fixtures';
 import { createRng } from '@/utils/seededRandom';
-import { BUILDINGS, finishShift, shiftDone, shiftQuestions, SHIFT_QUESTIONS } from '@/utils/town';
+import { BUILDINGS, changeCoins, finishShift, handedBack, shiftDone, shiftQuestions, SHIFT_QUESTIONS } from '@/utils/town';
 
 const today = '2026-11-07';
 const withPup = makeProfile({ unlocks: ['buddy-pup'], equipped: { background: 'bg-cream', cardStyle: 'card-classic', companion: 'buddy-pup' } });
@@ -11,9 +11,24 @@ describe('community shifts', () => {
       for (const grade of [0, 1, 3, 6] as const) {
         const qs = shiftQuestions(b.id, grade, createRng(7));
         expect(qs).toHaveLength(SHIFT_QUESTIONS);
-        qs.forEach((q) => expect(q.choices).toContain(q.answer));
+        qs.forEach((q) => (q.change ? expect(q.change.paid - q.change.price).toBe(q.answer) : expect(q.choices).toContain(q.answer)));
       }
     }
+  });
+
+  it('makes the shop and bakery hand back change from grade 1 up, with coins that can make the answer', () => {
+    for (const grade of [1, 3, 6] as const) {
+      for (const id of ['shop', 'bakery'] as const) {
+        const qs = shiftQuestions(id, grade, createRng(11));
+        qs.forEach((q) => {
+          expect(q.change).toBeDefined();
+          expect(q.answer).toBeGreaterThan(0);
+          expect(changeCoins(grade)).toContain(1); // any amount can be made
+        });
+      }
+    }
+    expect(shiftQuestions('shop', 0, createRng(3)).every((q) => !q.change)).toBe(true);
+    expect(handedBack([5, 2, 1])).toBe(8);
   });
 
   it('keeps kindergarten to addition within 20', () => {
