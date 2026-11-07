@@ -244,7 +244,7 @@ export const useProfiles = create<ProfilesState>()(
         set((s) => ({ profiles: s.profiles.map((p) => (p.id === id ? setLook(p, buddyId, change) : p)) })),
       finishShift: (id, building, correct) => {
         const current = get().profiles.find((p) => p.id === id);
-        if (!current) return { coins: 0, hearts: 0 };
+        if (!current) return { coins: 0, hearts: 0, bonus: 0 };
         const { profile, pay } = finishShift(current, building, correct, dateKey());
         set((s) => ({ profiles: s.profiles.map((p) => (p.id === id ? profile : p)) }));
         return pay;

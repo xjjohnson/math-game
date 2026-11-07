@@ -8,7 +8,8 @@
 - **Visiting friends over Nearby (up to 8 phones):** everyone in the same building stands in the same room as their character, and everyone moves their own character live (#42, #43, #44; protocol v5 and v6).
 - Opening Community **connects by itself**: it joins a visit someone is already hosting, otherwise it hosts one. No Host/Join buttons.
 - **Bring your buddies** (choose any of the ones you own, up to 3, from the 🐾 Bring button; nobody comes until you pick) and **wear an accessory** (hats, glasses); friends see them. You can only move your own person and buddies, never other players'.
-- Money jobs are interactive: in the **Shop and Bakery** a customer pays, "Give back: ?" shows what's owed, and you tap coins and bills (bigger for bigger values) onto the counter until it's the right change. Wrong answers get a gentle hint (count up for little ones, subtract for bigger kids) and a second try; kindergarten keeps the simpler add-it-up questions.
+- Money jobs are interactive: in the **Shop and Bakery** a customer pays, "Give back: ?" shows what's owed, and you tap green US dollar bills ($1, $5, $10, $20, plus $50 and $100 for older grades; no $2, no coins) onto the counter until it's the right change. Wrong answers get a gentle hint (count up for little ones, subtract for bigger kids) and a second try; kindergarten keeps the simpler add-it-up questions.
+- Jobs always pay something: the first play of the day pays full (2 coins per right answer, or hearts for your buddy at the Park) plus a bonus of 5 coins or 2 hearts; playing again the same day pays 1 coin per right answer as practice.
 
 **Buddy home**
 - Buy **extra rooms** with coins: Backyard, Study, Bedroom 2, Bedroom 3, Garage (#41).

@@ -28,6 +28,11 @@ export const BUILDINGS: Building[] = [
 export const SHIFT_QUESTIONS = 5;
 export const COINS_PER_RIGHT = 2;
 export const HEARTS_PER_RIGHT = 1;
+/** Playing a job again the same day still pays this many coins for each right answer. */
+export const REPLAY_COINS_PER_RIGHT = 1;
+/** The first play of the day pays its full rate plus a bonus (coins, or hearts for buddy jobs), if anything was right. */
+export const FIRST_BONUS_COINS = 5;
+export const FIRST_BONUS_HEARTS = 2;
 
 export interface TownQuestion {
   prompt: string;
@@ -37,11 +42,25 @@ export interface TownQuestion {
   change?: { price: number; paid: number; item: string };
 }
 
-/** The coins and bills offered for giving change, bigger ones for older kids. */
-export function changeCoins(grade: Grade): number[] {
-  if (grade <= 1) return [1, 2, 5, 10];
-  if (grade <= 3) return [1, 5, 10, 20, 50];
+/** The US bills offered for giving change: $1, $5, $10, $20, and bigger ones where the amounts need them. */
+export function changeBills(grade: Grade): number[] {
+  if (grade <= 1) return [1, 5, 10];
+  if (grade === 2) return [1, 5, 10, 20];
+  if (grade === 3) return [1, 5, 10, 20, 50];
   return [1, 5, 10, 20, 50, 100];
+}
+
+/** The bills a customer hands over to pay `amount`, biggest first; empty if that would be a very big pile. */
+export function paymentBills(amount: number, bills: number[]): number[] {
+  const out: number[] = [];
+  let left = amount;
+  for (const b of [...bills].sort((a, c) => c - a)) {
+    while (left >= b) {
+      out.push(b);
+      left -= b;
+    }
+  }
+  return left === 0 && out.length <= 6 ? out : [];
 }
 
 /** Adds up what was handed back. */
@@ -140,19 +159,30 @@ export function shiftDone(profile: Profile, building: BuildingId, today: string)
 export interface ShiftPay {
   coins: number;
   hearts: number;
+  /** How much of the coins (or hearts) is the first-play bonus. */
+  bonus: number;
 }
 
-/** What a shift with `correct` right answers pays. Heart jobs pay coins instead when there is no buddy. */
-export function shiftPay(profile: Profile, building: BuildingId, correct: number): ShiftPay {
+/**
+ * What a shift with `correct` right answers pays. The first play of the day pays the full rate plus a
+ * bonus (hearts for buddy jobs when there is a buddy, otherwise coins); playing again pays a little.
+ */
+export function shiftPay(profile: Profile, building: BuildingId, correct: number, first = true): ShiftPay {
   const b = BUILDINGS.find((x) => x.id === building)!;
-  if (b.reward === 'hearts' && buddyCompanion(profile)) return { coins: 0, hearts: correct * HEARTS_PER_RIGHT };
-  return { coins: correct * COINS_PER_RIGHT, hearts: 0 };
+  if (!first) return { coins: correct * REPLAY_COINS_PER_RIGHT, hearts: 0, bonus: 0 };
+  const hearts = b.reward === 'hearts' && buddyCompanion(profile);
+  if (hearts) {
+    const bonus = correct > 0 ? FIRST_BONUS_HEARTS : 0;
+    return { coins: 0, hearts: correct * HEARTS_PER_RIGHT + bonus, bonus };
+  }
+  const bonus = correct > 0 ? FIRST_BONUS_COINS : 0;
+  return { coins: correct * COINS_PER_RIGHT + bonus, hearts: 0, bonus };
 }
 
-/** Finishes a shift: pays out and marks the building done for today. A second shift the same day pays nothing. */
+/** Finishes a shift and pays out. Only the first play of the day marks the building done and earns the bonus; replays pay a little. */
 export function finishShift(profile: Profile, building: BuildingId, correct: number, today: string): { profile: Profile; pay: ShiftPay } {
-  if (shiftDone(profile, building, today)) return { profile, pay: { coins: 0, hearts: 0 } };
-  const pay = shiftPay(profile, building, correct);
+  const first = !shiftDone(profile, building, today);
+  const pay = shiftPay(profile, building, correct, first);
   const buddyId = profile.equipped.companion;
   const buddyHearts =
     pay.hearts > 0 && buddyId
@@ -165,7 +195,7 @@ export function finishShift(profile: Profile, building: BuildingId, correct: num
       ...profile,
       coins: profile.coins + pay.coins,
       buddyHearts,
-      town: { date: today, done: [...visits.done, building] },
+      town: first ? { date: today, done: [...visits.done, building] } : visits,
     },
   };
 }
