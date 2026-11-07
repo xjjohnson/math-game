@@ -149,8 +149,8 @@ function Bakery({ w, h, floorY }: Part) {
         <View style={styles.dials}><View style={styles.dial} /><View style={styles.dial} /></View>
       </View>
       {/* Bread shelf */}
-      <View style={[edge, styles.shelf, { left: w * 0.24, top: h * 0.2, width: w * 0.3 }]} />
-      <Text style={[styles.pastry, { position: 'absolute', left: w * 0.27, top: h * 0.13 }]}>🍞 🥖 🥐</Text>
+      <View style={[edge, styles.shelf, { left: w * 0.24, top: h * 0.3, width: w * 0.3 }]} />
+      <Text style={[styles.pastry, { position: 'absolute', left: w * 0.27, top: h * 0.24 }]}>🍞 🥖 🥐</Text>
     </>
   );
 }

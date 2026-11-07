@@ -7,7 +7,6 @@ import { colors } from '@/constants/theme';
 import { townSession } from '@/services/townSession';
 import { useActiveProfile } from '@/store/profiles';
 import { allGranted, checkPermissions, devicePermissions } from '@/utils/nearbyPermissions';
-import { companionFor } from '@/utils/shop';
 import { Nearby } from '../../modules/math-nearby';
 
 /**
@@ -25,11 +24,6 @@ export function TownScreen() {
     setNeedsPermission(!ok);
     if (!ok || townSession().active) return;
     const session = townSession();
-    // First time here: bring the buddy that is out with you.
-    if (!session.getState().look.chosen) {
-      const buddy = companionFor(profile)?.emoji;
-      session.setLook(buddy ? [buddy] : []);
-    }
     void session.auto({ name: profile.name, avatar: profile.avatar });
   }, [profile]);
 

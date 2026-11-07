@@ -6,6 +6,7 @@ import { createNearbyTransport } from '@/services/nearbyTransport';
 import {
   HOST_ID,
   MAX_PLAYERS,
+  ownerOf,
   PROTOCOL_VERSION,
   TOWN_MARK,
   TOWN_VERSION,
@@ -225,8 +226,10 @@ export class TownSession {
     if (this.place === place) this.setPlace(null);
   }
 
-  /** Drag a person (anyone, not just yourself) to a spot in the scene. */
+  /** Drag your own person, or one of your buddies, to a spot in the scene. */
   moveTo(id: string, x: number, y: number) {
+    // Only your own person and buddies can be moved.
+    if (ownerOf(id) !== this.state.myId) return;
     this.set({ spots: { ...this.state.spots, [id]: { x, y } } });
     if (this.state.status === 'hosting') {
       this.spots.set(id, { x, y });
@@ -314,7 +317,7 @@ export class TownSession {
         break;
       case 'visit':
         if (!this.roster.some((p) => p.id === id)) return;
-        if (this.places.get(id) !== message.place) this.spots.delete(id);
+        if (this.places.get(id) !== message.place) this.clearSpots(id);
         if (message.place) this.places.set(id, message.place);
         else this.places.delete(id);
         this.publish();
@@ -326,7 +329,8 @@ export class TownSession {
         this.publish();
         break;
       case 'move':
-        if (!this.roster.some((p) => p.id === message.id)) return;
+        // A phone can only move its own pieces.
+        if (ownerOf(message.id) !== id || !this.roster.some((p) => p.id === id)) return;
         this.spots.set(message.id, { x: message.x, y: message.y });
         this.set({ spots: { ...this.state.spots, [message.id]: { x: message.x, y: message.y } } });
         this.sendToGuests(message, id);
@@ -352,6 +356,7 @@ export class TownSession {
       case 'town': {
         const spots: TownState['spots'] = {};
         for (const p of message.people) if (p.x !== undefined && p.y !== undefined) spots[p.id] = { x: p.x, y: p.y };
+        for (const e of message.spots ?? []) spots[e.id] = { x: e.x, y: e.y };
         this.set({ people: message.people, spots });
         break;
       }
@@ -370,12 +375,17 @@ export class TownSession {
   private drop(id: string) {
     this.roster = this.roster.filter((p) => p.id !== id);
     this.places.delete(id);
-    this.spots.delete(id);
+    this.clearSpots(id);
     this.publish();
   }
 
+  /** Forget where a player's person and buddies were put. */
+  private clearSpots(owner: string) {
+    for (const key of [...this.spots.keys()]) if (ownerOf(key) === owner) this.spots.delete(key);
+  }
+
   private setHostPlace() {
-    if (this.places.get(HOST_ID) !== (this.place ?? undefined)) this.spots.delete(HOST_ID);
+    if (this.places.get(HOST_ID) !== (this.place ?? undefined)) this.clearSpots(HOST_ID);
     if (this.place) this.places.set(HOST_ID, this.place);
     else this.places.delete(HOST_ID);
   }
@@ -390,9 +400,9 @@ export class TownSession {
       if (place) people.push({ ...p, place, ...(spot ?? {}) });
     }
     const spots: TownState['spots'] = {};
-    for (const [id, spot] of this.spots) if (this.places.has(id)) spots[id] = spot;
+    for (const [id, spot] of this.spots) if (this.places.has(ownerOf(id))) spots[id] = spot;
     this.set({ people, spots });
-    this.send({ type: 'town', people });
+    this.send({ type: 'town', people, spots: Object.entries(spots).map(([id, spot]) => ({ id, ...spot })) });
   }
 
   private markWave(id: string) {
