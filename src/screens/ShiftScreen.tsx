@@ -56,18 +56,18 @@ export function ShiftScreen() {
         <Text style={styles.text}>You already worked here today, so this is just practice (no pay).</Text>
       ) : null}
       <Text style={styles.text}>Question {index + 1} of {SHIFT_QUESTIONS}</Text>
-      <Text style={styles.prompt}>{q.prompt}</Text>
+      {q.change ? null : <Text style={styles.prompt}>{q.prompt}</Text>}
       {q.change ? (
         <ChangeGiving
           key={index}
+          item={q.change.item}
           price={q.change.price}
           paid={q.change.paid}
-          answer={q.answer}
+          grade={profile.grade}
           coins={changeCoins(profile.grade)}
-          given={selected}
-          onGive={(total) => {
-            setSelected(total);
-            if (total === q.answer) setCorrect((n) => n + 1);
+          onDone={(rightFirstTry) => {
+            setSelected(q.answer);
+            if (rightFirstTry) setCorrect((n) => n + 1);
           }}
         />
       ) : (

@@ -4,6 +4,7 @@ import { Pressable, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Text } from '@/components/AppText';
+import { BringPanel } from '@/components/BringPanel';
 import { CommunityRoom } from '@/components/community/CommunityRoom';
 import { VisitPanel } from '@/components/VisitPanel';
 import { colors, radius, spacing, TAP_TARGET } from '@/constants/theme';
@@ -26,7 +27,7 @@ export const goInside = (id: BuildingId) => router.push({ pathname: '/place', pa
 export function CommunityView({ place, actions, needsPermission = false }: Props) {
   const profile = useActiveProfile();
   const { status, people } = useTownState();
-  const [open, setOpen] = useState(false);
+  const [open, setOpen] = useState<'friends' | 'bring' | null>(null);
   usePlace(place);
 
   return (
@@ -34,19 +35,29 @@ export function CommunityView({ place, actions, needsPermission = false }: Props
       <CommunityRoom place={place} onDoor={goInside} onExit={() => router.back()} />
       <View style={styles.top} pointerEvents="box-none">
         <Text style={styles.pill}>🪙 {profile?.coins ?? 0}</Text>
-        <Pressable
-          onPress={() => setOpen((o) => !o)}
-          accessibilityRole="button"
-          accessibilityLabel="Visit with friends"
-          style={({ pressed }) => [styles.pill, styles.visit, pressed && { opacity: 0.8 }]}
-        >
-          <Text style={styles.visitText}>{status === 'off' ? '👫 Friends' : `👫 ${people.length} here`}</Text>
-        </Pressable>
+        <View style={styles.pills}>
+          <Pressable
+            onPress={() => setOpen((o) => (o === 'bring' ? null : 'bring'))}
+            accessibilityRole="button"
+            accessibilityLabel="Choose your buddies and what you wear"
+            style={({ pressed }) => [styles.pill, styles.visit, pressed && { opacity: 0.8 }]}
+          >
+            <Text style={styles.visitText}>🐾 Bring</Text>
+          </Pressable>
+          <Pressable
+            onPress={() => setOpen((o) => (o === 'friends' ? null : 'friends'))}
+            accessibilityRole="button"
+            accessibilityLabel="Visit with friends"
+            style={({ pressed }) => [styles.pill, styles.visit, pressed && { opacity: 0.8 }]}
+          >
+            <Text style={styles.visitText}>{status === 'off' ? '👫 Friends' : `👫 ${people.length} here`}</Text>
+          </Pressable>
+        </View>
       </View>
       {open ? (
         <View style={styles.panel}>
-          <VisitPanel needsPermission={needsPermission} />
-          <Pressable onPress={() => setOpen(false)} accessibilityRole="button" style={styles.close}>
+          {open === 'bring' ? <BringPanel /> : <VisitPanel needsPermission={needsPermission} />}
+          <Pressable onPress={() => setOpen(null)} accessibilityRole="button" style={styles.close}>
             <Text style={styles.visitText}>Close</Text>
           </Pressable>
         </View>
@@ -60,6 +71,7 @@ const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: '#9BD4F5' },
   top: { position: 'absolute', top: spacing.sm, left: spacing.sm, right: spacing.sm, flexDirection: 'row', justifyContent: 'space-between' },
   pill: { fontSize: 20, fontWeight: '900', color: colors.text, backgroundColor: 'rgba(255,255,255,0.9)', paddingHorizontal: 14, paddingVertical: 6, borderRadius: radius.lg, overflow: 'hidden' },
+  pills: { flexDirection: 'row', gap: spacing.sm },
   visit: { minHeight: TAP_TARGET * 0.8 },
   visitText: { fontSize: 18, fontWeight: '800', color: colors.primary, textAlign: 'center' },
   panel: { position: 'absolute', top: 64, left: spacing.md, right: spacing.md, padding: spacing.md, gap: spacing.sm, backgroundColor: 'rgba(255,255,255,0.96)', borderRadius: radius.lg, borderWidth: 3, borderColor: colors.border },

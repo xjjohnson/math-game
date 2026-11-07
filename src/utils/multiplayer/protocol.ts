@@ -58,6 +58,17 @@ export interface PlayerInfo {
 
 export const MAX_BUDDIES = 3;
 
+/** Where a piece was put in its scene: a player's id, or `${playerId}:b${n}` for one of their buddies. */
+export interface SpotEntry {
+  id: string;
+  x: number;
+  y: number;
+}
+
+/** Whose piece an id is: the player id before any colon. */
+export const ownerOf = (pieceId: string): string => pieceId.split(':')[0];
+export const buddyPieceId = (playerId: string, n: number): string => `${playerId}:b${n}`;
+
 /** Starts the name a phone advertises when it hosts a community visit, so games and visits don't mix in the finder. */
 export const TOWN_MARK = '🏘️';
 
@@ -84,7 +95,7 @@ export type GameMessage =
   /** Community (v5): a guest says where it is now, or null when it left the community. */
   | { type: 'visit'; place: TownPlace | null }
   /** Community (v5): the host tells everyone who is where. Only people in the community are listed. */
-  | { type: 'town'; people: TownPerson[] }
+  | { type: 'town'; people: TownPerson[]; spots?: SpotEntry[] }
   /** Community (v5): a wave. Guests send it to the host, who passes it on with the sender's id. */
   | { type: 'hi'; playerId?: string }
   /** Community: a guest changed its buddies or accessory. */
@@ -127,6 +138,14 @@ function parsePlayers(v: unknown): PlayerInfo[] | null {
 }
 
 const isUnit = (v: unknown): v is number => typeof v === 'number' && v >= 0 && v <= 1;
+const parseSpotList = (v: unknown): SpotEntry[] =>
+  Array.isArray(v)
+    ? v
+        .filter((e): e is Record<string, unknown> => typeof e === 'object' && e !== null)
+        .filter((e) => isId(e.id) && isUnit(e.x) && isUnit(e.y))
+        .slice(0, MAX_PLAYERS * (MAX_BUDDIES + 1))
+        .map((e) => ({ id: e.id as string, x: e.x as number, y: e.y as number }))
+    : [];
 const isPlace = (v: unknown): v is TownPlace => TOWN_PLACES.includes(v as TownPlace);
 
 /** Parses a message from another phone, or returns null if it isn't one we understand. */
@@ -197,7 +216,8 @@ export function parseMessage(text: string): GameMessage | null {
     case 'visit':
       return m.place === null ? { type: 'visit', place: null } : isPlace(m.place) ? { type: 'visit', place: m.place } : null;
     case 'town': {
-      if (Array.isArray(m.people) && m.people.length === 0) return { type: 'town', people: [] };
+      const spotList = parseSpotList(m.spots);
+      if (Array.isArray(m.people) && m.people.length === 0) return { type: 'town', people: [], ...(spotList.length ? { spots: spotList } : {}) };
       const players = parsePlayers(m.people);
       if (!players) return null;
       const places = (m.people as Record<string, unknown>[]).map((p) => p.place);
@@ -209,6 +229,7 @@ export function parseMessage(text: string): GameMessage | null {
           const { x, y } = raw[i];
           return { ...p, place: places[i] as TownPlace, ...(isUnit(x) && isUnit(y) ? { x, y } : {}) };
         }),
+        ...(spotList.length ? { spots: spotList } : {}),
       };
     }
     case 'look':

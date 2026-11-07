@@ -34,7 +34,7 @@ export interface TownQuestion {
   answer: number;
   choices: number[];
   /** Money jobs: the player hands back change with coins and bills instead of picking an answer. */
-  change?: { price: number; paid: number };
+  change?: { price: number; paid: number; item: string };
 }
 
 /** The coins and bills offered for giving change, bigger ones for older kids. */
@@ -47,8 +47,14 @@ export function changeCoins(grade: Grade): number[] {
 /** Adds up what was handed back. */
 export const handedBack = (hand: number[]): number => hand.reduce((a, b) => a + b, 0);
 
-function changeQuestion(prompt: string, price: number, paid: number): TownQuestion {
-  return { prompt, answer: paid - price, choices: [], change: { price, paid } };
+/** A gentle nudge after wrong change; little ones are told to count up, bigger kids to subtract. */
+export function changeHint(price: number, paid: number, given: number, grade: Grade): string {
+  const how = grade <= 1 ? `Start at ${price} and count up to ${paid}. How far is it?` : `${paid} − ${price} = ?`;
+  return `${given > paid - price ? 'That is a bit too much.' : 'Not quite enough yet.'} ${how}`;
+}
+
+function changeQuestion(prompt: string, price: number, paid: number, item: string): TownQuestion {
+  return { prompt, answer: paid - price, choices: [], change: { price, paid, item } };
 }
 
 /** The biggest numbers used at a grade: kindergarten stays within 10, then it grows. */
@@ -88,7 +94,7 @@ export function shiftQuestions(building: BuildingId, grade: Grade, rng: Rng): To
           // Grown-ups' shop: add it up, take the money, give the change.
           const paid = a + b + randInt(rng, 1, Math.max(1, Math.floor(max / 4)));
           out.push(
-            changeQuestion(`A customer buys a ${e1} ${n1} for ${a} and a ${e2} ${n2} for ${b}. They pay ${paid}. Give them their change.`, a + b, paid),
+            changeQuestion(`A customer buys a ${e1} ${n1} for ${a} and a ${e2} ${n2} for ${b}. They pay ${paid}. Give them their change.`, a + b, paid, `${e1}${e2}`),
           );
         }
         break;
@@ -96,13 +102,13 @@ export function shiftQuestions(building: BuildingId, grade: Grade, rng: Rng): To
       case 'bakery': {
         // Kindergarten has not met subtraction, so the bakery counts up instead.
         const price = randInt(rng, 1, Math.max(2, Math.floor(max / 2)));
-        const [, label] = pick(rng, BAKES).split(' ');
+        const [bakeEmoji, label] = pick(rng, BAKES).split(' ');
         if (grade === 0) {
           const second = randInt(rng, 1, Math.max(1, max - price));
           out.push(question(`One ${label} costs ${price} and another costs ${second}. How much for both?`, price + second, rng));
         } else {
           const paid = Math.min(max, price + randInt(rng, 1, Math.max(1, Math.floor(max / 2))));
-          out.push(changeQuestion(`A ${label} costs ${price}. The customer pays ${paid}. Give them their change.`, price, paid));
+          out.push(changeQuestion(`A ${label} costs ${price}. The customer pays ${paid}. Give them their change.`, price, paid, bakeEmoji));
         }
         break;
       }

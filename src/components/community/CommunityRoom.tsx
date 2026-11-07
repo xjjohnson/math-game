@@ -7,7 +7,7 @@ import { FLOOR, Interior } from '@/components/community/Interiors';
 import { ACCESSORIES, GLASSES } from '@/components/VisitPanel';
 import { townSession, useTownState, WAVE_MS } from '@/services/townSession';
 import { useActiveProfile } from '@/store/profiles';
-import type { TownPerson, TownPlace } from '@/utils/multiplayer/protocol';
+import { buddyPieceId, type TownPerson, type TownPlace } from '@/utils/multiplayer/protocol';
 import { clampSpot, spotFor, type Spot } from '@/utils/multiplayer/scene';
 import type { BuildingId } from '@/utils/town';
 
@@ -89,9 +89,22 @@ export function CommunityRoom({ place, onDoor, onExit }: Props) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [place, w, roomW]);
 
-  const ordered = here
-    .map((p, i) => ({ p, spot: onFloor(spotFor(spotsNow[p.id], i, here.length)) }))
-    .sort((a, b) => a.spot.y - b.spot.y);
+  const palSize = token * 0.5;
+  /** Everything standing in the room: each person, then each buddy they brought, sorted so nearer things draw on top. */
+  const pieces = here.flatMap((p, i) => {
+    const spot = onFloor(spotFor(spotsNow[p.id], i, here.length));
+    const list: { key: string; kind: 'person' | 'pal'; person: TownPerson; spot: Spot; value?: string }[] = [
+      { key: p.id, kind: 'person', person: p, spot },
+    ];
+    (p.buddies ?? []).forEach((b, n) => {
+      const id = buddyPieceId(p.id, n);
+      // Until a buddy is moved it stands next to its owner.
+      const beside = onFloor({ x: spot.x + ((n + 1) * token * 0.55) / roomW, y: spot.y });
+      list.push({ key: id, kind: 'pal', person: p, value: b, spot: spotsNow[id] ? onFloor(spotsNow[id]) : beside });
+    });
+    return list;
+  });
+  pieces.sort((a, b) => a.spot.y - b.spot.y);
 
   return (
     <View style={styles.fill} onLayout={(e) => setSize({ w: e.nativeEvent.layout.width, h: e.nativeEvent.layout.height })}>
@@ -104,52 +117,64 @@ export function CommunityRoom({ place, onDoor, onExit }: Props) {
           contentContainerStyle={{ width: roomW, height: h }}
         >
           <Interior place={place} width={roomW} viewWidth={w} height={h} onDoor={onDoor} onExit={onExit} />
-          {ordered.map(({ p, spot }) => (
-            <Person
-              key={p.id}
-              person={p}
-              isMe={p.id === self}
-              waving={visiting ? Date.now() - (waves[p.id] ?? 0) < WAVE_MS : p.id === self && soloWave > 0}
-              spot={spot}
-              w={roomW}
-              h={h}
-              token={token}
-              onMove={(x, y) => move(p.id, x, y)}
-              onTap={() => p.id === self && wave()}
-              onDragging={setDragging}
-            />
-          ))}
+          {pieces.map((piece) =>
+            piece.kind === 'person' ? (
+              <Person
+                key={piece.key}
+                person={piece.person}
+                isMe={piece.person.id === self}
+                waving={visiting ? Date.now() - (waves[piece.person.id] ?? 0) < WAVE_MS : piece.person.id === self && soloWave > 0}
+                spot={piece.spot}
+                w={roomW}
+                h={h}
+                token={token}
+                onMove={(x, y) => move(piece.key, x, y)}
+                onTap={wave}
+                onDragging={setDragging}
+              />
+            ) : (
+              <Pal
+                key={piece.key}
+                value={piece.value!}
+                mine={piece.person.id === self}
+                spot={piece.spot}
+                w={roomW}
+                h={h}
+                size={palSize}
+                onMove={(x, y) => move(piece.key, x, y)}
+                onDragging={setDragging}
+              />
+            ),
+          )}
         </ScrollView>
       ) : null}
     </View>
   );
 }
 
-interface PersonProps {
-  person: TownPerson;
-  isMe: boolean;
-  waving: boolean;
+interface DragArgs {
   spot: Spot;
   w: number;
   h: number;
-  token: number;
+  enabled: boolean;
   onMove: (x: number, y: number) => void;
-  onTap: () => void;
+  onTap?: () => void;
   onDragging: (on: boolean) => void;
 }
 
-function Person({ person, isMe, waving, spot, w, h, token, onMove, onTap, onDragging }: PersonProps) {
-  // While a finger is down the person follows it here; other phones get throttled updates.
+/** Drag a piece with one finger. Others' pieces get no handlers, so touches pass through them. */
+function useDrag(args: DragArgs) {
+  // While a finger is down the piece follows it here; other phones get throttled updates.
   const [drag, setDrag] = useState<Spot | null>(null);
-  const start = useRef(spot);
+  const start = useRef(args.spot);
   const last = useRef(0);
-  const latest = useRef({ spot, w, h, onMove, onTap, onDragging });
-  latest.current = { spot, w, h, onMove, onTap, onDragging };
+  const latest = useRef(args);
+  latest.current = args;
 
   const pan = useRef(
     PanResponder.create({
-      onStartShouldSetPanResponder: () => true,
-      onMoveShouldSetPanResponder: () => true,
+      onStartShouldSetPanResponder: () => latest.current.enabled,
+      onMoveShouldSetPanResponder: () => latest.current.enabled,
       onPanResponderTerminationRequest: () => false,
       onPanResponderGrant: () => {
         start.current = latest.current.spot;
@@ -168,7 +193,7 @@ function Person({ person, isMe, waving, spot, w, h, token, onMove, onTap, onDrag
       },
       onPanResponderRelease: (_e, g) => {
         const { w: cw, h: ch, onMove: send, onTap: tap } = latest.current;
-        if (Math.abs(g.dx) < 6 && Math.abs(g.dy) < 6) tap();
+        if (Math.abs(g.dx) < 6 && Math.abs(g.dy) < 6) tap?.();
         else {
           const next = onFloor({ x: start.current.x + g.dx / cw, y: start.current.y + g.dy / ch });
           send(next.x, next.y);
@@ -183,14 +208,32 @@ function Person({ person, isMe, waving, spot, w, h, token, onMove, onTap, onDrag
     }),
   ).current;
 
-  const at = drag ?? spot;
+  return { handlers: args.enabled ? pan.panHandlers : {}, at: drag ?? args.spot, lifted: drag !== null };
+}
+
+interface PersonProps {
+  person: TownPerson;
+  isMe: boolean;
+  waving: boolean;
+  spot: Spot;
+  w: number;
+  h: number;
+  token: number;
+  onMove: (x: number, y: number) => void;
+  onTap: () => void;
+  onDragging: (on: boolean) => void;
+}
+
+function Person({ person, isMe, waving, spot, w, h, token, onMove, onTap, onDragging }: PersonProps) {
+  const { handlers, at, lifted } = useDrag({ spot, w, h, enabled: isMe, onMove, onTap, onDragging });
   const i = colorIndex(person.id);
   const acc = person.acc && (ACCESSORIES as readonly string[]).includes(person.acc) ? person.acc : undefined;
   return (
     <View
-      {...pan.panHandlers}
-      accessibilityLabel={`${isMe ? 'You' : person.name}. Drag to move.`}
-      style={[styles.person, { width: token, left: at.x * w - token / 2, top: at.y * h - token - 14 }, drag && styles.lifted]}
+      {...handlers}
+      pointerEvents={isMe ? 'auto' : 'none'}
+      accessibilityLabel={isMe ? 'You. Drag to move.' : person.name}
+      style={[styles.person, { width: token, left: at.x * w - token / 2, top: at.y * h - token - 14 }, lifted && styles.lifted]}
     >
       <Text style={styles.wave}>{waving ? '👋' : ' '}</Text>
       <View>
@@ -208,14 +251,35 @@ function Person({ person, isMe, waving, spot, w, h, token, onMove, onTap, onDrag
           </Text>
         ) : null}
       </View>
-      {(person.buddies ?? []).map((b, n) => (
-        <View key={b + n} style={[styles.pal, { left: token * (0.72 + n * 0.3) }]} pointerEvents="none">
-          <BuddyFigure value={b} size={token * 0.5} fur="#F2B880" belly="#FFE3C2" dressed={{}} />
-        </View>
-      ))}
       <Text style={[styles.name, isMe && styles.me]} numberOfLines={1}>
         {isMe ? 'You' : person.name}
       </Text>
+    </View>
+  );
+}
+
+interface PalProps {
+  value: string;
+  mine: boolean;
+  spot: Spot;
+  w: number;
+  h: number;
+  size: number;
+  onMove: (x: number, y: number) => void;
+  onDragging: (on: boolean) => void;
+}
+
+/** One of a player's buddies; only its owner can move it. */
+function Pal({ value, mine, spot, w, h, size, onMove, onDragging }: PalProps) {
+  const { handlers, at, lifted } = useDrag({ spot, w, h, enabled: mine, onMove, onDragging });
+  return (
+    <View
+      {...handlers}
+      pointerEvents={mine ? 'auto' : 'none'}
+      accessibilityLabel={mine ? 'Your buddy. Drag to move.' : 'A buddy'}
+      style={[styles.person, { width: size, left: at.x * w - size / 2, top: at.y * h - size - 6 }, lifted && styles.lifted]}
+    >
+      <BuddyFigure value={value} size={size} fur="#F2B880" belly="#FFE3C2" dressed={{}} />
     </View>
   );
 }

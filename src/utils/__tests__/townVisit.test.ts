@@ -1,7 +1,7 @@
 import { createMockNetwork } from '@/services/mockTransport';
 import { TownSession } from '@/services/townSession';
 import { clampSpot, defaultSpot, spotFor } from '@/utils/multiplayer/scene';
-import { encodeMessage, type GameMessage, HOST_ID, MIN_GAME_VERSION, parseMessage, PROTOCOL_VERSION } from '@/utils/multiplayer/protocol';
+import { buddyPieceId, encodeMessage, type GameMessage, HOST_ID, MIN_GAME_VERSION, parseMessage, PROTOCOL_VERSION } from '@/utils/multiplayer/protocol';
 
 const tick = () => new Promise((r) => setTimeout(r, 0));
 
@@ -110,21 +110,46 @@ describe('protocol v5 messages', () => {
 });
 
 describe('shared scene', () => {
-  it('lets anyone drag anyone and every phone sees it', async () => {
+  it('lets each player move only their own person and buddies, and every phone sees it', async () => {
     const { sessions } = setup(3);
     const [host, a, b] = sessions;
+    a.setLook(['🐶'], undefined);
     await joinAll(sessions, ['H', 'A', 'B']);
     host.setPlace('bakery');
     a.setPlace('bakery');
     b.setPlace('bakery');
     await tick();
+    const aId = a.getState().myId;
     const bId = b.getState().myId;
-    a.moveTo(bId, 0.25, 0.5); // A drags B
+    a.moveTo(aId, 0.25, 0.7); // my own person
+    a.moveTo(buddyPieceId(aId, 0), 0.3, 0.8); // my own buddy
+    a.moveTo(bId, 0.9, 0.9); // someone else's: ignored on this phone
     await tick();
-    for (const s of sessions) expect(s.getState().spots[bId]).toEqual({ x: 0.25, y: 0.5 });
-    host.moveTo(a.getState().myId, 0.9, 0.2);
+    for (const s of sessions) {
+      expect(s.getState().spots[aId]).toEqual({ x: 0.25, y: 0.7 });
+      expect(s.getState().spots[buddyPieceId(aId, 0)]).toEqual({ x: 0.3, y: 0.8 });
+      expect(s.getState().spots[bId]).toBeUndefined();
+    }
+    host.moveTo(aId, 0.1, 0.1); // the host cannot move A either
     await tick();
-    expect(b.getState().spots[a.getState().myId]).toEqual({ x: 0.9, y: 0.2 });
+    expect(b.getState().spots[aId]).toEqual({ x: 0.25, y: 0.7 });
+  });
+
+  it('ignores a move message for another players piece on the host', async () => {
+    const net = createMockNetwork(2);
+    const host = new TownSession(() => net[0]);
+    await host.host({ name: 'H', avatar: '🐼' });
+    const guest = net[1];
+    const peer = await new Promise<string>((res) => {
+      guest.on('peerFound', (p) => res(p.id));
+      guest.discover();
+    });
+    await guest.connect('G', peer);
+    await guest.send({ type: 'hello', version: 6, name: 'G', avatar: '🦊' });
+    await guest.send({ type: 'visit', place: 'park' });
+    await guest.send({ type: 'move', id: 'host', x: 0.9, y: 0.9 }); // tries to move the host
+    await tick();
+    expect(host.getState().spots['host']).toBeUndefined();
   });
 
   it('gives late arrivals the current spots and resets a spot when someone changes place', async () => {
@@ -149,6 +174,8 @@ describe('shared scene', () => {
     expect(spotFor(undefined, 0, 2)).toEqual(defaultSpot(0, 2));
     expect(parseMessage(encodeMessage({ type: 'move', id: 'x', x: 0.5, y: 1 }))).toEqual({ type: 'move', id: 'x', x: 0.5, y: 1 });
     expect(parseMessage(JSON.stringify({ type: 'move', id: 'x', x: 3, y: 0 }))).toBeNull();
+    const withSpots = parseMessage(encodeMessage({ type: 'town', people: [], spots: [{ id: 'a:b0', x: 0.2, y: 0.9 }] }));
+    expect(withSpots).toEqual({ type: 'town', people: [], spots: [{ id: 'a:b0', x: 0.2, y: 0.9 }] });
   });
 });
 
