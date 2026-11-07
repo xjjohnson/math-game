@@ -10,6 +10,9 @@ import { dateKey } from '@/utils/dates';
 import { applyRound, type RoundOutcome, type RoundResult } from '@/utils/progress';
 import { careForBuddy as applyCare, heartForRound, type CareAction, type CareResult } from '@/utils/buddy';
 import {
+  addExtraRooms,
+  AREAS_BEFORE_EXTRA_ROOMS,
+  buyRoom,
   buyRoomItem,
   emptyRoom,
   moveInRoom,
@@ -19,6 +22,7 @@ import {
   upgradeRoom,
   widenHome,
   type Placement,
+  type HomeRoomBuyResult,
   type RoomBuyResult,
 } from '@/utils/room';
 import { finishShift, type BuildingId, type ShiftPay } from '@/utils/town';
@@ -72,6 +76,7 @@ export function createProfile(
     wardrobe: [],
     outfits: {},
     looks: {},
+    homeRooms: [],
     town: { date: '', done: [] },
   };
 }
@@ -96,6 +101,8 @@ interface ProfilesState {
   /** Buys a thing for the buddies' home and sets it down in `area` (an index into HOME_AREAS). */
   /** `at` is where new things land, as a share of the home's width (the middle of the screen). */
   buyRoomItem: (id: string, itemId: string, area: number, at?: number) => RoomBuyResult;
+  /** Buys an extra room (an area id) for the buddies' home with coins. */
+  buyHomeRoom: (id: string, areaId: string) => HomeRoomBuyResult;
   /** Moves a thing in the home, or a buddy when `key` is BUDDY_KEY plus its id. */
   moveInRoom: (id: string, key: string, place: Placement) => void;
   setPlaced: (id: string, key: string, placed: boolean, area: number, at?: number) => void;
@@ -188,6 +195,15 @@ export const useProfiles = create<ProfilesState>()(
         }
         return result;
       },
+      buyHomeRoom: (id, areaId) => {
+        const current = get().profiles.find((p) => p.id === id);
+        if (!current) return { ok: false, reason: 'unknown' };
+        const result = buyRoom(current, areaId);
+        if (result.ok) {
+          set((s) => ({ profiles: s.profiles.map((p) => (p.id === id ? result.profile : p)) }));
+        }
+        return result;
+      },
       moveInRoom: (id, key, spot) =>
         set((s) => ({
           profiles: s.profiles.map((p) => (p.id === id ? moveInRoom(p, key, spot) : p)),
@@ -236,7 +252,7 @@ export const useProfiles = create<ProfilesState>()(
     }),
     {
       name: 'math-game.profiles',
-      version: 12,
+      version: 13,
       storage: persistStorage,
       migrate: (persisted, version) => {
         const state = persisted as Pick<ProfilesState, 'profiles' | 'activeProfileId'>;
@@ -298,7 +314,11 @@ export const useProfiles = create<ProfilesState>()(
         }
         if (version < 11) {
           // Version 11 made the rooms wider and added the bathroom and playroom.
-          state.profiles = state.profiles.map((p) => ({ ...p, room: widenHome(p.room) }));
+          state.profiles = state.profiles.map((p) => ({ ...p, room: widenHome(p.room, AREAS_BEFORE_EXTRA_ROOMS) }));
+        }
+        if (version < 13) {
+          // Version 13 added extra rooms to buy. Everyone starts with none, and the new areas' paint is filled in.
+          state.profiles = state.profiles.map((p) => ({ ...p, homeRooms: p.homeRooms ?? [], room: addExtraRooms(p.room) }));
         }
         if (version < 12) {
           // Version 12 added the community: which buildings' jobs are done today.

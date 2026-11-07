@@ -95,6 +95,8 @@ export interface Profile {
   outfits: Record<string, Outfit>;
   /** How each person buddy looks (hair, skin, beard), once changed from its start. */
   looks: Record<string, PersonLook>;
+  /** Ids of the extra rooms (HomeArea.price) bought for the buddies' home. */
+  homeRooms: string[];
   /** Community buildings whose daily job is done, for today only. */
   town: TownVisits;
 }
