@@ -95,6 +95,14 @@ export interface Profile {
   outfits: Record<string, Outfit>;
   /** How each person buddy looks (hair, skin, beard), once changed from its start. */
   looks: Record<string, PersonLook>;
+  /** Community buildings whose daily job is done, for today only. */
+  town: TownVisits;
+}
+
+export interface TownVisits {
+  /** Local date, "YYYY-MM-DD". */
+  date: string;
+  done: string[];
 }
 
 /** Wearable ids a buddy has on, one per spot. */

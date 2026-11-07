@@ -46,6 +46,7 @@ export const makeProfile = (overrides: Partial<Profile> = {}): Profile => ({
   wardrobe: [],
   outfits: {},
   looks: {},
+  town: { date: '', done: [] },
   missed: {},
   ...overrides,
 });
