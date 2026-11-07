@@ -118,6 +118,12 @@ export function HomeScreen() {
             style={styles.half}
           />
           <BigButton
+            label="🏘️ Community"
+            color={colors.correct}
+            onPress={() => router.push('/town')}
+            style={styles.half}
+          />
+          <BigButton
             label="My progress"
             color={colors.accent}
             onPress={() => router.push('/progress')}

@@ -21,6 +21,7 @@ import {
   type Placement,
   type RoomBuyResult,
 } from '@/utils/room';
+import { finishShift, type BuildingId, type ShiftPay } from '@/utils/town';
 import { buyItem, equipItem, freeAvatars, type BuyResult } from '@/utils/shop';
 import { moveWearable, setLook, takeOff, undress, wear, type MoveResult, type WearResult } from '@/utils/wardrobe';
 import type { PersonLook } from '@/constants/wardrobe';
@@ -71,6 +72,7 @@ export function createProfile(
     wardrobe: [],
     outfits: {},
     looks: {},
+    town: { date: '', done: [] },
   };
 }
 
@@ -109,6 +111,8 @@ interface ProfilesState {
   moveWearable: (id: string, fromId: string, toId: string, wearableId: string) => MoveResult;
   /** Changes a person buddy's hair, skin or beard. */
   setLook: (id: string, buddyId: string, change: Partial<PersonLook>) => void;
+  /** Finishes a job in the community and returns what it paid. */
+  finishShift: (id: string, building: BuildingId, correct: number) => ShiftPay;
 }
 
 export const useProfiles = create<ProfilesState>()(
@@ -222,10 +226,17 @@ export const useProfiles = create<ProfilesState>()(
       },
       setLook: (id, buddyId, change) =>
         set((s) => ({ profiles: s.profiles.map((p) => (p.id === id ? setLook(p, buddyId, change) : p)) })),
+      finishShift: (id, building, correct) => {
+        const current = get().profiles.find((p) => p.id === id);
+        if (!current) return { coins: 0, hearts: 0 };
+        const { profile, pay } = finishShift(current, building, correct, dateKey());
+        set((s) => ({ profiles: s.profiles.map((p) => (p.id === id ? profile : p)) }));
+        return pay;
+      },
     }),
     {
       name: 'math-game.profiles',
-      version: 11,
+      version: 12,
       storage: persistStorage,
       migrate: (persisted, version) => {
         const state = persisted as Pick<ProfilesState, 'profiles' | 'activeProfileId'>;
@@ -288,6 +299,10 @@ export const useProfiles = create<ProfilesState>()(
         if (version < 11) {
           // Version 11 made the rooms wider and added the bathroom and playroom.
           state.profiles = state.profiles.map((p) => ({ ...p, room: widenHome(p.room) }));
+        }
+        if (version < 12) {
+          // Version 12 added the community: which buildings' jobs are done today.
+          state.profiles = state.profiles.map((p) => ({ ...p, town: p.town ?? { date: '', done: [] } }));
         }
         return state as ProfilesState;
       },
