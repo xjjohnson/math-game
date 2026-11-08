@@ -25,6 +25,8 @@ export interface TransportEvents {
 export interface Transport {
   host(name: string): Promise<void>;
   discover(): Promise<void>;
+  /** While hosting, also look for other hosts nearby (found ones arrive as peerFound), without stopping hosting. */
+  lookAround?(): Promise<void>;
   connect(name: string, peerId: string): Promise<void>;
   /** To one peer, or to every connected peer when `to` is left out. */
   send(message: GameMessage, to?: string): Promise<void>;

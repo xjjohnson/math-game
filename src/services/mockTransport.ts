@@ -19,6 +19,8 @@ export function createMockPair(): [Transport, Transport] {
 
 class MockTransport extends Emitter implements Transport {
   hostingAs: string | null = null;
+  /** Looking for hosts: hears about phones that start or stop hosting. */
+  looking = false;
   readonly links = new Set<MockTransport>();
 
   constructor(
@@ -29,10 +31,19 @@ class MockTransport extends Emitter implements Transport {
   }
 
   async host(name: string) {
+    // Like Nearby: starting to host stops looking first.
+    this.looking = false;
     this.hostingAs = name;
+    for (const phone of this.net) if (phone !== this && phone.looking) phone.emit('peerFound', { id: this.id, name });
   }
 
   async discover() {
+    this.hostingAs = null;
+    await this.lookAround();
+  }
+
+  async lookAround() {
+    this.looking = true;
     for (const phone of this.net) {
       if (phone !== this && phone.hostingAs) this.emit('peerFound', { id: phone.id, name: phone.hostingAs });
     }
@@ -55,7 +66,9 @@ class MockTransport extends Emitter implements Transport {
   }
 
   disconnect() {
+    if (this.hostingAs) for (const phone of this.net) if (phone !== this && phone.looking) phone.emit('peerLost', { id: this.id });
     this.hostingAs = null;
+    this.looking = false;
     for (const p of this.links) {
       p.links.delete(this);
       p.emit('disconnected', { id: this.id });
