@@ -1,5 +1,6 @@
-import { artFor, PERSON_STICKERS, stickerText } from '@/constants/art';
+import { artFor, PERSON_AVATARS, PERSON_STICKERS, stickerText } from '@/constants/art';
 import { SHOP_ITEMS } from '@/constants/shop';
+import { findWearable } from '@/constants/wardrobe';
 import { makeProfile, results } from '@/test/fixtures';
 import { newBadges } from '@/utils/badges';
 import { applyRound } from '@/utils/progress';
@@ -37,6 +38,21 @@ describe('shop catalog', () => {
       const person = PERSON_STICKERS[item.companion.emoji];
       if (person) expect(person.buddyId).toBe(item.id);
     }
+  });
+});
+
+describe('free human avatars', () => {
+  it('are free for everyone, short enough to send, and draw from valid wardrobe and looks', () => {
+    const profile = makeProfile();
+    const free = freeAvatars(profile);
+    for (const [key, a] of Object.entries(PERSON_AVATARS)) {
+      expect(free).toContain(key);
+      expect(key.length).toBeLessThanOrEqual(8);
+      expect(stickerText(key)).toBe(a.standIn);
+      expect(a.look.skin).toBeLessThan(6);
+      for (const id of Object.values(a.outfit)) expect(findWearable(id as string)).toBeDefined();
+    }
+    expect(new Set(Object.values(PERSON_AVATARS).map((a) => a.look.skin)).size).toBe(6);
   });
 });
 

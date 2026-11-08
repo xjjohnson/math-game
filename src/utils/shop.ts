@@ -5,6 +5,7 @@ import {
   type Companion,
   type ShopItem,
 } from '@/constants/shop';
+import { PERSON_AVATARS } from '@/constants/art';
 import { AVATARS, colors } from '@/constants/theme';
 import type { Profile } from '@/types';
 
@@ -29,9 +30,9 @@ export function isEquipped(profile: Profile, item: ShopItem): boolean {
   }
 }
 
-/** Avatars a player can always switch to for free: their first pick, then the defaults. */
+/** Avatars a player can always switch to for free: their first pick, the animal defaults, then the human avatars. */
 export function freeAvatars(profile: Profile): string[] {
-  return [...new Set([profile.startAvatar, ...AVATARS])];
+  return [...new Set([profile.startAvatar, ...AVATARS, ...Object.keys(PERSON_AVATARS)])];
 }
 
 /** Spends coins on an item, then equips it right away. */

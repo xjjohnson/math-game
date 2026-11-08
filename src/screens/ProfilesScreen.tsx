@@ -7,6 +7,7 @@ import { BigButton } from '@/components/BigButton';
 import { OptionGroup } from '@/components/OptionGroup';
 import { Screen } from '@/components/Screen';
 import { Sticker } from '@/components/Sticker';
+import { PERSON_AVATARS, stickerText } from '@/constants/art';
 import { DEFAULT_GRADE, GRADE_LIST, GRADES } from '@/constants/grades';
 import { AVATARS, colors, fontSizes, radius, spacing, TAP_TARGET } from '@/constants/theme';
 import { useProfiles } from '@/store/profiles';
@@ -69,16 +70,16 @@ export function ProfilesScreen() {
         onSubmitEditing={create}
       />
       <View style={styles.avatars}>
-        {AVATARS.map((a) => (
+        {[...AVATARS, ...Object.keys(PERSON_AVATARS)].map((a) => (
           <Pressable
             key={a}
             onPress={() => setAvatar(a)}
             accessibilityRole="button"
-            accessibilityLabel={`Avatar ${a}`}
+            accessibilityLabel={`Avatar ${PERSON_AVATARS[a]?.name ?? stickerText(a)}`}
             accessibilityState={{ selected: a === avatar }}
             style={[styles.avatarChoice, a === avatar && styles.avatarSelected]}
           >
-            <Text style={styles.avatarText}>{a}</Text>
+            <Sticker value={a} size={40} />
           </Pressable>
         ))}
       </View>
