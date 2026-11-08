@@ -73,36 +73,52 @@ export const RECIPES: readonly Recipe[] = [
   { emoji: '🍫', name: 'Fudge', needs: ['choc', 'sweet'] },
 ];
 
-/** What anything else (no flour, no match) turns into. */
-export const SURPRISE: Recipe = { emoji: '🍮', name: 'Yummy pudding', needs: [] };
+/** What a wrong mix turns into: a funny mess, never a nice treat. */
+export const MESSES: readonly Recipe[] = [
+  { emoji: '🍝', name: 'Spaghetti chocolate mess', needs: [] },
+  { emoji: '🍲', name: 'Sticky fruit gloop', needs: [] },
+  { emoji: '🍲', name: 'Weird gloop', needs: [] },
+];
 
-/** Which treat this bowl bakes into: an index into RECIPES, or -1 for the surprise. -2 when the bowl is empty. */
+/** Every possible result: the recipes, then the messes. A result is an index into this. */
+export const RESULTS: readonly Recipe[] = [...RECIPES, ...MESSES];
+
+const SWEET_THINGS: readonly Kind[] = ['sweet', 'choc', 'berry', 'apple', 'banana', 'jam'];
+
+/** Which result this bowl bakes into: an index into RESULTS, or -1 when the bowl is empty. */
 export function recipeFor(mask: number): number {
-  if (mask === 0) return -2;
+  if (mask === 0) return -1;
   const kinds = kindsIn(mask);
+  // Salt with anything sweet is a wrong mix, even if flour is in there too.
+  const clash = kinds.has('salt') && SWEET_THINGS.some((k) => kinds.has(k));
   let best = -1;
-  RECIPES.forEach((r, i) => {
-    if (r.needs.every((k) => kinds.has(k)) && (best < 0 || r.needs.length > RECIPES[best].needs.length)) best = i;
-  });
-  return best;
+  if (!clash) {
+    RECIPES.forEach((r, i) => {
+      if (r.needs.every((k) => kinds.has(k)) && (best < 0 || r.needs.length > RECIPES[best].needs.length)) best = i;
+    });
+  }
+  if (best >= 0) return best;
+  if (kinds.has('choc')) return RECIPES.length;
+  if (SWEET_THINGS.some((k) => kinds.has(k))) return RECIPES.length + 1;
+  return RECIPES.length + 2;
 }
 
-/** The treat for a bowl: always something. */
+/** The result for a bowl, or null when it is empty. */
 export const bake = (mask: number): Recipe | null => {
   const i = recipeFor(mask);
-  return i === -2 ? null : i === -1 ? SURPRISE : RECIPES[i];
+  return i < 0 ? null : RESULTS[i];
 };
 
 /**
  * Finished treats sit on the counter as a few spare pieces, each with a
  * switch that says what it is. y carries the answer: 0 is "nothing here",
- * otherwise (recipe number + 2) / 64, where the surprise is number -1.
+ * otherwise (result number + 1) / 64.
  */
 export const MADE_SLOTS = 6;
-export const madeToUnit = (recipe: number): number => (recipe + 2) / 64;
-/** The recipe number kept in a switch's y, or null for an empty slot. */
+export const madeToUnit = (result: number): number => (result + 1) / 64;
+/** The result number kept in a switch's y, or null for an empty slot. */
 export const unitToMade = (y: number): number | null => {
-  const n = Math.round(y * 64) - 2;
-  return n >= -1 && n < RECIPES.length ? n : null;
+  const n = Math.round(y * 64) - 1;
+  return n >= 0 && n < RESULTS.length ? n : null;
 };
-export const madeRecipe = (n: number): Recipe => (n < 0 ? SURPRISE : RECIPES[n]);
+export const madeRecipe = (n: number): Recipe => RESULTS[n];

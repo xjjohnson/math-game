@@ -1,5 +1,9 @@
 # Change log
 
+## 2026-11-08 (later)
+
+- **Bakery fixes after the first phone test:** ingredients now stay where you put them (no more springing back to the shelf); whatever sits on the bowl is in it, and carrying the bowl carries them along. They go back to their shelves only when they're used up in the oven or when you tap the bowl to tip it out. A wrong mix no longer gives a nice pudding: chocolate with the wrong things makes a **spaghetti chocolate mess** 🍝, other fruit and sweet mixes make **sticky fruit gloop**, and anything else is **weird gloop**. Salt with sweet things is always a wrong mix.
+
 ## 2026-11-08
 
 **Bakery baking**
