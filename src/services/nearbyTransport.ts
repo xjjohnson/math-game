@@ -50,6 +50,11 @@ class NearbyTransport extends Emitter implements Transport {
     await Nearby!.startFinding().catch((e) => this.fail(e));
   }
 
+  async lookAround() {
+    // No stop first: the phone keeps hosting while it looks.
+    await Nearby!.startFinding().catch((e) => this.fail(e));
+  }
+
   async connect(name: string, peerId: string) {
     await Nearby!.connect(name, peerId).catch((e) => this.fail(e));
   }

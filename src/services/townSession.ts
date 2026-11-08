@@ -4,6 +4,7 @@ import { stickerText } from '@/constants/art';
 import type { Peer, Transport } from '@/services/multiplayer';
 import { createNearbyTransport } from '@/services/nearbyTransport';
 import type { HomeSnapshot } from '@/utils/homeVisit';
+import { advertName, newToken, shouldYield, tokenOf } from '@/utils/multiplayer/autoHost';
 import { isSharedPiece } from '@/utils/multiplayer/placeProps';
 import {
   HOST_ID,
@@ -45,6 +46,9 @@ export interface HomeVisit {
   snap: HomeSnapshot | null;
 }
 
+/** A guest that just connected says hello within this long; a host doesn't give way meanwhile. */
+const HELLO_MS = 5000;
+
 /** How long to wait for a friend's phone to send its home. */
 export const HOME_WAIT_MS = 8000;
 
@@ -78,6 +82,13 @@ export class TownSession {
   private homeSource: (() => HomeSnapshot | null) | null = null;
   private homeTimer: ReturnType<typeof setTimeout> | null = null;
 
+  /** The tag this phone advertises when it hosts, so two hosts can agree which one gives way. */
+  private readonly token = newToken();
+  /** When each phone found nearby was first seen, by its id. */
+  private seenAt = new Map<string, number>();
+  /** When a guest last connected, while its hello is on the way. */
+  private lastConnect = 0;
+
   constructor(private readonly makeTransport: () => Transport | null) {}
 
   // --- store for React ---
@@ -99,7 +110,7 @@ export class TownSession {
   async host(me: Omit<PlayerInfo, 'id'>) {
     if (!this.begin(me, true)) return;
     try {
-      await this.transport!.host(`${TOWN_MARK} ${stickerText(me.avatar)} ${me.name}`);
+      await this.transport!.host(advertName(TOWN_MARK, this.token, `${stickerText(me.avatar)} ${me.name}`));
     } catch (e) {
       this.leave(errorText(e));
       return;
@@ -138,6 +149,7 @@ export class TownSession {
       t.disconnect();
     }
     this.roster = [];
+    this.seenAt.clear();
     this.places.clear();
     this.spots.clear();
     this.set({ ...OFF, look: this.state.look, notice });
@@ -159,34 +171,34 @@ export class TownSession {
   private autoRun = 0;
 
   /**
-   * Opens the community with no choices to make: look for a visit someone is
-   * already hosting and join it, otherwise host one. A phone left hosting alone
-   * looks again now and then, so two phones that opened at the same moment
-   * still end up together.
+   * Opens the community with no choices to make. It looks once for a visit
+   * someone is already hosting and joins it; if there is none, it hosts and
+   * stays the host. While nobody has joined it, it keeps an eye out for
+   * another host (two phones that opened at the same moment) and the two
+   * become one: see `shouldYield`.
    */
   async auto(me: Omit<PlayerInfo, 'id'>) {
     const run = ++this.autoRun;
     const { buddies, acc } = this.state.look;
     this.me = { id: HOST_ID, ...me, buddies: buddies.length ? buddies : undefined, acc };
     const alive = () => this.autoRun === run;
+    /** The host to join, once this phone has given way to it. */
+    let joinName: string | null = null;
     while (alive()) {
       if (!(await this.discoverOnce(alive))) return;
       // Give hosts a moment to be found; the wait differs per phone so two phones don't decide together.
-      await sleep(3000 + Math.random() * 3000);
+      await sleep(joinName ? 1500 : 3000 + Math.random() * 3000);
       if (!alive()) return;
-      const host = this.state.found.find((p) => p.name.startsWith(TOWN_MARK));
-      if (host) {
-        await this.join(host.id);
-        for (let i = 0; i < 12 && alive() && this.state.status !== 'joined'; i++) await sleep(500);
-        if (this.state.status === 'joined') return this.watchGuest(run);
-        continue;
-      }
+      if (await this.joinFound(alive, joinName)) return this.watchGuest(run);
+      joinName = null;
       if (!(await this.hostOnce(alive))) return;
-      // Hosting: stay while friends are with us, otherwise look around again soon.
-      for (let waited = 0; alive() && waited < 20000 + Math.random() * 10000; waited += 1000) {
-        await sleep(1000);
-        if (this.roster.length > 1) return this.watchHost(run);
+      // Host and stay. Only a host nobody has joined gives way to another host.
+      const other = await this.watchForHosts(alive);
+      if (!other) {
+        if (alive() && this.state.status !== 'hosting') continue;
+        return;
       }
+      joinName = other;
     }
   }
 
@@ -196,16 +208,41 @@ export class TownSession {
     this.leave();
   }
 
+  /** Joins a community host that was found (the one named `name`, if given). True once joined. */
+  private async joinFound(alive: () => boolean, name: string | null): Promise<boolean> {
+    const hosts = this.state.found.filter((p) => p.name.startsWith(TOWN_MARK));
+    const host = (name ? hosts.find((p) => p.name === name) : undefined) ?? hosts[0];
+    if (!host) return false;
+    await this.join(host.id);
+    for (let i = 0; i < 12 && alive() && this.state.status !== 'joined'; i++) await sleep(500);
+    return alive() && this.state.status === 'joined';
+  }
+
   private async watchGuest(run: number) {
     // If the host goes away, try again from the top.
     while (this.autoRun === run && this.state.status === 'joined') await sleep(1000);
     if (this.autoRun === run) void this.auto(this.me);
   }
 
-  private async watchHost(run: number) {
-    // A host with nobody left becomes a searcher again.
-    while (this.autoRun === run && this.state.status === 'hosting' && this.roster.length > 1) await sleep(1000);
-    if (this.autoRun === run && this.state.status === 'hosting') void this.auto(this.me);
+  /**
+   * While hosting: keep looking for other community hosts nearby. Returns the
+   * advertised name of a host to give way to, or null when hosting ended.
+   */
+  private async watchForHosts(alive: () => boolean): Promise<string | null> {
+    await this.transport?.lookAround?.().catch(() => undefined);
+    while (alive() && this.state.status === 'hosting') {
+      await sleep(1000);
+      if (!alive() || this.state.status !== 'hosting') break;
+      // Friends are here, or one is saying hello: stay the host.
+      if (this.roster.length > 1 || Date.now() - this.lastConnect < HELLO_MS) continue;
+      const now = Date.now();
+      for (const peer of this.state.found) {
+        if (!peer.name.startsWith(TOWN_MARK)) continue;
+        const seen = now - (this.seenAt.get(peer.id) ?? now);
+        if (shouldYield(this.token, tokenOf(peer.name, TOWN_MARK), seen)) return peer.name;
+      }
+    }
+    return null;
   }
 
   private async discoverOnce(alive: () => boolean): Promise<boolean> {
@@ -324,11 +361,18 @@ export class TownSession {
 
   private listen(t: Transport, asHost: boolean) {
     this.offs = [
-      t.on('peerFound', (peer) => this.set({ found: [...this.state.found.filter((p) => p.id !== peer.id), peer] })),
-      t.on('peerLost', ({ id }) => this.set({ found: this.state.found.filter((p) => p.id !== id) })),
+      t.on('peerFound', (peer) => {
+        if (!this.seenAt.has(peer.id)) this.seenAt.set(peer.id, Date.now());
+        this.set({ found: [...this.state.found.filter((p) => p.id !== peer.id), peer] });
+      }),
+      t.on('peerLost', ({ id }) => {
+        this.seenAt.delete(id);
+        this.set({ found: this.state.found.filter((p) => p.id !== id) });
+      }),
       t.on('error', (text) => this.set({ notice: text })),
       t.on('connected', ({ id }) => {
         if (asHost) {
+          this.lastConnect = Date.now();
           if (this.roster.length >= MAX_PLAYERS) this.send({ type: 'bye' }, id);
           return; // otherwise wait for its hello
         }

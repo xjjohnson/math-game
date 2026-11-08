@@ -1,5 +1,12 @@
 # Change log
 
+## 2026-11-08 (stay the host)
+
+- **Join or host, then stay.** Community and Several phones now work the same way: when you open them, the phone looks once for someone already hosting and joins them. If nobody is, it hosts and **stays the host**, with no more restarting every 20-30 seconds.
+- **Two hosts become one.** If two phones open at the same moment and both end up hosting, they find each other and merge: the host nobody has joined yet gives way and joins the other one. A host that already has friends never gives way.
+- **Several phones** no longer has Host and Join buttons: it joins a game nearby, or hosts one if there isn't one. You can still tap a game in the list while it's looking.
+- Works with the current app, no new APK needed. Hosting phones put a short tag in their name so two hosts can agree which one gives way.
+
 ## 2026-11-08 (free people avatars)
 
 - **12 free human avatars:** boys and girls, kids, teens and grown-ups, in all six skin tones and a mix of hair (Ava, Leo, Mia, Sam, Zoe, Max, Nia, Jay, Ivy, Ben, Rosa, Omar). They're drawn the same way as the people buddies, show up in the Shop's "Free avatars" row, and are also on the new-player picker. No coins needed, and they show in the Community and on visits like any other avatar. No store or protocol change.

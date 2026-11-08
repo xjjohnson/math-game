@@ -1,4 +1,4 @@
-import { router } from 'expo-router';
+import { router, useFocusEffect } from 'expo-router';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 
@@ -58,13 +58,14 @@ import {
   type MatchSetup,
   type PlayerInfo,
 } from '@/utils/multiplayer/protocol';
+import { advertName, GAME_MARK, newToken, shouldYield, shownName, tokenOf } from '@/utils/multiplayer/autoHost';
 import { multiplayerRound } from '@/utils/multiplayer/rounds';
 import { allGranted, checkPermissions, devicePermissions } from '@/utils/nearbyPermissions';
 import { randomSeed } from '@/utils/seededRandom';
 import { playSound } from '@/utils/soundEffects';
 import { Nearby } from '../../modules/math-nearby';
 
-/** choose → (host) lobby, or (guest) finding → lobby; then playing; gone when the game ends early. */
+/** choose (getting ready) → finding → lobby (as guest, or as host when nobody else is); then playing; gone when the game ends early. */
 type Phase = 'choose' | 'finding' | 'lobby' | 'playing' | 'gone';
 
 const MODES: { value: MatchMode; label: string }[] = [
@@ -78,6 +79,9 @@ const MEDALS = ['🥇', '🥈', '🥉'];
 const VERSION_MISMATCH = 'Some phones have a different version of Math Game. Update them all, then try again.';
 
 const errorText = (e: unknown) => (e instanceof Error ? e.message : String(e));
+const wait = (ms: number) => new Promise<void>((done) => setTimeout(done, ms));
+/** A guest that just connected says hello within this long; a host doesn't give way meanwhile. */
+const HELLO_MS = 5000;
 
 /** Keeps a value in state for rendering and in a ref for transport callbacks. */
 function useStateRef<T>(initial: T) {
@@ -103,6 +107,17 @@ export function NearbyPlayScreen() {
   /** This phone's player id; a guest learns it from the host's welcome. */
   const [myId, setMyId, myIdRef] = useStateRef<string>(HOST_ID);
   const [found, setFound] = useState<Peer[]>([]);
+  const foundRef = useRef<Peer[]>([]);
+  foundRef.current = found;
+  /** When each game found nearby was first seen, by its id. */
+  const seenAt = useRef(new Map<string, number>());
+  /** This phone's tag when it hosts, so two hosts can agree which one gives way. */
+  const token = useRef(newToken());
+  /** Bumped to stop a join-or-host run that is under way. */
+  const run = useRef(0);
+  /** When a guest last connected, while its hello is on the way. */
+  const lastConnect = useRef(0);
+  const [needsPermission, setNeedsPermission] = useState(false);
   const [code, setCode] = useState('');
   const [notice, setNotice] = useState<string | null>(null);
   const [goneText, setGoneText] = useState('');
@@ -153,10 +168,18 @@ export function NearbyPlayScreen() {
 
     const offs = [
       // Community visits advertise too; only games belong in this list.
-      t.on('peerFound', (peer) => !peer.name.startsWith(TOWN_MARK) && setFound((f) => [...f.filter((p) => p.id !== peer.id), peer])),
-      t.on('peerLost', ({ id }) => setFound((f) => f.filter((p) => p.id !== id))),
+      t.on('peerFound', (peer) => {
+        if (peer.name.startsWith(TOWN_MARK)) return;
+        if (!seenAt.current.has(peer.id)) seenAt.current.set(peer.id, Date.now());
+        setFound((f) => (foundRef.current = [...f.filter((p) => p.id !== peer.id), peer]));
+      }),
+      t.on('peerLost', ({ id }) => {
+        seenAt.current.delete(id);
+        setFound((f) => (foundRef.current = f.filter((p) => p.id !== id)));
+      }),
       t.on('connected', ({ id, code: digits }) => {
         if (isHostRef.current) {
+          lastConnect.current = Date.now();
           // Late or extra phones are turned away; the rest wait for their hello.
           if (phaseRef.current === 'playing' || rosterRef.current.length >= MAX_PLAYERS) {
             t.send({ type: 'bye' }, id).catch(() => undefined);
@@ -218,6 +241,8 @@ export function NearbyPlayScreen() {
       }),
     ];
     return () => {
+      run.current++;
+      transport.current = null;
       offs.forEach((off) => off());
       t.send({ type: 'bye' }).catch(() => undefined);
       t.disconnect();
@@ -225,6 +250,21 @@ export function NearbyPlayScreen() {
     // Set up once for the life of the screen; callbacks read the refs.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Join or host as soon as the screen opens.
+  useEffect(() => {
+    if (Nearby) void start();
+    // Once, when the screen opens; start() reads the refs.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Back from the permission screen: try again.
+  useFocusEffect(
+    useCallback(() => {
+      if (needsPermission) void start();
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [needsPermission]),
+  );
 
   if (!Nearby) {
     return (
@@ -234,24 +274,83 @@ export function NearbyPlayScreen() {
     );
   }
 
-  const go = async (asHost: boolean) => {
+  const myName = `${stickerText(me.avatar)} ${me.name}`;
+
+  /**
+   * Join or host, as soon as the screen opens: look once for a game someone is
+   * already hosting and join it; if there is none, host, and stay the host.
+   * While nobody has joined, a host gives way to another host it finds, so two
+   * phones that started together still end up in one game (see shouldYield).
+   */
+  const start = async () => {
+    const mine = ++run.current;
+    const alive = () => run.current === mine && transport.current !== null;
     const list = devicePermissions();
     if (!allGranted(await checkPermissions(list), list)) {
-      router.push('/permissions');
+      setNeedsPermission(true);
+      setPhase('choose');
       return;
     }
+    setNeedsPermission(false);
     setNotice(null);
-    setFound([]);
-    try {
-      if (asHost) await transport.current?.host(`${stickerText(me.avatar)} ${me.name}`);
-      else await transport.current?.discover();
-      setIsHost(asHost);
+    let joinName: string | null = null;
+    while (alive()) {
+      seenAt.current.clear();
+      setFound((foundRef.current = []));
+      setIsHost(false);
       setMyId(HOST_ID);
-      setRoster(asHost ? [me] : []);
-      setPhase(asHost ? 'lobby' : 'finding');
-    } catch (e) {
-      setNotice(errorText(e));
+      setRoster([]);
+      setPhase('finding');
+      try {
+        await transport.current?.discover();
+      } catch (e) {
+        setNotice(errorText(e));
+        setPhase('choose');
+        return;
+      }
+      // Give hosts a moment to be found; the wait differs per phone so two phones don't decide together.
+      await wait(joinName ? 1500 : 3000 + Math.random() * 3000);
+      // Stop if the screen closed, or a game was tapped and joined meanwhile.
+      if (!alive() || phaseRef.current !== 'finding') return;
+      const games = foundRef.current;
+      const game = (joinName ? games.find((p) => p.name === joinName) : undefined) ?? games[0];
+      if (game) {
+        await transport.current?.connect(myName, game.id).catch(() => undefined);
+        for (let i = 0; i < 12 && alive() && phaseRef.current === 'finding'; i++) await wait(500);
+        if (!alive() || phaseRef.current !== 'finding') return;
+      }
+      joinName = null;
+      try {
+        await transport.current?.host(advertName(GAME_MARK, token.current, myName));
+      } catch (e) {
+        setNotice(errorText(e));
+        setPhase('choose');
+        return;
+      }
+      setIsHost(true);
+      setMyId(HOST_ID);
+      setRoster([me]);
+      setPhase('lobby');
+      await transport.current?.lookAround?.().catch(() => undefined);
+      const other = await watchForHosts(alive);
+      if (!other) return;
+      joinName = other;
     }
+  };
+
+  /** While hosting in the lobby with nobody else yet: the name of another host to give way to, or null. */
+  const watchForHosts = async (alive: () => boolean): Promise<string | null> => {
+    while (alive() && isHostRef.current && phaseRef.current === 'lobby') {
+      await wait(1000);
+      if (!alive() || !isHostRef.current || phaseRef.current !== 'lobby') break;
+      // Friends are here, or one is saying hello: stay the host.
+      if (rosterRef.current.length > 1 || Date.now() - lastConnect.current < HELLO_MS) continue;
+      const now = Date.now();
+      for (const peer of foundRef.current) {
+        if (shouldYield(token.current, tokenOf(peer.name, GAME_MARK), now - (seenAt.current.get(peer.id) ?? now))) return peer.name;
+      }
+    }
+    return null;
   };
 
   const startGame = () => {
@@ -296,27 +395,33 @@ export function NearbyPlayScreen() {
       {phase === 'choose' ? (
         <>
           <Text style={styles.body}>
-            One phone hosts the game. Everyone else joins it, up to {MAX_PLAYERS} phones in all.
+            {needsPermission
+              ? 'Playing on several phones needs permission to find phones nearby.'
+              : `Your phone joins a game nearby, or hosts one if there isn't one yet. Up to ${MAX_PLAYERS} phones in all.`}
           </Text>
-          <BigButton label="📣 Host a game" color={colors.primary} onPress={() => go(true)} />
-          <BigButton label="🔍 Join a game" color={colors.accent} onPress={() => go(false)} />
+          {needsPermission ? (
+            <BigButton label="Allow nearby play" color={colors.primary} onPress={() => router.push('/permissions')} />
+          ) : (
+            <BigButton label="🔍 Find a game" color={colors.primary} onPress={() => void start()} />
+          )}
         </>
       ) : null}
 
       {phase === 'finding' ? (
         <View style={styles.section}>
-          <Text style={styles.heading}>{found.length ? 'Tap a game to join' : 'Looking for games nearby…'}</Text>
+          <Text style={styles.heading}>{found.length ? 'Joining a game…' : 'Looking for a game nearby…'}</Text>
+          <Text style={styles.body}>If nobody is hosting one, your phone will host it.</Text>
           {found.map((peer) => (
             <Pressable
               key={peer.id}
               onPress={() =>
-                transport.current?.connect(`${stickerText(me.avatar)} ${me.name}`, peer.id).catch((e) => setNotice(errorText(e)))
+                transport.current?.connect(myName, peer.id).catch((e) => setNotice(errorText(e)))
               }
               accessibilityRole="button"
-              accessibilityLabel={`Join ${peer.name}`}
+              accessibilityLabel={`Join ${shownName(peer.name, GAME_MARK)}`}
               style={({ pressed }) => [styles.peer, pressed && styles.pressed]}
             >
-              <Text style={styles.peerName}>{peer.name}</Text>
+              <Text style={styles.peerName}>{shownName(peer.name, GAME_MARK)}</Text>
             </Pressable>
           ))}
         </View>
