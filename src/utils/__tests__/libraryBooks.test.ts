@@ -10,9 +10,17 @@ describe('library books', () => {
     for (const b of SHELF) {
       expect(b).toBeDefined();
       expect(b.pages.length).toBeGreaterThan(2);
-      for (const p of b.pages) expect(pageWords(p).length).toBeGreaterThan(0);
+      // A page with a printed picture can be all picture; every other page has words to read aloud.
+      for (const p of b.pages) if (!('image' in p && p.image)) expect(pageWords(p).length).toBeGreaterThan(0);
+      expect(b.pages.some((p) => pageWords(p).length > 0)).toBe(true);
     }
     expect(new Set(SHELF.map((b) => b.title)).size).toBe(SHELF_BOOKS);
+  });
+
+  it('credits the Texas readers at the end of every school book', () => {
+    const school = SHELF.filter((b) => b.grade);
+    expect(school.length).toBe(SHELF_BOOKS - 9);
+    for (const b of school) expect(pageWords(b.pages[b.pages.length - 1])).toContain('Texas Education Agency');
   });
 
   it('hides every bakery recipe in some book, and only real ones', () => {
