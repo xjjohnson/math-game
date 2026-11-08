@@ -3,3 +3,6 @@ import { createJSONStorage } from 'zustand/middleware';
 
 /** Offline storage shared by every persisted store (localStorage on web). */
 export const persistStorage = createJSONStorage(() => AsyncStorage);
+
+/** The same offline storage, read and written as plain text. */
+export const rawStorage = AsyncStorage;

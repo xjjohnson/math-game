@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 
 import { Text } from '@/components/AppText';
@@ -11,7 +11,8 @@ import { findBadge } from '@/constants/badges';
 import { OPERATIONS } from '@/constants/difficulty';
 import { GRADES } from '@/constants/grades';
 import { colors, fontSizes, radius, spacing, TAP_TARGET } from '@/constants/theme';
-import { useProfiles } from '@/store/profiles';
+import { profilesStorage, restoreProfiles, useProfiles, useProfilesLoad } from '@/store/profiles';
+import type { Backup } from '@/store/safeStorage';
 import { useSettings, type CoinPayout } from '@/store/settings';
 import type { Profile } from '@/types';
 import { dateKey, dayStreak } from '@/utils/dates';
@@ -46,6 +47,7 @@ export function ParentScreen() {
 
   return (
     <Screen title="Parent area">
+      <SavedData />
       <PayoutSettings />
       <ParentReport />
       <View style={styles.actions}>
@@ -116,6 +118,65 @@ function PinPad({
       <Text style={styles.note}>
         The code keeps this area for grown-ups.
       </Text>
+    </View>
+  );
+}
+
+/** Backups of the saved players, made before each app update changed them, with a way to put one back. */
+function SavedData() {
+  const load = useProfilesLoad();
+  const [backups, setBackups] = useState<Backup[]>([]);
+  const [asking, setAsking] = useState<string | null>(null);
+  const [note, setNote] = useState<string | null>(null);
+
+  useEffect(() => {
+    let live = true;
+    profilesStorage.backups().then((list) => live && setBackups(list)).catch(() => undefined);
+    return () => {
+      live = false;
+    };
+  }, [load]);
+
+  const restore = async (b: Backup) => {
+    if (asking !== b.key) {
+      setAsking(b.key);
+      setNote(null);
+      return;
+    }
+    setAsking(null);
+    const ok = await restoreProfiles(b.key);
+    setNote(ok ? 'Players restored from the backup.' : "That backup couldn't be opened either.");
+  };
+
+  if (load === 'ok' && backups.length === 0) return null;
+  return (
+    <View style={styles.card}>
+      <Text style={styles.player}>💾 Saved players</Text>
+      {load === 'failed' ? (
+        <Text style={[styles.line, styles.warn]}>
+          The saved players couldn't be opened after the last update. Nothing is being saved, so their real coins and
+          homes are still safe. Restore a backup below, or wait for the next update.
+        </Text>
+      ) : (
+        <Text style={styles.line}>
+          A copy is kept each time an update changes the saved players. Restore one only if something went missing; it
+          replaces everything since that copy.
+        </Text>
+      )}
+      {backups.map((b) => (
+        <BigButton
+          key={b.key}
+          label={asking === b.key ? 'Tap again to restore' : `Restore copy from ${new Date(b.savedAt).toLocaleDateString()}`}
+          color={asking === b.key ? colors.primary : colors.text}
+          outline={asking !== b.key}
+          onPress={() => void restore(b)}
+        />
+      ))}
+      {note ? (
+        <Text style={styles.line} accessibilityLiveRegion="polite">
+          {note}
+        </Text>
+      ) : null}
     </View>
   );
 }
@@ -278,6 +339,7 @@ const styles = StyleSheet.create({
   player: { fontSize: fontSizes.button, fontWeight: '900', color: colors.text },
   heading: { fontSize: fontSizes.body, fontWeight: '800', color: colors.text, marginTop: spacing.sm },
   line: { fontSize: 16, color: colors.text },
+  warn: { fontWeight: '800', color: colors.primary },
   adjustRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs },
   adjustLabel: { flex: 1, fontSize: 16, fontWeight: '700', color: colors.text },
   adjustKey: {

@@ -49,6 +49,10 @@ class MockTransport extends Emitter implements Transport {
     }
   }
 
+  stopLooking() {
+    this.looking = false;
+  }
+
   async connect(name: string, peerId: string) {
     const host = this.net.find((p) => p.id === peerId);
     if (!host?.hostingAs) throw new Error('Nobody is hosting');

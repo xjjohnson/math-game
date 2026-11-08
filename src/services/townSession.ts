@@ -236,11 +236,23 @@ export class TownSession {
    */
   private async watchForHosts(alive: () => boolean): Promise<string | null> {
     await this.transport?.lookAround?.().catch(() => undefined);
+    let looking = true;
     while (alive() && this.state.status === 'hosting') {
       await sleep(1000);
       if (!alive() || this.state.status !== 'hosting') break;
+      // Friends are here: stay the host, and stop searching, which makes their connections flaky.
+      // If they all leave, start looking for other lonely hosts again.
+      const friends = this.roster.length > 1;
+      if (friends && looking) {
+        this.transport?.stopLooking?.();
+        looking = false;
+      } else if (!friends && !looking) {
+        await this.transport?.lookAround?.().catch(() => undefined);
+        looking = true;
+        continue;
+      }
       // Friends are here, or one is saying hello: stay the host.
-      if (this.roster.length > 1 || Date.now() - this.lastConnect < HELLO_MS) continue;
+      if (friends || Date.now() - this.lastConnect < HELLO_MS) continue;
       const now = Date.now();
       for (const peer of this.state.found) {
         if (!peer.name.startsWith(TOWN_MARK)) continue;
@@ -398,6 +410,8 @@ export class TownSession {
           return; // otherwise wait for its hello
         }
         this.set({ status: 'joined' });
+        // Joined: stop searching, which makes the connection slow and flaky.
+        t.stopLooking?.();
         this.send({
           type: 'hello',
           version: PROTOCOL_VERSION,

@@ -24,6 +24,8 @@ interface NativeNearby {
   connect(name: string, endpointId: string): Promise<void>;
   /** Sends to one phone, or to every connected phone when endpointId is null. */
   send(endpointId: string | null, text: string): Promise<void>;
+  /** Stops looking for hosts; hosting and connections carry on. Missing on APKs built before it was added. */
+  stopFinding?(): void;
   stop(): void;
   addListener<E extends keyof NearbyEvents>(event: E, listener: NearbyEvents[E]): EventSubscription;
 }

@@ -75,4 +75,25 @@ describe('community auto-connect', () => {
     friend.stop();
     b.stop();
   });
+
+  it('stops searching once phones are connected, and a host looks again when its friends leave', async () => {
+    const net = createMockNetwork(2);
+    const looking = (i: number) => (net[i] as unknown as { looking: boolean }).looking;
+    const [a, friend] = net.map((t) => new TownSession(() => t));
+    void a.auto({ name: 'A', avatar: '🐼' });
+    await jest.advanceTimersByTimeAsync(8000);
+    expect(a.getState().status).toBe('hosting');
+    expect(looking(0)).toBe(true);
+    void friend.auto({ name: 'F', avatar: '🐸' });
+    await jest.advanceTimersByTimeAsync(8000);
+    expect(friend.getState().status).toBe('joined');
+    // Searching makes Nearby connections flaky, so both phones stop.
+    expect(looking(1)).toBe(false);
+    expect(looking(0)).toBe(false);
+    friend.stop();
+    await jest.advanceTimersByTimeAsync(3000);
+    expect(a.getState().status).toBe('hosting');
+    expect(looking(0)).toBe(true);
+    a.stop();
+  });
 });

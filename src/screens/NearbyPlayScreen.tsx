@@ -186,6 +186,8 @@ export function NearbyPlayScreen() {
           }
           return;
         }
+        // Joined: stop searching, which makes the connection slow and flaky.
+        t.stopLooking?.();
         setCode(digits);
         setPhase('lobby');
         playSound('reward');
@@ -340,11 +342,22 @@ export function NearbyPlayScreen() {
 
   /** While hosting in the lobby with nobody else yet: the name of another host to give way to, or null. */
   const watchForHosts = async (alive: () => boolean): Promise<string | null> => {
+    let looking = true;
     while (alive() && isHostRef.current && phaseRef.current === 'lobby') {
       await wait(1000);
       if (!alive() || !isHostRef.current || phaseRef.current !== 'lobby') break;
+      // Friends are here: stop searching, which makes their connections flaky. Start again if they all leave.
+      const friends = rosterRef.current.length > 1;
+      if (friends && looking) {
+        transport.current?.stopLooking?.();
+        looking = false;
+      } else if (!friends && !looking) {
+        await transport.current?.lookAround?.().catch(() => undefined);
+        looking = true;
+        continue;
+      }
       // Friends are here, or one is saying hello: stay the host.
-      if (rosterRef.current.length > 1 || Date.now() - lastConnect.current < HELLO_MS) continue;
+      if (friends || Date.now() - lastConnect.current < HELLO_MS) continue;
       const now = Date.now();
       for (const peer of foundRef.current) {
         if (shouldYield(token.current, tokenOf(peer.name, GAME_MARK), now - (seenAt.current.get(peer.id) ?? now))) return peer.name;
@@ -356,6 +369,8 @@ export function NearbyPlayScreen() {
   const startGame = () => {
     const setup: MatchSetup = { mode, operation, difficulty: level.difficulty, grade: level.grade, seed: randomSeed() };
     send({ type: 'start', setup, players: roster });
+    // No more searching during the game.
+    transport.current?.stopLooking?.();
     setMatch(startMatch(setup, roster, HOST_ID));
     setPhase('playing');
   };

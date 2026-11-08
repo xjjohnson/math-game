@@ -1,18 +1,19 @@
+import { useSyncExternalStore } from 'react';
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 
 import { DEFAULT_GRADE } from '@/constants/grades';
 import { DEFAULT_EQUIPPED } from '@/constants/shop';
 import { useSettings } from '@/store/settings';
-import { persistStorage } from '@/store/storage';
-import type { Difficulty, Grade, InputStyle, Profile } from '@/types';
+import { migrateProfiles, PROFILES_VERSION } from '@/store/profileMigrations';
+import { createSafeStorage, type LoadStatus } from '@/store/safeStorage';
+import { rawStorage } from '@/store/storage';
+import type { Grade, InputStyle, Profile } from '@/types';
 import { dateKey } from '@/utils/dates';
 import { applyRound, type RoundOutcome, type RoundResult } from '@/utils/progress';
 import { careForBuddy as applyCare, heartForRound, type CareAction, type CareResult } from '@/utils/buddy';
 import {
-  addExtraRooms,
   moveRoom,
-  AREAS_BEFORE_EXTRA_ROOMS,
   buyRoom,
   buyRoomItem,
   emptyRoom,
@@ -20,8 +21,6 @@ import {
   setBuddyHome,
   setPlaced,
   setPaint,
-  upgradeRoom,
-  widenHome,
   type Placement,
   type HomeRoomBuyResult,
   type RoomBuyResult,
@@ -125,6 +124,9 @@ interface ProfilesState {
   /** Finishes a job in the community and returns what it paid. */
   finishShift: (id: string, building: BuildingId, correct: number) => ShiftPay;
 }
+
+/** Where the profiles are saved: backed up before each upgrade, and never saved over by a failed load. */
+export const profilesStorage = createSafeStorage<ProfilesState>(rawStorage, 'math-game.profiles', PROFILES_VERSION);
 
 export const useProfiles = create<ProfilesState>()(
   persist(
@@ -262,79 +264,17 @@ export const useProfiles = create<ProfilesState>()(
     }),
     {
       name: 'math-game.profiles',
-      version: 13,
-      storage: persistStorage,
-      migrate: (persisted, version) => {
-        const state = persisted as Pick<ProfilesState, 'profiles' | 'activeProfileId'>;
-        if (version < 2) {
-          // Version 2 added play dates, the daily challenge and last difficulty.
-          state.profiles = state.profiles.map((p) => ({
-            ...p,
-            playDates: p.playDates ?? [],
-            dailyChallengeDate: p.dailyChallengeDate ?? null,
-            lastDifficulty: p.lastDifficulty ?? 'easy',
-          }));
+      version: PROFILES_VERSION,
+      storage: profilesStorage,
+      migrate: (persisted, version) => migrateProfiles(persisted, version) as ProfilesState,
+      onRehydrateStorage: () => (_state, error) => {
+        if (error) {
+          profilesStorage.fail();
+          return;
         }
-        if (version < 3) {
-          // Version 3 added the shop (equipped items), badges and weekly goals.
-          state.profiles = state.profiles.map((p) => ({
-            ...p,
-            equipped: p.equipped ?? { ...DEFAULT_EQUIPPED },
-            badges: p.badges ?? [],
-            week: p.week ?? null,
-          }));
-        }
-        if (version < 4) {
-          // Version 4 added the weak-spots review list.
-          state.profiles = state.profiles.map((p) => ({ ...p, missed: p.missed ?? {} }));
-        }
-        if (version < 5) {
-          // Version 5 remembers the first avatar so it can be picked again.
-          state.profiles = state.profiles.map((p) => ({ ...p, startAvatar: p.startAvatar ?? p.avatar }));
-        }
-        if (version < 6) {
-          // Version 6 added buddy hearts, daily buddy care and the buddy's room.
-          state.profiles = state.profiles.map((p) => ({
-            ...p,
-            buddyHearts: p.buddyHearts ?? {},
-            buddyCare: p.buddyCare ?? null,
-            room: p.room ?? emptyRoom(),
-          }));
-        }
-        if (version < 7) {
-          // Version 7 added grade levels. Start near the classic level they last played.
-          const nearest: Record<Difficulty, Grade> = { easy: 1, medium: 3, hard: 5 };
-          state.profiles = state.profiles.map((p) => ({ ...p, grade: p.grade ?? nearest[p.lastDifficulty] ?? DEFAULT_GRADE }));
-        }
-        if (version < 8) {
-          // Version 8 grew the one room into a home with areas and room for several buddies.
-          // The old room becomes the living room, with the buddy in use where it stood.
-          state.profiles = state.profiles.map((p) => ({
-            ...p,
-            room: upgradeRoom(p.room, p.equipped?.companion ?? null),
-          }));
-        }
-        if (version < 9) {
-          // Version 9 added clothes for buddies.
-          state.profiles = state.profiles.map((p) => ({ ...p, wardrobe: p.wardrobe ?? [], outfits: p.outfits ?? {} }));
-        }
-        if (version < 10) {
-          // Version 10 added hair, skin and beards for people buddies.
-          state.profiles = state.profiles.map((p) => ({ ...p, looks: p.looks ?? {} }));
-        }
-        if (version < 11) {
-          // Version 11 made the rooms wider and added the bathroom and playroom.
-          state.profiles = state.profiles.map((p) => ({ ...p, room: widenHome(p.room, AREAS_BEFORE_EXTRA_ROOMS) }));
-        }
-        if (version < 13) {
-          // Version 13 added extra rooms to buy. Everyone starts with none, and the new areas' paint is filled in.
-          state.profiles = state.profiles.map((p) => ({ ...p, homeRooms: p.homeRooms ?? [], room: addExtraRooms(p.room) }));
-        }
-        if (version < 12) {
-          // Version 12 added the community: which buildings' jobs are done today.
-          state.profiles = state.profiles.map((p) => ({ ...p, town: p.town ?? { date: '', done: [] } }));
-        }
-        return state as ProfilesState;
+        profilesStorage.unlock();
+        // Save what was loaded, so an upgraded save is written once loading worked.
+        useProfiles.setState({});
       },
     },
   ),
@@ -342,4 +282,16 @@ export const useProfiles = create<ProfilesState>()(
 
 export function useActiveProfile(): Profile | undefined {
   return useProfiles((s) => s.profiles.find((p) => p.id === s.activeProfileId));
+}
+
+/** Whether the saved profiles have loaded: 'failed' means they couldn't be opened, and nothing is being saved. */
+export function useProfilesLoad(): LoadStatus {
+  return useSyncExternalStore(profilesStorage.subscribe, profilesStorage.status, profilesStorage.status);
+}
+
+/** Puts a backup back as the saved profiles and loads them again. */
+export async function restoreProfiles(backupKey: string): Promise<boolean> {
+  if (!(await profilesStorage.restore(backupKey))) return false;
+  await useProfiles.persist.rehydrate();
+  return profilesStorage.status() === 'ok';
 }

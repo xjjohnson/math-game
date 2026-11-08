@@ -55,6 +55,14 @@ class NearbyTransport extends Emitter implements Transport {
     await Nearby!.startFinding().catch((e) => this.fail(e));
   }
 
+  stopLooking() {
+    try {
+      Nearby!.stopFinding?.();
+    } catch {
+      // Not looking anyway.
+    }
+  }
+
   async connect(name: string, peerId: string) {
     await Nearby!.connect(name, peerId).catch((e) => this.fail(e));
   }
