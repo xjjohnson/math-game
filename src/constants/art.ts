@@ -1,5 +1,7 @@
 import type { ImageSourcePropType } from 'react-native';
 
+import type { PersonLook, WearSlot } from '@/constants/wardrobe';
+
 /**
  * Drawn pictures for characters no emoji covers. Avatars and buddies store
  * these as "@key" (short enough for the multiplayer hello message) in the
@@ -51,7 +53,94 @@ export const PERSON_STICKERS: Record<string, { buddyId: string; standIn: string 
   '@baby': { buddyId: 'buddy-baby', standIn: '👶🏾' },
 };
 
+/**
+ * Free human avatars: every skin tone, hair and age, boys and girls. Drawn like
+ * the people buddies, but kept apart from PEOPLE since they aren't buddies.
+ * Keys stay within 8 characters for the multiplayer hello message.
+ */
+export interface PersonAvatar {
+  name: string;
+  look: PersonLook;
+  outfit: Partial<Record<WearSlot, string>>;
+  standIn: string;
+}
+
+export const PERSON_AVATARS: Record<string, PersonAvatar> = {
+  '@p-ava': {
+    name: 'Ava',
+    look: { skin: 0, hair: 'pigtails', hairColor: 4, beard: null, height: 0.85 },
+    outfit: { shirt: 'dressPink', legs: 'whiteTights' },
+    standIn: '👧🏻',
+  },
+  '@p-leo': {
+    name: 'Leo',
+    look: { skin: 1, hair: 'short', hairColor: 2, beard: null, height: 0.85 },
+    outfit: { shirt: 'shirtBlue', legs: 'jeans' },
+    standIn: '👦🏻',
+  },
+  '@p-mia': {
+    name: 'Mia',
+    look: { skin: 2, hair: 'ponytail', hairColor: 1, beard: null, height: 0.85 },
+    outfit: { shirt: 'shirtPurple', legs: 'skirt' },
+    standIn: '👧🏽',
+  },
+  '@p-sam': {
+    name: 'Sam',
+    look: { skin: 2, hair: 'curly', hairColor: 5, beard: null, height: 0.85 },
+    outfit: { shirt: 'stripedTee', legs: 'shorts' },
+    standIn: '👦🏽',
+  },
+  '@p-zoe': {
+    name: 'Zoe',
+    look: { skin: 3, hair: 'bun', hairColor: 0, beard: null, height: 0.85 },
+    outfit: { shirt: 'shirtYellow', legs: 'jeans' },
+    standIn: '👧🏾',
+  },
+  '@p-max': {
+    name: 'Max',
+    look: { skin: 4, hair: 'short', hairColor: 0, beard: null, height: 0.85 },
+    outfit: { shirt: 'shirtGreen', legs: 'blackPants' },
+    standIn: '👦🏾',
+  },
+  '@p-nia': {
+    name: 'Nia',
+    look: { skin: 5, hair: 'curly', hairColor: 0, beard: null, height: 0.85 },
+    outfit: { shirt: 'dressBlue', legs: 'beigeTights' },
+    standIn: '👧🏿',
+  },
+  '@p-jay': {
+    name: 'Jay',
+    look: { skin: 5, hair: 'bald', hairColor: 0, beard: null, height: 0.85 },
+    outfit: { shirt: 'hoodie', legs: 'shorts' },
+    standIn: '👦🏿',
+  },
+  '@p-ivy': {
+    name: 'Ivy',
+    look: { skin: 1, hair: 'long', hairColor: 5, beard: null, height: 0.92 },
+    outfit: { shirt: 'sweaterGreen', legs: 'jeans' },
+    standIn: '🧑🏼',
+  },
+  '@p-ben': {
+    name: 'Ben',
+    look: { skin: 3, hair: 'wavy', hairColor: 3, beard: null, height: 0.92 },
+    outfit: { shirt: 'hoodie', legs: 'jeans' },
+    standIn: '🧑🏽',
+  },
+  '@p-rosa': {
+    name: 'Rosa',
+    look: { skin: 3, hair: 'long', hairColor: 0, beard: null, height: 1 },
+    outfit: { shirt: 'dressFlowers' },
+    standIn: '👩🏽',
+  },
+  '@p-omar': {
+    name: 'Omar',
+    look: { skin: 4, hair: 'short', hairColor: 0, beard: 0, height: 1 },
+    outfit: { shirt: 'sweaterTan', legs: 'blackPants' },
+    standIn: '🧔🏾',
+  },
+};
+
 /** An avatar or buddy as plain text: the emoji itself, or a drawing's stand-in. */
 export function stickerText(value: string): string {
-  return artFor(value)?.standIn ?? PERSON_STICKERS[value]?.standIn ?? value;
+  return artFor(value)?.standIn ?? PERSON_STICKERS[value]?.standIn ?? PERSON_AVATARS[value]?.standIn ?? value;
 }

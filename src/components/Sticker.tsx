@@ -2,7 +2,7 @@ import { Image, View, type ImageStyle, type StyleProp, type ViewStyle } from 're
 
 import { Text } from '@/components/AppText';
 import { PersonFigure } from '@/components/PersonFigure';
-import { artFor, PERSON_STICKERS } from '@/constants/art';
+import { artFor, PERSON_AVATARS, PERSON_STICKERS } from '@/constants/art';
 import { PEOPLE } from '@/constants/wardrobe';
 import { clothOf } from '@/utils/wardrobe';
 
@@ -28,7 +28,7 @@ export function Sticker({ value, size, style }: Props) {
       />
     );
   }
-  const person = PERSON_STICKERS[value] && PEOPLE[PERSON_STICKERS[value].buddyId];
+  const person = PERSON_AVATARS[value] ?? (PERSON_STICKERS[value] && PEOPLE[PERSON_STICKERS[value].buddyId]);
   if (person) {
     // Head and shoulders: the figure drawn full height, cut off below the chest.
     const figure = side / 0.7;
