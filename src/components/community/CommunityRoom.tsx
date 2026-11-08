@@ -8,26 +8,22 @@ import { ACCESSORIES, GLASSES } from '@/components/VisitPanel';
 import { townSession, useTownState, WAVE_MS } from '@/services/townSession';
 import { useActiveProfile } from '@/store/profiles';
 import {
-  addToMask,
   bake,
   madeRecipe,
   madeToUnit,
   maskEmojis,
-  maskToUnit,
   recipeFor,
   unitToMade,
-  unitToMask,
   MADE_SLOTS,
 } from '@/utils/bakery';
 import {
   bakedSwitch,
   BOWL,
-  BOWL_SWITCH,
   inOven,
   INSIDE_SCREENS,
   isInside,
   madeSwitch,
-  onBowl,
+  bowlContents,
   PLACE_PROPS,
   propPieceId,
   settle,
@@ -161,11 +157,11 @@ export function CommunityRoom({ place, onDoor, onExit }: Props) {
 
   // The bakery's mixing bowl: what is in it, kept as a switch so every phone agrees.
   const bakery = place === 'bakery';
-  const bowlSwitch = switchPieceId('bakery', BOWL_SWITCH);
-  const bowlMask = bakery ? unitToMask(spotsNow[bowlSwitch]?.x ?? 0) : 0;
+  const contents = bakery ? bowlContents(spotsNow) : { mask: 0, props: [] as PropDef[] };
+  const bowlMask = contents.mask;
   const bowlSpot: Spot = spotsNow[propPieceId('bakery', BOWL.id)] ?? { x: BOWL.x, y: BOWL.y };
-  const latest = useRef({ spotsNow, bowlSpot, bowlMask });
-  latest.current = { spotsNow, bowlSpot, bowlMask };
+  const latest = useRef({ spotsNow, bowlSpot, bowlMask, contents });
+  latest.current = { spotsNow, bowlSpot, bowlMask, contents };
 
   const props: Piece[] = inside
     ? PLACE_PROPS[place].flatMap((prop): Piece[] => {
@@ -205,28 +201,36 @@ export function CommunityRoom({ place, onDoor, onExit }: Props) {
   useEffect(() => {
     if (!bowlBaking) return;
     const timer = setTimeout(() => {
-      const { spotsNow: now, bowlSpot: at, bowlMask: mask } = latest.current;
+      const { spotsNow: now, bowlSpot: at, bowlMask: mask, contents: inside } = latest.current;
       const recipe = bake(mask);
       if (!recipe) return;
       // The first free spot for it, or the first spot again when the counter is full.
       const free = Array.from({ length: MADE_SLOTS }, (_, i) => i).find((i) => unitToMade(now[switchPieceId('bakery', madeSwitch(i))]?.y ?? 0) === null) ?? 0;
       move(propPieceId('bakery', `made${free}`), at.x, Math.min(0.95, at.y + 0.001));
       move(switchPieceId('bakery', madeSwitch(free)), 1, madeToUnit(recipeFor(mask)));
-      move(bowlSwitch, 0, 0);
+      // The ingredients are used up: they go back on their shelves.
+      sendHome(inside.props);
     }, BAKE_MS);
     return () => clearTimeout(timer);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [bowlBaking, bowlMask]);
 
-  /** An ingredient let go over the bowl goes in; the thing itself springs back to its shelf. */
-  const dropIngredient = (prop: PropDef, s: Spot) => {
-    if (prop.ingredient === undefined || !onBowl(s, latest.current.bowlSpot)) return;
-    move(bowlSwitch, maskToUnit(addToMask(latest.current.bowlMask, prop.ingredient)), 0);
+  /** Puts ingredients back where they live. */
+  function sendHome(list: PropDef[]) {
+    for (const p of list) move(propPieceId('bakery', p.id), p.x, p.y);
+  }
+  /** Carrying the bowl carries what is in it. */
+  const carryBowl = (to: Spot) => {
+    const { bowlSpot: from, contents: inside, spotsNow: now } = latest.current;
+    const land = settle('bakery', BOWL, to.x, to.y);
+    for (const p of inside.props) {
+      const at = now[propPieceId('bakery', p.id)] ?? { x: p.x, y: p.y };
+      move(propPieceId('bakery', p.id), clamp(at.x + land.x - from.x, 0.01, 0.99), clamp(at.y + land.y - from.y, 0.08, 0.95));
+    }
   };
-  const returnsHome = (prop: PropDef, s: Spot): Spot => (prop.ingredient !== undefined && onBowl(s, latest.current.bowlSpot) ? { x: prop.x, y: prop.y } : s);
   /** Tap the bowl to tip it out; tap a finished treat to eat it. */
   const tapProp = (prop: PropDef): (() => void) | undefined => {
-    if (prop.bowl) return () => move(bowlSwitch, 0, 0);
+    if (prop.bowl) return () => sendHome(latest.current.contents.props);
     if (prop.made !== undefined) return () => move(switchPieceId('bakery', madeSwitch(prop.made as number)), 0, 0);
     return undefined;
   };
@@ -300,8 +304,8 @@ export function CommunityRoom({ place, onDoor, onExit }: Props) {
                 h={h}
                 size={piece.prop.big ? propSize * 1.4 : propSize}
                 onMove={(x, y) => move(piece.key, x, y)}
-                land={(s) => (piece.prop.ingredient !== undefined && onBowl(s, bowlSpot) ? returnsHome(piece.prop, s) : settle(place as InsidePlace, piece.prop, s.x, s.y))}
-                onDrop={(s) => dropIngredient(piece.prop, s)}
+                land={(s) => settle(place as InsidePlace, piece.prop, s.x, s.y)}
+                onDrop={piece.prop.bowl ? carryBowl : undefined}
                 onTap={tapProp(piece.prop)}
                 onDragging={setDragging}
               />
@@ -325,7 +329,7 @@ interface DragArgs {
   fit?: (s: Spot) => Spot;
   /** Where it ends up when let go (things drop onto a shelf). */
   land?: (s: Spot) => Spot;
-  /** Called with the spot it was let go at (before landing), after a drag but not a tap. */
+  /** Called with the spot it was let go at (before landing) just before it is sent, after a drag but not a tap. */
   onDrop?: (s: Spot) => void;
 }
 
@@ -364,8 +368,8 @@ function useDrag(args: DragArgs) {
         else {
           const held = fit({ x: start.current.x + g.dx / cw, y: start.current.y + g.dy / ch });
           const next = land ? land(held) : held;
-          send(next.x, next.y);
           onDrop?.(held);
+          send(next.x, next.y);
         }
         setDrag(null);
         latest.current.onDragging(false);
@@ -476,7 +480,7 @@ interface PropProps {
 function Prop({ prop, shown, badge, caption, spot, w, h, size, onMove, onTap, land, onDrop, onDragging }: PropProps) {
   const { handlers, at, lifted } = useDrag({ spot, w, h, enabled: true, onMove, onTap, onDragging, fit: inRoom, land, onDrop });
   const box = size * 1.25;
-  const label = prop.bowl ? 'Mixing bowl. Drop food in. Tap to empty.' : caption ? `${caption}. Tap to eat.` : `${shown}. Drag to move.`;
+  const label = prop.bowl ? 'Mixing bowl. Drop food on it. Tap to tip it out.' : caption ? `${caption}. Tap to eat.` : `${shown}. Drag to move.`;
   return (
     <View
       {...handlers}

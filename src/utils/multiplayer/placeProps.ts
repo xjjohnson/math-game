@@ -1,4 +1,4 @@
-import { ingredientIndex, MADE_SLOTS } from '@/utils/bakery';
+import { addToMask, ingredientIndex, MADE_SLOTS } from '@/utils/bakery';
 import type { TownPlace } from '@/utils/multiplayer/protocol';
 import type { Spot } from '@/utils/multiplayer/scene';
 
@@ -147,8 +147,6 @@ const books = (caseIndex: number): PropDef[] => {
 
 /** The bakery's mixing bowl: drop ingredients in, then slide it into the hot oven. */
 export const BOWL: PropDef = { id: 'bowl', emoji: '🥣', x: 0.225, y: BAKERY.counter.top, big: true, bowl: true };
-/** The switch that keeps what is in the bowl (x is the contents as a number between 0 and 1). */
-export const BOWL_SWITCH = 'bowl';
 /** A switch that says a finished treat is waiting in this slot (y says which treat). */
 export const madeSwitch = (slot: number): string => `made-${slot}`;
 
@@ -249,9 +247,21 @@ export function settle(place: InsidePlace, prop: Pick<PropDef, 'float'>, x: numb
   return { x: cx, y: below ? below.y : FLOOR + 0.04 };
 }
 
-/** Whether a thing let go at this spot lands in the mixing bowl (bowl is where the bowl is now). */
-export function onBowl(s: Spot, bowl: Spot): boolean {
-  return Math.abs(s.x - bowl.x) <= 0.04 && s.y >= bowl.y - 0.2 && s.y <= bowl.y + 0.04;
+/** Whether an ingredient sitting at `s` is in the bowl sitting at `bowl` (both rest on the same surface). */
+export function inBowl(s: Spot, bowl: Spot): boolean {
+  return Math.abs(s.x - bowl.x) <= 0.03 && Math.abs(s.y - bowl.y) <= 0.03;
+}
+
+/**
+ * What is in the mixing bowl: every ingredient that has been put down on it.
+ * Worked out from where the pieces are, so every phone agrees and nothing snaps back.
+ */
+export function bowlContents(spots: Record<string, Spot | undefined>): { mask: number; props: PropDef[] } {
+  const bowl = spots[propPieceId('bakery', BOWL.id)] ?? { x: BOWL.x, y: BOWL.y };
+  const props = PLACE_PROPS.bakery.filter(
+    (p) => p.ingredient !== undefined && inBowl(spots[propPieceId('bakery', p.id)] ?? { x: p.x, y: p.y }, bowl),
+  );
+  return { mask: props.reduce((m, p) => addToMask(m, p.ingredient as number), 0), props };
 }
 
 /** Whether a spot is inside the bakery oven, where things bake while it's on. */
