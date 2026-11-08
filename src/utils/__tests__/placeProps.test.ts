@@ -6,10 +6,10 @@ import {
   BAKERY,
   FLOOR,
   BOWL,
-  bowlContents,
+  BOWL_SWITCH,
   inOven,
   madeSwitch,
-  inBowl,
+  onBowl,
   PLACE_PROPS,
   propPieceId,
   settle,
@@ -18,7 +18,7 @@ import {
 } from '@/utils/multiplayer/placeProps';
 import { encodeMessage, type GameMessage, HOST_ID, MAX_SPOTS, parseMessage } from '@/utils/multiplayer/protocol';
 
-import { bake, ingredientIndex, madeRecipe, madeToUnit, recipeFor, unitToMade } from '@/utils/bakery';
+import { addToMask, bake, ingredientIndex, madeRecipe, madeToUnit, maskToUnit, recipeFor, unitToMade, unitToMask } from '@/utils/bakery';
 
 const tick = () => new Promise((r) => setTimeout(r, 0));
 
@@ -70,43 +70,39 @@ describe('things in the community rooms', () => {
     expect(inOven({ x: 0.2, y: BAKERY.counter.top })).toBe(false);
   });
 
-  it('knows what is in the mixing bowl from where things are put', () => {
+  it('knows when food is let go over the mixing bowl', () => {
     const bowl = { x: BOWL.x, y: BOWL.y };
-    expect(inBowl({ x: bowl.x + 0.02, y: bowl.y }, bowl)).toBe(true);
-    expect(inBowl({ x: bowl.x + 0.1, y: bowl.y }, bowl)).toBe(false);
-    // Nothing in it to start with.
-    expect(bowlContents({}).mask).toBe(0);
-    const flour = PLACE_PROPS.bakery.find((p) => p.ingredient === ingredientIndex('flour'));
-    const sugar = PLACE_PROPS.bakery.find((p) => p.ingredient === ingredientIndex('sugar'));
-    const spots = {
-      [propPieceId('bakery', flour?.id as string)]: { x: bowl.x - 0.01, y: bowl.y },
-      [propPieceId('bakery', sugar?.id as string)]: { x: bowl.x + 0.02, y: bowl.y },
-    };
-    expect(bowlContents(spots).props.map((p) => p.emoji)).toEqual(['🌾', '🍬']);
-    // Move the bowl away and they are not in it any more.
-    expect(bowlContents({ ...spots, [propPieceId('bakery', BOWL.id)]: { x: 0.5, y: 0.8 } }).mask).toBe(0);
+    expect(onBowl({ x: bowl.x, y: bowl.y - 0.08 }, bowl)).toBe(true);
+    expect(onBowl({ x: bowl.x + 0.03, y: bowl.y }, bowl)).toBe(true);
+    expect(onBowl({ x: bowl.x + 0.1, y: bowl.y }, bowl)).toBe(false);
+    expect(onBowl({ x: bowl.x, y: bowl.y + 0.2 }, bowl)).toBe(false);
   });
 
-  it('shares ingredients in the bowl and a finished treat with every phone', async () => {
+  it('never leaves the bowl on the floor', () => {
+    // Let go low under the counter: it goes up onto the counter.
+    expect(settle('bakery', BOWL, 0.3, 0.85)).toEqual({ x: 0.3, y: BAKERY.counter.top });
+    // Let go low under the oven: it goes onto the rack.
+    expect(settle('bakery', BOWL, 0.5, 0.85).y).toBe(BAKERY.oven.rack);
+    // Let go over the open floor with nothing above: back to its place on the counter.
+    expect(settle('bakery', BOWL, 0.42, 0.85)).toEqual({ x: BOWL.x, y: BOWL.y });
+  });
+
+  it('shares the bowl and a finished treat with every phone', async () => {
     const net = createMockNetwork(2);
     const sessions = net.map((t) => new TownSession(() => t));
     const [host, guest] = sessions;
     await joinAll(sessions);
     for (const s of sessions) s.setPlace('bakery');
     await tick();
-    const butter = PLACE_PROPS.bakery.find((p) => p.ingredient === ingredientIndex('butter'));
-    const flour = PLACE_PROPS.bakery.find((p) => p.ingredient === ingredientIndex('flour'));
-    guest.moveTo(propPieceId('bakery', flour?.id as string), BOWL.x, BOWL.y);
-    host.moveTo(propPieceId('bakery', butter?.id as string), BOWL.x + 0.01, BOWL.y);
+    const mask = addToMask(addToMask(0, ingredientIndex('flour')), ingredientIndex('butter'));
+    guest.moveTo(switchPieceId('bakery', BOWL_SWITCH), maskToUnit(mask), 0);
+    await tick();
+    host.moveTo(switchPieceId('bakery', madeSwitch(0)), 1, madeToUnit(recipeFor(mask)));
     await tick();
     for (const s of sessions) {
-      const { mask } = bowlContents(s.getState().spots);
-      expect(bake(mask)?.name).toBe('Croissants');
-    }
-    guest.moveTo(switchPieceId('bakery', madeSwitch(0)), 1, madeToUnit(recipeFor(bowlContents(guest.getState().spots).mask)));
-    await tick();
-    for (const s of sessions) {
-      expect(madeRecipe(unitToMade(s.getState().spots[switchPieceId('bakery', madeSwitch(0))].y) as number).name).toBe('Croissants');
+      const spots = s.getState().spots;
+      expect(bake(unitToMask(spots[switchPieceId('bakery', BOWL_SWITCH)].x))?.name).toBe('Croissants');
+      expect(madeRecipe(unitToMade(spots[switchPieceId('bakery', madeSwitch(0))].y) as number).name).toBe('Croissants');
     }
   });
 

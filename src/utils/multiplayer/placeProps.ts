@@ -1,4 +1,4 @@
-import { addToMask, ingredientIndex, MADE_SLOTS } from '@/utils/bakery';
+import { ingredientIndex, MADE_SLOTS } from '@/utils/bakery';
 import type { TownPlace } from '@/utils/multiplayer/protocol';
 import type { Spot } from '@/utils/multiplayer/scene';
 
@@ -148,6 +148,8 @@ const books = (caseIndex: number): PropDef[] => {
 /** The bakery's mixing bowl: drop ingredients in, then slide it into the hot oven. */
 export const BOWL: PropDef = { id: 'bowl', emoji: '🥣', x: 0.225, y: BAKERY.counter.top, big: true, bowl: true };
 /** A switch that says a finished treat is waiting in this slot (y says which treat). */
+/** The switch that keeps what is in the bowl (x is the contents as a number between 0 and 1). */
+export const BOWL_SWITCH = 'bowl';
 export const madeSwitch = (slot: number): string => `made-${slot}`;
 
 const asIngredient = (keys: string[]) => (p: PropDef, i: number): PropDef => ({ ...p, ingredient: ingredientIndex(keys[i]) });
@@ -237,9 +239,17 @@ const clamp = (v: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, v
  * up the wall it drops onto the nearest shelf or counter below, or to the
  * floor if there is none. Floating things stay put.
  */
-export function settle(place: InsidePlace, prop: Pick<PropDef, 'float'>, x: number, y: number): Spot {
+export function settle(place: InsidePlace, prop: Pick<PropDef, 'float' | 'bowl'>, x: number, y: number): Spot {
   const cx = clamp(x, 0.01, 0.99);
   if (prop.float) return { x: cx, y: clamp(y, 0.1, 0.95) };
+  if (prop.bowl) {
+    // The bowl stays up on a counter, shelf or the oven rack: let go low, it goes onto whatever is above the floor there.
+    const tops = SURFACES[place].filter((s) => cx >= s.x0 && cx <= s.x1);
+    const below = tops.filter((s) => s.y >= y - 0.015).sort((a, b) => a.y - b.y)[0];
+    const lowest = tops.sort((a, b) => b.y - a.y)[0];
+    const top = below ?? lowest;
+    return top ? { x: cx, y: top.y } : { x: BOWL.x, y: BOWL.y };
+  }
   if (y >= FLOOR + 0.02) return { x: cx, y: Math.min(0.95, y) };
   const below = SURFACES[place]
     .filter((s) => cx >= s.x0 && cx <= s.x1 && s.y >= y - 0.015)
@@ -247,21 +257,9 @@ export function settle(place: InsidePlace, prop: Pick<PropDef, 'float'>, x: numb
   return { x: cx, y: below ? below.y : FLOOR + 0.04 };
 }
 
-/** Whether an ingredient sitting at `s` is in the bowl sitting at `bowl` (both rest on the same surface). */
-export function inBowl(s: Spot, bowl: Spot): boolean {
-  return Math.abs(s.x - bowl.x) <= 0.03 && Math.abs(s.y - bowl.y) <= 0.03;
-}
-
-/**
- * What is in the mixing bowl: every ingredient that has been put down on it.
- * Worked out from where the pieces are, so every phone agrees and nothing snaps back.
- */
-export function bowlContents(spots: Record<string, Spot | undefined>): { mask: number; props: PropDef[] } {
-  const bowl = spots[propPieceId('bakery', BOWL.id)] ?? { x: BOWL.x, y: BOWL.y };
-  const props = PLACE_PROPS.bakery.filter(
-    (p) => p.ingredient !== undefined && inBowl(spots[propPieceId('bakery', p.id)] ?? { x: p.x, y: p.y }, bowl),
-  );
-  return { mask: props.reduce((m, p) => addToMask(m, p.ingredient as number), 0), props };
+/** Whether an ingredient let go at `s` lands in the mixing bowl sitting at `bowl`. */
+export function onBowl(s: Spot, bowl: Spot): boolean {
+  return Math.abs(s.x - bowl.x) <= 0.04 && s.y >= bowl.y - 0.2 && s.y <= bowl.y + 0.05;
 }
 
 /** Whether a spot is inside the bakery oven, where things bake while it's on. */

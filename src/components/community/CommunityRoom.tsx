@@ -11,7 +11,10 @@ import {
   bake,
   madeRecipe,
   madeToUnit,
+  addToMask,
   maskEmojis,
+  maskToUnit,
+  unitToMask,
   recipeFor,
   unitToMade,
   MADE_SLOTS,
@@ -23,7 +26,8 @@ import {
   INSIDE_SCREENS,
   isInside,
   madeSwitch,
-  bowlContents,
+  BOWL_SWITCH,
+  onBowl,
   PLACE_PROPS,
   propPieceId,
   settle,
@@ -167,11 +171,11 @@ export function CommunityRoom({ place, onDoor, onExit }: Props) {
 
   // The bakery's mixing bowl: what is in it, kept as a switch so every phone agrees.
   const bakery = place === 'bakery';
-  const contents = bakery ? bowlContents(spotsNow) : { mask: 0, props: [] as PropDef[] };
-  const bowlMask = contents.mask;
+  const bowlSwitch = switchPieceId('bakery', BOWL_SWITCH);
+  const bowlMask = bakery ? unitToMask(spotsNow[bowlSwitch]?.x ?? 0) : 0;
   const bowlSpot: Spot = spotsNow[propPieceId('bakery', BOWL.id)] ?? { x: BOWL.x, y: BOWL.y };
-  const latest = useRef({ spotsNow, bowlSpot, bowlMask, contents });
-  latest.current = { spotsNow, bowlSpot, bowlMask, contents };
+  const latest = useRef({ spotsNow, bowlSpot, bowlMask });
+  latest.current = { spotsNow, bowlSpot, bowlMask };
 
   const props: Piece[] = inside
     ? PLACE_PROPS[place].flatMap((prop): Piece[] => {
@@ -186,10 +190,7 @@ export function CommunityRoom({ place, onDoor, onExit }: Props) {
         }
         const baked = !!prop.bakeTo && isOn(bakedSwitch(prop.id));
         const piece: Piece = { key, kind: 'prop', prop, spot, baked, shown: baked && prop.bakeTo ? prop.bakeTo : prop.emoji };
-        if (prop.bowl) {
-          piece.badge = bowlMask ? maskEmojis(bowlMask) : 'Drop food in';
-          if (bowlMask && !inOven(bowlSpot)) piece.caption = 'Bake it in the oven ➡️';
-        }
+        if (prop.bowl && bowlMask) piece.badge = maskEmojis(bowlMask);
         return [piece];
       })
     : [];
@@ -214,36 +215,29 @@ export function CommunityRoom({ place, onDoor, onExit }: Props) {
   useEffect(() => {
     if (!bowlBaking) return;
     const timer = setTimeout(() => {
-      const { spotsNow: now, bowlSpot: at, bowlMask: mask, contents: inside } = latest.current;
+      const { spotsNow: now, bowlSpot: at, bowlMask: mask } = latest.current;
       const recipe = bake(mask);
       if (!recipe) return;
       // The first free spot for it, or the first spot again when the counter is full.
       const free = Array.from({ length: MADE_SLOTS }, (_, i) => i).find((i) => unitToMade(now[switchPieceId('bakery', madeSwitch(i))]?.y ?? 0) === null) ?? 0;
       move(propPieceId('bakery', `made${free}`), at.x, Math.min(0.95, at.y + 0.001));
       move(switchPieceId('bakery', madeSwitch(free)), 1, madeToUnit(recipeFor(mask)));
-      // The ingredients are used up: they go back on their shelves.
-      sendHome(inside.props);
+      // The bowl is empty again, ready for the next one.
+      move(bowlSwitch, 0, 0);
     }, BAKE_MS);
     return () => clearTimeout(timer);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [bowlBaking, bowlMask]);
 
-  /** Puts ingredients back where they live. */
-  function sendHome(list: PropDef[]) {
-    for (const p of list) move(propPieceId('bakery', p.id), p.x, p.y);
-  }
-  /** Carrying the bowl carries what is in it. */
-  const carryBowl = (to: Spot) => {
-    const { bowlSpot: from, contents: inside, spotsNow: now } = latest.current;
-    const land = settle('bakery', BOWL, to.x, to.y);
-    for (const p of inside.props) {
-      const at = now[propPieceId('bakery', p.id)] ?? { x: p.x, y: p.y };
-      move(propPieceId('bakery', p.id), clamp(at.x + land.x - from.x, 0.01, 0.99), clamp(at.y + land.y - from.y, 0.08, 0.95));
-    }
+  /** An ingredient let go over the bowl goes in it, and the ingredient itself goes back to its shelf to use again. */
+  const intoBowl = (prop: PropDef, s: Spot): boolean => prop.ingredient !== undefined && onBowl(s, latest.current.bowlSpot);
+  const dropIngredient = (prop: PropDef, s: Spot) => {
+    if (!intoBowl(prop, s)) return;
+    move(bowlSwitch, maskToUnit(addToMask(latest.current.bowlMask, prop.ingredient as number)), 0);
   };
   /** Tap the bowl to tip it out; tap a finished treat to eat it. */
   const tapProp = (prop: PropDef): (() => void) | undefined => {
-    if (prop.bowl) return () => sendHome(latest.current.contents.props);
+    if (prop.bowl) return () => move(bowlSwitch, 0, 0);
     if (prop.made !== undefined) return () => move(switchPieceId('bakery', madeSwitch(prop.made as number)), 0, 0);
     return undefined;
   };
@@ -317,8 +311,8 @@ export function CommunityRoom({ place, onDoor, onExit }: Props) {
                 h={h}
                 size={piece.prop.big ? propSize * 1.4 : propSize}
                 onMove={(x, y) => move(piece.key, x, y)}
-                land={(s) => settle(place as InsidePlace, piece.prop, s.x, s.y)}
-                onDrop={piece.prop.bowl ? carryBowl : undefined}
+                land={(s) => (intoBowl(piece.prop, s) ? { x: piece.prop.x, y: piece.prop.y } : settle(place as InsidePlace, piece.prop, s.x, s.y))}
+                onDrop={piece.prop.ingredient !== undefined ? (s) => dropIngredient(piece.prop, s) : undefined}
                 onTap={tapProp(piece.prop)}
                 onDragging={setDragging}
               />
@@ -493,7 +487,7 @@ interface PropProps {
 function Prop({ prop, shown, badge, caption, spot, w, h, size, onMove, onTap, land, onDrop, onDragging }: PropProps) {
   const { handlers, at, lifted } = useDrag({ spot, w, h, enabled: true, onMove, onTap, onDragging, fit: inRoom, land, onDrop });
   const box = size * 1.25;
-  const label = prop.bowl ? 'Mixing bowl. Drop food on it. Tap to tip it out.' : caption ? `${caption}. Tap to eat.` : `${shown}. Drag to move.`;
+  const label = prop.bowl ? 'Mixing bowl. Drop food on it, then put it in the oven. Tap to tip it out.' : caption ? `${caption}. Tap to eat.` : `${shown}. Drag to move.`;
   return (
     <View
       {...handlers}
@@ -502,12 +496,12 @@ function Prop({ prop, shown, badge, caption, spot, w, h, size, onMove, onTap, la
     >
       <Text style={{ fontSize: size, lineHeight: box }}>{shown}</Text>
       {badge ? (
-        <Text pointerEvents="none" style={[styles.tag, { bottom: box * 0.95, left: -box, right: -box, fontSize: /[A-Za-z]/.test(badge) ? size * 0.34 : size * 0.5 }]}>
+        <Text pointerEvents="none" numberOfLines={2} style={[styles.tag, { bottom: box * 0.7, left: -box * 0.1, right: -box * 0.1, fontSize: 14, lineHeight: 17 }]}>
           {badge}
         </Text>
       ) : null}
       {caption ? (
-        <Text pointerEvents="none" style={[styles.tag, styles.caption, { top: box * 0.95, left: -box, right: -box, fontSize: size * 0.4 }]}>
+        <Text pointerEvents="none" numberOfLines={2} style={[styles.tag, styles.caption, { top: box * 0.95, left: -box * 0.4, right: -box * 0.4, fontSize: 11 }]}>
           {caption}
         </Text>
       ) : null}
