@@ -1,7 +1,7 @@
 import { APPLIANCES, BUILT_IN_SEATS, CUPBOARDS, findRoomItem, GADGETS, HOME_AREAS, MONTH_NAMES, ROOM_SPAN, seasonOf, SURFACES } from '@/constants/room';
 import { makeProfile } from '@/test/fixtures';
 import type { Profile, RoomThing } from '@/types';
-import { dropBuddy, dropThing, gadgetBox, homeSize, layoutHome, pieceAt, ridersOf, seatLine, shelvesOf, surfaceLine, type Piece } from '@/utils/home';
+import { dropBuddy, dropThing, fixtureBox, gadgetBox, homeSize, layoutHome, pieceAt, ridersOf, seatLine, shelvesOf, slideTrip, surfaceLine, type Piece } from '@/utils/home';
 import { BUDDY_KEY, buddiesHome, buyRoomItem, FIXTURE_KEY, placeBuddy, placeThing, setBuddyHome, setPlaced } from '@/utils/room';
 
 const NOVEMBER = 10;
@@ -198,6 +198,64 @@ describe('dropping things', () => {
       expect(sitting.sunk ?? 0).toBeCloseTo(line.y - line.rimY);
     }
     expect(BUILT_IN_SEATS.find((s) => s.id === 'inTub')?.rim).toBeGreaterThan(0);
+  });
+});
+
+describe('the backyard and the bought rooms', () => {
+  const seat = (id: string) => BUILT_IN_SEATS.find((s) => s.id === id)!;
+  const yard = HOME_AREAS.findIndex((a) => a.id === 'backyard');
+
+  it('gives every bought room built-in things to play with', () => {
+    for (const area of HOME_AREAS.filter((a) => a.price !== undefined)) {
+      expect(APPLIANCES.some((a) => a.area === area.id)).toBe(true);
+    }
+    expect(APPLIANCES.map((a) => a.kind)).toEqual(expect.arrayContaining(['treeHouse', 'swingSet', 'playScape', 'trampoline']));
+  });
+
+  it('draws buddies in the tree house small enough to look out of its window', () => {
+    const p = withThings([]);
+    const line = seatLine(seat('inTreeHouse'), size);
+    const buddy = piece(layout(p), `${BUDDY_KEY}puppy`);
+    const [dx, dy] = to(buddy, (line.left + line.right) / 2, size.floorY - 4);
+    const place = dropBuddy(layout(p), buddy, dx, dy, size);
+    expect(place.on).toBe(FIXTURE_KEY + 'inTreeHouse');
+    const up = piece(layout(placeBuddy(p, 'puppy', place)), `${BUDDY_KEY}puppy`);
+    expect(up.height).toBeCloseTo(buddy.height * 0.55);
+    // Its head stays under the tree house roof.
+    const tree = fixtureBox(APPLIANCES.find((a) => a.id === 'treeHouse')!, size);
+    expect(up.y - up.height).toBeGreaterThan(tree.top);
+  });
+
+  it('lets only one buddy on each swing', () => {
+    const p = withThings([]);
+    const pieces = layout(p);
+    const buddy = piece(pieces, `${BUDDY_KEY}puppy`);
+    const line = seatLine(seat('onSwing1'), size);
+    const other: Piece = { ...buddy, key: `${BUDDY_KEY}kitty`, buddyId: 'kitty', builtIn: 'onSwing1', x: (line.left + line.right) / 2, y: line.y };
+    const [dx, dy] = to(buddy, (line.left + line.right) / 2, line.y);
+    expect(dropBuddy(pieces, buddy, dx, dy, size).on).toBe(FIXTURE_KEY + 'onSwing1');
+    expect(dropBuddy([...pieces, other], buddy, dx, dy, size).on).not.toBe(FIXTURE_KEY + 'onSwing1');
+  });
+
+  it('picks the top or bottom bunk by how high the buddy is dropped', () => {
+    const p = withThings([]);
+    const pieces = layout(p);
+    const buddy = piece(pieces, `${BUDDY_KEY}puppy`);
+    const top = seatLine(seat('bunkTop'), size);
+    const bottom = seatLine(seat('bunkBottom'), size);
+    const mid = (top.left + top.right) / 2;
+    expect(dropBuddy(pieces, buddy, ...to(buddy, mid, top.rimY - 10), size).on).toBe(FIXTURE_KEY + 'bunkTop');
+    expect(dropBuddy(pieces, buddy, ...to(buddy, mid, bottom.rimY), size).on).toBe(FIXTURE_KEY + 'bunkBottom');
+  });
+
+  it('slides from the fort down to the grass, still in the backyard', () => {
+    const trip = slideTrip(size);
+    const fort = seatLine(seat('onFort'), size);
+    expect(trip.top.y).toBeCloseTo(fort.y);
+    expect(trip.foot.y).toBe(size.floorY);
+    expect(trip.foot.x).toBeGreaterThan(trip.top.x);
+    expect(trip.off.y).toBeGreaterThan(size.floorY);
+    expect(trip.off.x).toBeLessThan((yard + 1) * size.areaWidth);
   });
 });
 

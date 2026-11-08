@@ -1,5 +1,7 @@
 import {
+  APPLIANCES,
   BUDDY_SIZE,
+  FORT,
   BUILT_IN_SEATS,
   type BuiltInSeat,
   CUPBOARDS,
@@ -202,7 +204,8 @@ export function layoutHome(room: Room, buddies: BuddyAt[], size: HomeSize, open:
         const line = seatLine(fixed, size);
         x = clampAround(x, (line.left + line.right) / 2, (line.right - line.left) / 2);
         const sunk = Math.max(0, line.y - line.rimY);
-        return { key, x, y: line.y, width: px, height: px, buddyId: b.id, builtIn: fixed.id, sunk, rootY: size.floorY, depth: 0 };
+        const side = px * (fixed.scale ?? 1);
+        return { key, x, y: line.y, width: side, height: side, buddyId: b.id, builtIn: fixed.id, sunk, rootY: size.floorY, depth: 0 };
       }
       const seat = b.spot.on && !b.spot.on.startsWith(FIXTURE_KEY) ? place(b.spot.on) : null;
       const ledge = seat?.item?.seat !== undefined ? ledgeOf(seat) : null;
@@ -376,7 +379,7 @@ export function dropThing(
 
 /**
  * Where a buddy lands after being dragged: on a seat if it is dropped on one, in a built-in
- * (the bathtub, the toilet, the ball pit) if it is dropped over one, or standing.
+ * (the bathtub, the toilet, the ball pit, a swing, the tree house) if it is dropped over one, or standing.
  */
 export function dropBuddy(pieces: Piece[], piece: Piece, dx: number, dy: number, size: HomeSize): Placement {
   const baseX = piece.x + dx;
@@ -389,12 +392,29 @@ export function dropBuddy(pieces: Piece[], piece: Piece, dx: number, dy: number,
     })
     .pop();
   if (seat) return { x: baseX / size.width, y: (ledgeOf(seat) ?? baseY) / size.height, on: seat.key };
+  // Of the built-ins it is over, the one whose rim is nearest (the top or bottom bunk); a swing someone else is on is full.
+  let best: { s: BuiltInSeat; line: ReturnType<typeof seatLine>; far: number } | null = null;
   for (const s of BUILT_IN_SEATS) {
     const line = seatLine(s, size);
     if (baseX < line.left || baseX > line.right) continue;
-    if (baseY >= line.rimY - size.unit * 0.25 && baseY <= size.floorY + size.unit * 0.04) {
-      return { x: baseX / size.width, y: line.y / size.height, on: FIXTURE_KEY + s.id };
-    }
+    if (baseY < line.rimY - size.unit * 0.25 || baseY > size.floorY + size.unit * 0.04) continue;
+    if (s.one && pieces.some((p) => p.key !== piece.key && p.buddyId && p.builtIn === s.id)) continue;
+    const far = Math.abs(baseY - line.rimY);
+    if (!best || far < best.far) best = { s, line, far };
   }
+  if (best) return { x: baseX / size.width, y: best.line.y / size.height, on: FIXTURE_KEY + best.s.id };
   return { x: baseX / size.width, y: baseY / size.height };
+}
+
+/**
+ * The trip down the backyard slide, in pixels across the home: from the top of the chute at the
+ * fort's edge to its foot, then where the buddy stands on the grass after.
+ */
+export function slideTrip(size: HomeSize): { top: { x: number; y: number }; foot: { x: number; y: number }; off: { x: number; y: number } } {
+  const scape = APPLIANCES.find((a) => a.kind === 'playScape');
+  if (!scape) return { top: { x: 0, y: 0 }, foot: { x: 0, y: 0 }, off: { x: 0, y: 0 } };
+  const box = fixtureBox(scape, size);
+  const top = { x: box.left + box.width * FORT.width, y: box.top + box.height * FORT.platform };
+  const foot = { x: box.left + box.width * 0.97, y: size.floorY };
+  return { top, foot, off: { x: foot.x + size.screen * 0.06, y: size.floorY + size.unit * 0.05 } };
 }

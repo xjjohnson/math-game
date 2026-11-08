@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
+import Animated, { Easing, useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
 import {
   Pressable,
   ScrollView,
@@ -13,16 +14,19 @@ import {
 } from 'react-native';
 
 import { Text } from '@/components/AppText';
+import { BackyardSky, Birds, Lawn, NightSky, SunMoon } from '@/components/Backyard';
 import { Candle } from '@/components/Candle';
 import { BuddyFigure, type Dressed } from '@/components/BuddyFigure';
 import { PersonFigure, type PersonDressed } from '@/components/PersonFigure';
 import { Furniture } from '@/components/Furniture';
 import { FramedPicture } from '@/components/PaintingView';
 import { Lamp } from '@/components/Lamp';
-import { Bob, Drifting, Flicker, FloatUp, Lively, Rumble, Spin, type BounceKind } from '@/components/Motion';
+import { Bob, Drifting, Flicker, FloatUp, Lively, Rumble, Spin, Swing, type BounceKind } from '@/components/Motion';
 import { PopIn } from '@/components/PopIn';
 import { Sticker } from '@/components/Sticker';
 import { ApplianceView } from '@/components/Appliance';
+import { TreeHouseInside, type TreeHouseEvent } from '@/components/TreeHouse';
+import { useMotion } from '@/hooks/useAccessibility';
 import {
   APPLIANCES,
   BUILT_IN_SEATS,
@@ -35,7 +39,9 @@ import {
   WALL_COLORS,
   type Appliance,
   type AreaId,
+  type BuiltInSeat,
   type Cupboard,
+  findBuiltInSeat,
   type FixtureSpot,
   type Gadget,
   type Season,
@@ -53,12 +59,13 @@ import {
   pieceAt,
   ridersOf,
   shelvesOf,
+  slideTrip,
   type Box,
   type HomeSize,
   type Piece,
 } from '@/utils/home';
 import type { Picture } from '@/utils/easel';
-import { AREA_COUNT, BUDDY_KEY, paintOf, type Placement } from '@/utils/room';
+import { AREA_COUNT, BUDDY_KEY, FIXTURE_KEY, paintOf, type Placement } from '@/utils/room';
 
 export interface HomeBuddy {
   /** Shop item id. */
@@ -111,6 +118,10 @@ interface Props {
   onBuyRoom?: (areaId: AreaId) => void;
   /** Pictures from the School easel hanging in the home, by thing key. A friend's home leaves them out (empty frames show). */
   pictures?: Record<string, Picture>;
+  /** Something happened up in the tree house (or it was climbed into); `inside` are the buddies up there. */
+  onTreeHouse?: (e: TreeHouseEvent, inside: string[]) => void;
+  /** The backyard's sun (or moon) was tapped: whether it is night there now. */
+  onNight?: (night: boolean) => void;
 }
 
 const TRIM = '#A86B45';
@@ -141,12 +152,20 @@ const MORE_WINDOWS: { id: string; spot: FixtureSpot; night?: boolean }[] = [
   { id: 'bedCurtains2', spot: { area: 'bedroom', left: 1.28, width: 0.4, bottom: 0.38, height: 0.26 }, night: true },
   { id: 'bathCurtains', spot: { area: 'bathroom', left: 0.95, width: 0.36, bottom: 0.4, height: 0.22 } },
   { id: 'playCurtains', spot: { area: 'playroom', left: 0.12, width: 0.36, bottom: 0.33, height: 0.3 } },
+  { id: 'studyCurtains', spot: { area: 'study', left: 0.1, width: 0.4, bottom: 0.3, height: 0.3 } },
+  { id: 'bed2Curtains', spot: { area: 'bedroom2', left: 0.08, width: 0.32, bottom: 0.33, height: 0.28 }, night: true },
+  { id: 'bed3Curtains', spot: { area: 'bedroom3', left: 1.05, width: 0.4, bottom: 0.36, height: 0.26 }, night: true },
 ];
 /** Built-in tables, under the dining table and desk ledges. */
 const TABLES: FixtureSpot[] = [
   { area: 'kitchen', left: 1.2, width: 0.5, bottom: 0, height: 0.2 },
   { area: 'bedroom', left: 1.25, width: 0.45, bottom: 0, height: 0.2 },
+  { area: 'study', left: 1.05, width: 0.5, bottom: 0, height: 0.2 },
 ];
+/** How long a buddy takes to go down the backyard slide. */
+const SLIDE_MS = 1300;
+/** The tree house's seat, for climbing up. */
+const TREE_SEAT = 'inTreeHouse';
 const PLAY_SHELF: FixtureSpot = { area: 'playroom', left: 1.1, width: 0.4, bottom: 0.395, height: 0.025 };
 const DARK = 'rgba(16, 18, 52, 0.55)';
 /** Sizes of the rings in a pool of light, as shares of how far it reaches. */
@@ -196,6 +215,12 @@ export function BuddyRoom(props: Props) {
   const [pops, setPops] = useState<Pop[]>([]);
   /** The last one-off animation for each piece, replayed when `n` changes. */
   const [bumps, setBumps] = useState<Record<string, { n: number; kind: BounceKind }>>({});
+  /** Up in the tree house, looking around inside. */
+  const [treeOpen, setTreeOpen] = useState(false);
+  /** Buddies on their way down the slide, by piece key. */
+  const [sliding, setSliding] = useState<ReadonlySet<string>>(new Set());
+  const slideTimers = useRef(new Map<string, ReturnType<typeof setTimeout>>());
+  const { animate } = useMotion();
   /** Set once the home has drawn, so only things added after that pop in. */
   const drawn = useRef(false);
   const popId = useRef(0);
@@ -217,9 +242,15 @@ export function BuddyRoom(props: Props) {
       popTimers.current.forEach(clearTimeout);
       if (washTimer.current) clearTimeout(washTimer.current);
       if (edgeTimer.current) clearInterval(edgeTimer.current);
+      slideTimers.current.forEach(clearTimeout);
     },
     [],
   );
+
+  // Going to another room climbs back down.
+  useEffect(() => {
+    if (areas[area]?.id !== 'backyard') setTreeOpen(false);
+  }, [area, areas]);
 
   useEffect(() => {
     if (size) drawn.current = true;
@@ -331,6 +362,7 @@ export function BuddyRoom(props: Props) {
 
   const dropPiece = (piece: Piece, dx: number, dy: number) => {
     bump(piece.key, 'land');
+    stopSlide(piece.key);
     if (piece.buddyId) onPlaceBuddy(piece.buddyId, dropBuddy(pieces, piece, dx, dy, size));
     else onPlaceThing(piece.key, dropThing(pieces, piece, dx, dy, size, open));
   };
@@ -409,10 +441,76 @@ export function BuddyRoom(props: Props) {
     onWash?.(on, false);
   };
 
+  function stopSlide(key: string) {
+    const t = slideTimers.current.get(key);
+    if (t) clearTimeout(t);
+    slideTimers.current.delete(key);
+    setSliding((set) => {
+      if (!set.has(key)) return set;
+      const next = new Set(set);
+      next.delete(key);
+      return next;
+    });
+  }
+
+  /** Sends a buddy on the fort down the slide; it ends up standing on the grass at the bottom. */
+  const slideDown = (p: Piece) => {
+    if (!p.buddyId || sliding.has(p.key)) return;
+    const id = p.buddyId;
+    const trip = slideTrip(size);
+    const land = () => {
+      slideTimers.current.delete(p.key);
+      setSliding((set) => {
+        const next = new Set(set);
+        next.delete(p.key);
+        return next;
+      });
+      bump(p.key, 'land');
+      onPlaceBuddy(id, { x: trip.off.x / size.width, y: trip.off.y / size.height });
+    };
+    if (!animate) return land();
+    setSliding((set) => new Set(set).add(p.key));
+    slideTimers.current.set(p.key, setTimeout(land, SLIDE_MS));
+  };
+
+  /** Everyone into the tree house, side by side. */
+  const callUp = () => {
+    const seat = findBuiltInSeat(TREE_SEAT);
+    if (!seat) return;
+    const left = (size.order.indexOf('backyard') * size.areaWidth + seat.left * size.screen) / size.width;
+    const span = (seat.width * size.screen) / size.width;
+    buddies.forEach((b, i) => {
+      const x = left + span * (buddies.length === 1 ? 0.5 : i / (buddies.length - 1));
+      onPlaceBuddy(b.id, { x, y: (size.floorY - seat.bottom * size.unit) / size.height, on: FIXTURE_KEY + TREE_SEAT });
+    });
+  };
+
   const tapAppliance = (a: Appliance) => {
-    const inside = pieces
-      .filter((p) => p.buddyId && p.builtIn && BUILT_IN_SEATS.find((s) => s.id === p.builtIn)?.appliance === a.id)
-      .map((p) => p.buddyId as string);
+    const riders = pieces.filter((p) => p.buddyId && p.builtIn && BUILT_IN_SEATS.find((s) => s.id === p.builtIn)?.appliance === a.id);
+    const inside = riders.map((p) => p.buddyId as string);
+    if (a.kind === 'treeHouse') {
+      setTreeOpen(true);
+      props.onTreeHouse?.({ kind: 'open' }, inside);
+      return;
+    }
+    if (a.kind === 'playScape') {
+      // Everyone on the fort goes down the slide, one after the other.
+      const box = fixtureBox(a, size);
+      if (!riders.length) pop(box.left + box.width * 0.7, box.top + box.height * 0.4, '🛝');
+      riders.forEach((p, i) => (i === 0 ? slideDown(p) : popTimers.current.push(setTimeout(() => slideDown(p), i * 450))));
+      setRun(a.id, true);
+      popTimers.current.push(setTimeout(() => setRun(a.id, false), SLIDE_MS + riders.length * 450));
+      onTapAppliance?.(a, true, 0, inside);
+      return;
+    }
+    if (a.kind === 'trampoline') {
+      // A super bounce: everyone on it jumps high and a star pops out.
+      const box = fixtureBox(a, size);
+      riders.forEach((p) => bump(p.key, 'hop'));
+      pop(box.left + box.width / 2, box.top - size.unit * 0.1, '⭐');
+      onTapAppliance?.(a, true, 0, inside);
+      return;
+    }
     if (a.kind === 'chalkboard') {
       const step = ((steps[a.id] ?? 0) + 1) % CHALK_DRAWINGS.length;
       setSteps((all) => ({ ...all, [a.id]: step }));
@@ -424,7 +522,8 @@ export function BuddyRoom(props: Props) {
     const box = fixtureBox(a, size);
     // Putting the lid down flushes.
     if (a.kind === 'toilet' && !on) pop(box.left + box.width / 2, box.top + box.height * 0.4, '💦');
-    if (a.kind === 'ballPit' && on) inside.forEach((id) => bump(BUDDY_KEY + id, 'hop'));
+    if ((a.kind === 'ballPit' || a.kind === 'bed' || a.kind === 'bunkBed') && on) inside.forEach((id) => bump(BUDDY_KEY + id, 'hop'));
+    if (a.kind === 'car' && on) pop(box.left + box.width * 0.1, box.top + box.height * 0.5, '💨');
     if (a.kind === 'tub' && on && inside.length) pop(box.left + box.width / 2, box.top + box.height * 0.4, '🫧');
     onTapAppliance?.(a, on, 0, inside);
   };
@@ -687,7 +786,10 @@ export function BuddyRoom(props: Props) {
             const offset = moving[piece.key];
             const buddy = piece.buddyId ? buddyById.get(piece.buddyId) : undefined;
             const parent = piece.parent ? byKey.get(piece.parent) : undefined;
-            const asleep = !!parent?.item?.sleep;
+            const seat = piece.builtIn ? findBuiltInSeat(piece.builtIn) : undefined;
+            const seatOn = seat ? running.has(seat.appliance) : false;
+            // In a bed, a buddy naps, unless someone's bouncing on it.
+            const asleep = !!parent?.item?.sleep || (!!seat?.sleep && !seatOn);
             const tall = Math.round(piece.height);
             const b = bumps[piece.key];
             return (
@@ -711,7 +813,8 @@ export function BuddyRoom(props: Props) {
                     ]}
                   />
                 ) : null}
-                <Sunk piece={piece} running={piece.builtIn ? running.has(BUILT_IN_SEATS.find((x) => x.id === piece.builtIn)?.appliance ?? '') : false}>
+                <Ride piece={piece} seat={seat} on={seatOn} size={size} sliding={sliding.has(piece.key)}>
+                <Sunk piece={piece} running={seatOn}>
                   <PopIn skip={!drawn.current} damping={9} style={styles.fill}>
                     <Lively
                       height={tall}
@@ -764,6 +867,7 @@ export function BuddyRoom(props: Props) {
                     </Lively>
                   </PopIn>
                 </Sunk>
+                </Ride>
                 {buddy && asleep ? (
                   <Drifting rise={piece.height * 0.25} style={styles.zzz}>
                     <Text style={{ fontSize: Math.round(piece.height * 0.3) }}>💤</Text>
@@ -783,6 +887,36 @@ export function BuddyRoom(props: Props) {
             />
           ) : null,
         )}
+        {areas.map((a, i) => {
+          // The backyard's sky: birds by day, and the sun to tap for night (then stars and fireflies).
+          if (a.id !== 'backyard' || forSale.includes(a.id)) return null;
+          const night = dark.has(a.id);
+          const left = i * size.areaWidth;
+          const sun = Math.round(size.floorY * 0.13);
+          return (
+            <View key={`sky-${a.id}`} pointerEvents="box-none" style={[styles.skyLayer, { left, width: size.areaWidth, height: size.height }]}>
+              {night ? <NightSky width={size.areaWidth} floorY={size.floorY} height={size.height} /> : <Birds width={size.areaWidth} floorY={size.floorY} />}
+              <SunMoon
+                left={size.screen * 1.2}
+                top={size.floorY * 0.28}
+                size={sun}
+                night={night}
+                onPress={() => {
+                  setDark((set) => {
+                    const next = new Set(set);
+                    if (night) next.delete(a.id);
+                    else next.add(a.id);
+                    return next;
+                  });
+                  props.onNight?.(!night);
+                }}
+              />
+            </View>
+          );
+        })}
+        {APPLIANCES.filter((a) => a.kind === 'starLamp' && running.has(a.id)).map((a) => (
+          <StarsOnWall key={`stars-${a.id}`} left={size.order.indexOf(a.area) * size.areaWidth} width={size.areaWidth} height={size.floorY} />
+        ))}
         {areas.map((a, i) =>
           forSale.includes(a.id) ? (
             <ForSale key={a.id} index={i} size={size} name={a.name} emoji={a.emoji} price={a.price ?? 0} coins={coins} onBuy={() => onBuyRoom?.(a.id)} />
@@ -816,6 +950,126 @@ export function BuddyRoom(props: Props) {
           </FloatUp>
         ))}
       </ScrollView>
+      {treeOpen ? (
+        <TreeHouseInside
+          width={view.width}
+          height={view.height}
+          buddies={pieces.filter((p) => p.builtIn === TREE_SEAT && p.buddyId).flatMap((p) => buddyById.get(p.buddyId as string) ?? [])}
+          onTapBuddy={onTapBuddy}
+          onClose={() => setTreeOpen(false)}
+          onEvent={(e) => {
+            if (e.kind === 'callUp') callUp();
+            props.onTreeHouse?.(e, pieces.filter((p) => p.builtIn === TREE_SEAT && p.buddyId).map((p) => p.buddyId as string));
+          }}
+        />
+      ) : null}
+    </View>
+  );
+}
+
+interface RideProps {
+  piece: Piece;
+  seat: BuiltInSeat | undefined;
+  /** Its built-in is switched on (the swings swinging, the car running, the bed bouncing). */
+  on: boolean;
+  size: HomeSize;
+  /** On the way down the slide. */
+  sliding: boolean;
+  children: ReactNode;
+}
+
+/**
+ * Moves a buddy with what it's riding: swinging from the swing bar, bouncing on the trampoline
+ * or a bed, rumbling in the car, or sliding down the slide. Anything else is drawn as it is.
+ */
+function Ride({ piece, seat, on, size, sliding, children }: RideProps) {
+  if (sliding) return <SlideTrip piece={piece} size={size}>{children}</SlideTrip>;
+  if (!seat) return <>{children}</>;
+  const { width: w, height: h } = piece;
+  if (seat.pivot !== undefined && on) {
+    // Hang from the bar: the swinging box reaches from the bar down to the buddy's feet.
+    const reach = Math.max(0, piece.y - h - (size.floorY - seat.pivot * size.unit));
+    return (
+      <View pointerEvents="none" style={{ position: 'absolute', left: 0, top: -reach, width: w, height: h + reach }}>
+        <Swing active style={styles.fill}>
+          <View style={{ position: 'absolute', left: 0, top: reach, width: w, height: h }}>{children}</View>
+        </Swing>
+      </View>
+    );
+  }
+  if (seat.appliance === 'trampoline') {
+    return (
+      <Bob seed={piece.key} rise={h * 0.45} active style={styles.fill}>
+        {children}
+      </Bob>
+    );
+  }
+  if (on && (seat.appliance === 'bed2' || seat.appliance === 'bunkBed')) {
+    return (
+      <Bob seed={piece.key} rise={h * 0.18} active style={styles.fill}>
+        {children}
+      </Bob>
+    );
+  }
+  if (on && seat.appliance === 'car') {
+    return (
+      <Rumble active style={styles.fill}>
+        {children}
+      </Rumble>
+    );
+  }
+  return <>{children}</>;
+}
+
+/** Down the slide: to the edge of the fort, then faster and faster down the chute, and off onto the grass. */
+function SlideTrip({ piece, size, children }: { piece: Piece; size: HomeSize; children: ReactNode }) {
+  const trip = slideTrip(size);
+  const t = useSharedValue(0);
+  useEffect(() => {
+    t.value = withTiming(1, { duration: SLIDE_MS, easing: Easing.linear });
+  }, [t]);
+  const a = { x: trip.top.x - piece.x, y: trip.top.y - piece.y };
+  const b = { x: trip.foot.x - piece.x, y: trip.foot.y - piece.y };
+  const c = { x: trip.off.x - piece.x, y: trip.off.y - piece.y };
+  const look = useAnimatedStyle(() => {
+    const v = t.value;
+    let x: number;
+    let y: number;
+    if (v < 0.25) {
+      const k = v / 0.25;
+      x = a.x * k;
+      y = a.y * k;
+    } else if (v < 0.85) {
+      const k = ((v - 0.25) / 0.6) ** 1.6;
+      x = a.x + (b.x - a.x) * k;
+      y = a.y + (b.y - a.y) * k;
+    } else {
+      const k = (v - 0.85) / 0.15;
+      x = b.x + (c.x - b.x) * k;
+      y = b.y + (c.y - b.y) * k;
+    }
+    return { transform: [{ translateX: x }, { translateY: y }, { rotate: v > 0.25 && v < 0.85 ? '-12deg' : '0deg' }] };
+  });
+  return (
+    <Animated.View pointerEvents="none" style={[styles.fill, look]}>
+      {children}
+    </Animated.View>
+  );
+}
+
+/** Stars a star lamp throws over its room's walls, twinkling. */
+function StarsOnWall({ left, width, height }: { left: number; width: number; height: number }) {
+  return (
+    <View pointerEvents="none" style={{ position: 'absolute', left, top: 0, width, height }}>
+      {Array.from({ length: 28 }, (_, i) => {
+        const r = ((i * 37) % 100) / 100;
+        const big = i % 5 === 0;
+        return (
+          <Flicker key={i} seed={`wallstar-${i}`} style={{ position: 'absolute', left: width * ((i + r) / 28), top: height * (0.12 + ((i * 53) % 70) / 100), width: big ? 10 : 6, height: big ? 10 : 6 }}>
+            <View style={[styles.wallStar, { borderRadius: big ? 5 : 3 }]} />
+          </Flicker>
+        );
+      })}
     </View>
   );
 }
@@ -836,8 +1090,13 @@ interface AreaProps {
 function Area({ id, index, size, wall, floor }: AreaProps) {
   return (
     <View style={[styles.area, { left: index * size.areaWidth, width: size.areaWidth, backgroundColor: wall }]}>
+      {id === 'backyard' ? <BackyardSky width={size.areaWidth} floorY={size.floorY} fence={wall} /> : null}
       <View style={[styles.floor, { top: size.floorY, backgroundColor: floor }]} />
-      <View style={[styles.baseboard, { top: size.floorY - 8 }]} />
+      {id === 'backyard' ? (
+        <Lawn width={size.areaWidth} top={size.floorY} height={size.height - size.floorY} />
+      ) : (
+        <View style={[styles.baseboard, { top: size.floorY - 8 }]} />
+      )}
       {id === 'bedroom' || id === 'bedroom2' || id === 'bedroom3' || id === 'bathroom' || id === 'playroom' ? (
         <View
           style={[
@@ -1477,6 +1736,8 @@ const styles = StyleSheet.create({
   fill: { width: '100%', height: '100%', alignItems: 'center', justifyContent: 'flex-end' },
   layer: { position: 'absolute', left: 0, top: 0, right: 0, bottom: 0 },
   dark: { position: 'absolute', top: 0, bottom: 0, backgroundColor: DARK },
+  skyLayer: { position: 'absolute', top: 0 },
+  wallStar: { flex: 1, backgroundColor: '#FFF59D', shadowColor: '#FFF59D', shadowOpacity: 1, shadowRadius: 5 },
   forSale: { position: 'absolute', top: 0, bottom: 0, backgroundColor: '#8F8A9E', alignItems: 'center', borderLeftWidth: 10, borderLeftColor: TRIM },
   saleCard: {
     width: 260,
