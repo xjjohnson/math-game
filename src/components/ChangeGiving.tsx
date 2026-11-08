@@ -15,6 +15,8 @@ interface Props {
   grade: Grade;
   /** Bills on offer. */
   coins: number[];
+  /** The bills the customer pays with; worked out from `paid` if left out. */
+  hand?: number[];
   /** Called once: with true if the first try was right, false after the answer was shown. */
   onDone: (rightFirstTry: boolean) => void;
 }
@@ -31,13 +33,12 @@ function Money({ value, small = false }: { value: number; small?: boolean }) {
   );
 }
 
-/** What the customer hands over: a few bills, or one bill when it can't be split. */
-function Payment({ paid, bills }: { paid: number; bills: number[] }) {
-  const made = paymentBills(paid, bills);
+/** What the customer hands over, and what it adds up to. */
+function Payment({ hand }: { hand: number[] }) {
   return (
     <View style={styles.payBills}>
-      {(made.length ? made : [paid]).map((b, i) => (
-        <Money key={i} value={b} small={made.length > 1} />
+      {hand.map((b, i) => (
+        <Money key={i} value={b} small={hand.length > 1} />
       ))}
     </View>
   );
@@ -48,7 +49,7 @@ function Payment({ paid, bills }: { paid: number; bills: number[] }) {
  * drawer onto the counter until the pile is the right amount, then say you're done.
  * A wrong answer gets a hint and a second try before the answer is shown.
  */
-export function ChangeGiving({ item, price, paid, grade, coins, onDone }: Props) {
+export function ChangeGiving({ item, price, paid, grade, coins, hand, onDone }: Props) {
   const answer = paid - price;
   const [pile, setPile] = useState<number[]>([]);
   const [tries, setTries] = useState(0);
@@ -87,8 +88,11 @@ export function ChangeGiving({ item, price, paid, grade, coins, onDone }: Props)
           </Text>
           <View style={styles.payRow}>
             <Text style={styles.say}>Here is </Text>
-            <Payment paid={paid} bills={coins} />
+            <Payment hand={hand?.length ? hand : paymentBills(paid, coins).length ? paymentBills(paid, coins) : [paid]} />
           </View>
+          <Text style={styles.say}>
+            That's <Text style={styles.strong}>{`$${paid}`}</Text>.
+          </Text>
         </View>
       </View>
 

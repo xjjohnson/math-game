@@ -64,6 +64,7 @@ export function ShiftScreen() {
           item={q.change.item}
           price={q.change.price}
           paid={q.change.paid}
+          hand={q.change.bills}
           grade={profile.grade}
           coins={changeBills(profile.grade)}
           onDone={(rightFirstTry) => {
