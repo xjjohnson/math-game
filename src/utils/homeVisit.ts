@@ -17,7 +17,7 @@ export function dressedOf(profile: Profile, buddyId: string): Dressed {
     hat: emoji(outfit.hat),
     face: emoji(outfit.face),
     neck: emoji(outfit.neck),
-    feet: emoji(outfit.feet),
+    feet: outfit.feet,
     shirt: outfit.shirt ? findWearable(outfit.shirt)?.color : undefined,
   };
 }
