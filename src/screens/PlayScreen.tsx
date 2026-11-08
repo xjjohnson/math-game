@@ -21,6 +21,7 @@ import { useColumnAnswer } from '@/hooks/useColumnAnswer';
 import { useGameSession } from '@/hooks/useGameSession';
 import { useTimer } from '@/hooks/useTimer';
 import { useActiveProfile, useProfiles } from '@/store/profiles';
+import { useSettings } from '@/store/settings';
 import type { GameConfig } from '@/types';
 import { buddyGift } from '@/utils/buddy';
 import { countingModel } from '@/utils/countingAid';
@@ -32,13 +33,18 @@ import {
 } from '@/utils/gameSession';
 import { resolveInputStyle } from '@/utils/inputStyle';
 import type { RoundOutcome } from '@/utils/progress';
-import { STREAK_MILESTONE } from '@/utils/rewards';
+import { coinsForAnswer, STREAK_MILESTONE } from '@/utils/rewards';
 import { randomSeed } from '@/utils/seededRandom';
 import { cardStyleFor, companionFor } from '@/utils/shop';
 import { playSound } from '@/utils/soundEffects';
 
 /** How long a right answer stays on screen before the next card. */
 const CORRECT_PAUSE_MS = 900;
+
+/** Coins one right answer pays, with the parent's payout setting applied. */
+function coinsPerAnswer(record: Parameters<typeof coinsForAnswer>[0]): number {
+  return Math.round(coinsForAnswer(record) * useSettings.getState().coinPayout);
+}
 
 export function PlayScreen() {
   const params = useLocalSearchParams<{ config?: string }>();
@@ -110,6 +116,7 @@ function Round({ config, onPlayAgain }: { config: GameConfig; onPlayAgain: () =>
     difficultyConfigFor(state.difficulty, config.grade).allowNegatives &&
     state.problem.operation === 'subtract' &&
     !state.problem.story;
+  const roundCoins = state.history.reduce((sum, r) => sum + (r.correct ? coinsPerAnswer(r) : 0), 0);
   const column = useColumnAnswer(state.problem, { allowNegative, teach: !!config.showWork });
   const countModel = useMemo(() => countingModel(state.problem), [state.problem]);
 
@@ -132,9 +139,9 @@ function Round({ config, onPlayAgain }: { config: GameConfig; onPlayAgain: () =>
           {state.index + 1} / {config.questionCount}
         </Text>
         <Text style={styles.status}>🔥 {state.streak}</Text>
-        {/* Points, not stars: stars are only handed out at the end of a round. */}
-        <Text style={styles.status} accessibilityLabel={`${state.score} points`}>
-          🎯 {state.score}
+        {/* Coins so far this round; stars are handed out at the end. */}
+        <Text style={styles.status} accessibilityLabel={`${roundCoins} coins this round`}>
+          🪙 {roundCoins}
         </Text>
       </View>
       {config.adaptive ? (
@@ -195,7 +202,7 @@ function Round({ config, onPlayAgain }: { config: GameConfig; onPlayAgain: () =>
         <PopIn key={`feedback-${state.index}`} damping={10}>
           <Text style={[styles.feedback, { color: last.correct ? palette.correct : palette.wrong }]}>
             {last.correct
-              ? `✓ Great job! +${last.points} points`
+              ? `✓ Great job! +${coinsPerAnswer(last)} 🪙`
               : last.given === null
                 ? "✗ Time's up!"
                 : '✗ Not quite. Remember this one!'}

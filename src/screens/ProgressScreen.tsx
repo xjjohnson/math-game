@@ -1,7 +1,10 @@
+import { router } from 'expo-router';
 import { StyleSheet, View } from 'react-native';
 
 import { Text } from '@/components/AppText';
+import { BigButton } from '@/components/BigButton';
 import { Screen } from '@/components/Screen';
+import { StarLevelCard } from '@/components/StarLevelCard';
 import { StreakCalendar } from '@/components/StreakCalendar';
 import { stickerText } from '@/constants/art';
 import { BADGES } from '@/constants/badges';
@@ -16,7 +19,7 @@ export function ProgressScreen() {
   const profile = useActiveProfile();
   if (!profile) {
     return (
-      <Screen title="My progress">
+      <Screen title="My progress" tab="me">
         <Text style={styles.empty}>Pick a player first.</Text>
       </Screen>
     );
@@ -28,7 +31,8 @@ export function ProgressScreen() {
     profile.week && profile.week.week === weekKey(today) ? profile.week : emptyWeek(today);
 
   return (
-    <Screen title={`${stickerText(profile.avatar)} ${profile.name}`}>
+    <Screen title={`${stickerText(profile.avatar)} ${profile.name}`} tab="me">
+      <StarLevelCard stars={profile.stars} />
       <View style={styles.tiles}>
         <Tile value={String(profile.coins)} label="🪙 Coins" />
         <Tile value={String(profile.stars)} label="⭐ Stars" />
@@ -116,6 +120,9 @@ export function ProgressScreen() {
 
       <Text style={styles.heading}>Days played</Text>
       <StreakCalendar playDates={profile.playDates} today={today} />
+
+      <BigButton label="Switch player" color={colors.textMuted} outline onPress={() => router.push('/profiles')} />
+      <BigButton label="Settings" outline onPress={() => router.push('/settings')} />
     </Screen>
   );
 }

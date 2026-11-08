@@ -2,6 +2,7 @@ import type { AnswerRecord, Difficulty, Profile } from '@/types';
 import { newBadges } from '@/utils/badges';
 import { roundRewards, type RoundRewards } from '@/utils/rewards';
 import { updateMissed } from '@/utils/weakSpots';
+import { grantStarRewards, levelsReached, type StarLevel } from '@/utils/starLevels';
 import { recordWeek, WEEKLY_GOAL_BONUS } from '@/utils/weekly';
 
 export interface RoundResult {
@@ -21,6 +22,8 @@ export interface RoundOutcome extends RoundRewards {
   weeklyBonusCoins: number;
   /** Badge ids earned by this round. */
   newBadges: string[];
+  /** Star levels this round reached, each with its free reward. */
+  newStarLevels: StarLevel[];
 }
 
 /**
@@ -78,14 +81,17 @@ export function applyRound(
     today,
   });
 
+  const withBadges: Profile = { ...updated, badges: [...updated.badges, ...earned] };
+  const { profile: withRewards } = grantStarRewards(withBadges);
   return {
-    profile: { ...updated, badges: [...updated.badges, ...earned] },
+    profile: withRewards,
     outcome: {
       ...rewards,
       coins: rewards.coins + weeklyBonusCoins,
       weeklyBonusCoins,
       newHighScore: round.score > previous,
       newBadges: earned,
+      newStarLevels: levelsReached(profile.stars, updated.stars),
     },
   };
 }
