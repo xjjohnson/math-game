@@ -17,6 +17,9 @@
 
 ## 2026-11-08 (later)
 
+- **The mixer mixes.** Put the bowl on the pink stand mixer and tap the mixer (or the bowl): it whirrs, and after a moment the food turns into batter (the bowl fills with batter and says "Mixed!"). Only mixed batter bakes into a real treat; food that goes in the oven unmixed comes out as a **lumpy mess**. Adding more food after mixing means mixing again.
+- **Friends' phones no longer undo your bowl.** When a phone joins a friend's visit, the things it changed in the last 10 minutes are put back the way it had them, instead of the friend's older room winning. While connected, each phone keeps up with every change, so a short drop in the connection doesn't bring back old things either.
+
 - **Bakery bowl works the way Justin asked:** drop food on the bowl and it goes *into* the bowl (small icons on top of it) while the food itself goes straight back to its shelf to use again. The bowl keeps what's in it until it's baked or tapped to tip it out, and carrying the bowl carries it all. The big "Drop food in" and "Bake it in the oven" labels are gone; treat names are small.
 
 - **Community things no longer reset by themselves.** A phone with no friends nearby keeps restarting its visit every 20-30 seconds to look for them, and each restart used to put everything in the buildings back on the shelves. Now the room stays as you left it, and a restarted visit starts from it. The bowl's hint is smaller ("Drop food in"), and once something is in the bowl it says "Bake it in the oven ➡️" (the oven is to the right, past the counter).

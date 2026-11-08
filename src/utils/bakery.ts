@@ -78,6 +78,7 @@ export const MESSES: readonly Recipe[] = [
   { emoji: '🍝', name: 'Spaghetti chocolate mess', needs: [] },
   { emoji: '🍲', name: 'Sticky fruit gloop', needs: [] },
   { emoji: '🍲', name: 'Weird gloop', needs: [] },
+  { emoji: '🥴', name: 'Lumpy mess (mix it first!)', needs: [] },
 ];
 
 /** Every possible result: the recipes, then the messes. A result is an index into this. */
@@ -85,9 +86,13 @@ export const RESULTS: readonly Recipe[] = [...RECIPES, ...MESSES];
 
 const SWEET_THINGS: readonly Kind[] = ['sweet', 'choc', 'berry', 'apple', 'banana', 'jam'];
 
-/** Which result this bowl bakes into: an index into RESULTS, or -1 when the bowl is empty. */
-export function recipeFor(mask: number): number {
+/**
+ * Which result this bowl bakes into: an index into RESULTS, or -1 when the bowl is empty.
+ * Food that was never mixed on the mixer bakes into a lumpy mess.
+ */
+export function recipeFor(mask: number, mixed = true): number {
   if (mask === 0) return -1;
+  if (!mixed) return RECIPES.length + 3;
   const kinds = kindsIn(mask);
   // Salt with anything sweet is a wrong mix, even if flour is in there too.
   const clash = kinds.has('salt') && SWEET_THINGS.some((k) => kinds.has(k));
@@ -104,8 +109,8 @@ export function recipeFor(mask: number): number {
 }
 
 /** The result for a bowl, or null when it is empty. */
-export const bake = (mask: number): Recipe | null => {
-  const i = recipeFor(mask);
+export const bake = (mask: number, mixed = true): Recipe | null => {
+  const i = recipeFor(mask, mixed);
   return i < 0 ? null : RESULTS[i];
 };
 

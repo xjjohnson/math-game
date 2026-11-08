@@ -27,7 +27,9 @@ import {
   isInside,
   madeSwitch,
   BOWL_SWITCH,
+  MIXER_MIDDLE,
   onBowl,
+  onMixer,
   PLACE_PROPS,
   propPieceId,
   settle,
@@ -61,12 +63,22 @@ export const ROOM_SCREENS: Record<TownPlace, number> = { street: 2.8, ...INSIDE_
 
 /** How long something sits in the hot oven before it's baked. */
 const BAKE_MS = 3000;
+/** How long the mixer whirrs before the bowl is mixed. */
+const MIX_MS = 1500;
+/** On joining a friend, things this phone moved this recently are put back the way this phone had them. */
+const KEEP_MY_CHANGES_MS = 10 * 60 * 1000;
 
 /**
  * Where things were put while playing alone, kept while the app is open so a
  * tidy shop is still tidy after doing the job. On a visit the host keeps them instead.
  */
 const soloMemory: Record<string, Spot> = {};
+/** When each remembered thing last changed, by this phone or a friend. */
+const memoryTime: Record<string, number> = {};
+function remember(id: string, spot: Spot) {
+  soloMemory[id] = { x: spot.x, y: spot.y };
+  memoryTime[id] = Date.now();
+}
 
 /** Where someone stands until they are moved: along the floor near the door, in order. */
 function standSpot(saved: Spot | undefined, index: number, inside: boolean, count: number): Spot {
@@ -84,7 +96,7 @@ interface Props {
 type Piece =
   | { key: string; kind: 'person'; person: TownPerson; spot: Spot }
   | { key: string; kind: 'pal'; person: TownPerson; spot: Spot; value: string }
-  | { key: string; kind: 'prop'; prop: PropDef; spot: Spot; baked: boolean; shown: string; badge?: string; caption?: string };
+  | { key: string; kind: 'prop'; prop: PropDef; spot: Spot; baked: boolean; shown: string; badge?: string; caption?: string; batter?: boolean };
 
 /**
  * A full-screen, side-view place. Everyone who is here stands in it as their
@@ -125,7 +137,7 @@ export function CommunityRoom({ place, onDoor, onExit }: Props) {
   const move = (id: string, x: number, y: number) => {
     // People and buddies start fresh each time; things in the rooms stay where they were put,
     // even when the visit restarts (a phone left alone keeps looking again and again).
-    if (id.startsWith('~')) soloMemory[id] = { x, y };
+    if (id.startsWith('~')) remember(id, { x, y });
     if (visiting) townSession().moveTo(id, x, y);
     else {
       setSoloSpots((s) => ({ ...s, [id]: { x, y } }));
@@ -146,6 +158,32 @@ export function CommunityRoom({ place, onDoor, onExit }: Props) {
     const known = session.getState().spots;
     for (const [id, spot] of Object.entries(soloMemory)) if (!known[id]) session.moveTo(id, spot.x, spot.y);
   }, [status]);
+
+  // Joining a friend: once their room has arrived, put back what this phone changed lately, so a
+  // bowl you just filled doesn't turn back into the friend's older one. After that, keep up with them.
+  const joinedAt = useRef(0);
+  useEffect(() => {
+    if (status !== 'joined') return;
+    joinedAt.current = Date.now();
+    const timer = setTimeout(() => {
+      const session = townSession();
+      const theirs = session.getState().spots;
+      const cutoff = Date.now() - KEEP_MY_CHANGES_MS;
+      for (const [id, mine] of Object.entries(soloMemory)) {
+        const now = theirs[id];
+        if ((memoryTime[id] ?? 0) > cutoff && (!now || now.x !== mine.x || now.y !== mine.y)) session.moveTo(id, mine.x, mine.y);
+      }
+      joinedAt.current = 0;
+    }, 1500);
+    return () => clearTimeout(timer);
+  }, [status]);
+  useEffect(() => {
+    if (!visiting || joinedAt.current) return;
+    for (const [id, spot] of Object.entries(spots)) {
+      const kept = soloMemory[id];
+      if (id.startsWith('~') && (!kept || kept.x !== spot.x || kept.y !== spot.y)) remember(id, spot);
+    }
+  }, [visiting, spots]);
 
   // Switches (an oven, a swing) are kept like pieces: x is 1 while it's on.
   const isOn = (name: string) => inside && (spotsNow[switchPieceId(place, name)]?.x ?? 0) >= 0.5;
@@ -173,9 +211,10 @@ export function CommunityRoom({ place, onDoor, onExit }: Props) {
   const bakery = place === 'bakery';
   const bowlSwitch = switchPieceId('bakery', BOWL_SWITCH);
   const bowlMask = bakery ? unitToMask(spotsNow[bowlSwitch]?.x ?? 0) : 0;
+  const bowlMixed = bowlMask !== 0 && (spotsNow[bowlSwitch]?.y ?? 0) >= 0.5;
   const bowlSpot: Spot = spotsNow[propPieceId('bakery', BOWL.id)] ?? { x: BOWL.x, y: BOWL.y };
-  const latest = useRef({ spotsNow, bowlSpot, bowlMask });
-  latest.current = { spotsNow, bowlSpot, bowlMask };
+  const latest = useRef({ spotsNow, bowlSpot, bowlMask, bowlMixed });
+  latest.current = { spotsNow, bowlSpot, bowlMask, bowlMixed };
 
   const props: Piece[] = inside
     ? PLACE_PROPS[place].flatMap((prop): Piece[] => {
@@ -190,7 +229,11 @@ export function CommunityRoom({ place, onDoor, onExit }: Props) {
         }
         const baked = !!prop.bakeTo && isOn(bakedSwitch(prop.id));
         const piece: Piece = { key, kind: 'prop', prop, spot, baked, shown: baked && prop.bakeTo ? prop.bakeTo : prop.emoji };
-        if (prop.bowl && bowlMask) piece.badge = maskEmojis(bowlMask);
+        if (prop.bowl && bowlMask) {
+          piece.batter = bowlMixed;
+          if (bowlMixed) piece.caption = 'Mixed!';
+          else piece.badge = maskEmojis(bowlMask);
+        }
         return [piece];
       })
     : [];
@@ -215,13 +258,13 @@ export function CommunityRoom({ place, onDoor, onExit }: Props) {
   useEffect(() => {
     if (!bowlBaking) return;
     const timer = setTimeout(() => {
-      const { spotsNow: now, bowlSpot: at, bowlMask: mask } = latest.current;
-      const recipe = bake(mask);
+      const { spotsNow: now, bowlSpot: at, bowlMask: mask, bowlMixed: mixed } = latest.current;
+      const recipe = bake(mask, mixed);
       if (!recipe) return;
       // The first free spot for it, or the first spot again when the counter is full.
       const free = Array.from({ length: MADE_SLOTS }, (_, i) => i).find((i) => unitToMade(now[switchPieceId('bakery', madeSwitch(i))]?.y ?? 0) === null) ?? 0;
       move(propPieceId('bakery', `made${free}`), at.x, Math.min(0.95, at.y + 0.001));
-      move(switchPieceId('bakery', madeSwitch(free)), 1, madeToUnit(recipeFor(mask)));
+      move(switchPieceId('bakery', madeSwitch(free)), 1, madeToUnit(recipeFor(mask, mixed)));
       // The bowl is empty again, ready for the next one.
       move(bowlSwitch, 0, 0);
     }, BAKE_MS);
@@ -229,15 +272,27 @@ export function CommunityRoom({ place, onDoor, onExit }: Props) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [bowlBaking, bowlMask]);
 
+  // The bowl on the stand mixer with the mixer whirring: after a moment it's all mixed into batter.
+  const mixing = bakery && isOn('mixer') && bowlMask !== 0 && !bowlMixed && onMixer(bowlSpot);
+  useEffect(() => {
+    if (!mixing) return;
+    const timer = setTimeout(() => {
+      move(bowlSwitch, maskToUnit(latest.current.bowlMask), 1);
+      move(switchPieceId('bakery', 'mixer'), 0, 0);
+    }, MIX_MS);
+    return () => clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [mixing, bowlMask]);
+
   /** An ingredient let go over the bowl goes in it, and the ingredient itself goes back to its shelf to use again. */
   const intoBowl = (prop: PropDef, s: Spot): boolean => prop.ingredient !== undefined && onBowl(s, latest.current.bowlSpot);
   const dropIngredient = (prop: PropDef, s: Spot) => {
     if (!intoBowl(prop, s)) return;
     move(bowlSwitch, maskToUnit(addToMask(latest.current.bowlMask, prop.ingredient as number)), 0);
   };
-  /** Tap the bowl to tip it out; tap a finished treat to eat it. */
+  /** Tap the bowl to tip it out (on the mixer, tapping it starts the mixer); tap a finished treat to eat it. */
   const tapProp = (prop: PropDef): (() => void) | undefined => {
-    if (prop.bowl) return () => move(bowlSwitch, 0, 0);
+    if (prop.bowl) return () => (onMixer(latest.current.bowlSpot) ? flip('mixer') : move(bowlSwitch, 0, 0));
     if (prop.made !== undefined) return () => move(switchPieceId('bakery', madeSwitch(prop.made as number)), 0, 0);
     return undefined;
   };
@@ -305,13 +360,18 @@ export function CommunityRoom({ place, onDoor, onExit }: Props) {
                 prop={piece.prop}
                 shown={piece.shown}
                 badge={piece.badge}
+                batter={piece.batter}
                 caption={piece.caption}
                 spot={piece.spot}
                 w={roomW}
                 h={h}
                 size={piece.prop.big ? propSize * 1.4 : propSize}
                 onMove={(x, y) => move(piece.key, x, y)}
-                land={(s) => (intoBowl(piece.prop, s) ? { x: piece.prop.x, y: piece.prop.y } : settle(place as InsidePlace, piece.prop, s.x, s.y))}
+                land={(s) => {
+                  if (intoBowl(piece.prop, s)) return { x: piece.prop.x, y: piece.prop.y };
+                  const at = settle(place as InsidePlace, piece.prop, s.x, s.y);
+                  return piece.prop.bowl && onMixer(at) ? { ...at, x: MIXER_MIDDLE } : at;
+                }}
                 onDrop={piece.prop.ingredient !== undefined ? (s) => dropIngredient(piece.prop, s) : undefined}
                 onTap={tapProp(piece.prop)}
                 onDragging={setDragging}
@@ -472,6 +532,8 @@ interface PropProps {
   badge?: string;
   /** A name under it (what a finished treat is). */
   caption?: string;
+  /** The bowl is full of mixed batter. */
+  batter?: boolean;
   spot: Spot;
   w: number;
   h: number;
@@ -484,7 +546,7 @@ interface PropProps {
 }
 
 /** A thing in the room anyone can pick up: it drops onto the shelf or counter under it when let go. */
-function Prop({ prop, shown, badge, caption, spot, w, h, size, onMove, onTap, land, onDrop, onDragging }: PropProps) {
+function Prop({ prop, shown, badge, caption, batter, spot, w, h, size, onMove, onTap, land, onDrop, onDragging }: PropProps) {
   const { handlers, at, lifted } = useDrag({ spot, w, h, enabled: true, onMove, onTap, onDragging, fit: inRoom, land, onDrop });
   const box = size * 1.25;
   const label = prop.bowl ? 'Mixing bowl. Drop food on it, then put it in the oven. Tap to tip it out.' : caption ? `${caption}. Tap to eat.` : `${shown}. Drag to move.`;
@@ -495,6 +557,7 @@ function Prop({ prop, shown, badge, caption, spot, w, h, size, onMove, onTap, la
       style={[styles.prop, { width: box, height: box, left: at.x * w - box / 2, top: at.y * h - box + size * 0.1 }, lifted && styles.lifted]}
     >
       <Text style={{ fontSize: size, lineHeight: box }}>{shown}</Text>
+      {batter ? <View pointerEvents="none" style={[styles.batter, { top: box * 0.42, left: box * 0.16, right: box * 0.16, height: box * 0.16 }]} /> : null}
       {badge ? (
         <Text pointerEvents="none" numberOfLines={2} style={[styles.tag, { bottom: box * 0.7, left: -box * 0.1, right: -box * 0.1, fontSize: 14, lineHeight: 17 }]}>
           {badge}
@@ -515,6 +578,7 @@ const styles = StyleSheet.create({
   prop: { position: 'absolute', alignItems: 'center', justifyContent: 'flex-end' },
   tag: { position: 'absolute', textAlign: 'center', fontWeight: '800', color: '#3B2B25' },
   caption: { fontWeight: '900', color: '#3B2B25' },
+  batter: { position: 'absolute', backgroundColor: '#E9C27D', borderRadius: 999, borderWidth: 2, borderColor: '#B98A45' },
   lifted: { transform: [{ scale: 1.12 }], zIndex: 50 },
   wave: { fontSize: 24, height: 30 },
   acc: { position: 'absolute', alignSelf: 'center', textAlign: 'center', left: 0, right: 0 },

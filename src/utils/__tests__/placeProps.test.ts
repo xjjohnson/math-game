@@ -10,6 +10,8 @@ import {
   inOven,
   madeSwitch,
   onBowl,
+  onMixer,
+  MIXER_MIDDLE,
   PLACE_PROPS,
   propPieceId,
   settle,
@@ -76,6 +78,12 @@ describe('things in the community rooms', () => {
     expect(onBowl({ x: bowl.x + 0.03, y: bowl.y }, bowl)).toBe(true);
     expect(onBowl({ x: bowl.x + 0.1, y: bowl.y }, bowl)).toBe(false);
     expect(onBowl({ x: bowl.x, y: bowl.y + 0.2 }, bowl)).toBe(false);
+  });
+
+  it('knows when the bowl is on the mixer', () => {
+    expect(onMixer({ x: MIXER_MIDDLE, y: BAKERY.counter.top })).toBe(true);
+    expect(onMixer({ x: BOWL.x + 0.05, y: BAKERY.counter.top })).toBe(false);
+    expect(onMixer({ x: MIXER_MIDDLE, y: 0.8 })).toBe(false);
   });
 
   it('shares the bowl and a finished treat with every phone', async () => {
