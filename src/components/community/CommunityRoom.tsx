@@ -113,8 +113,8 @@ export function roomWidth(viewW: number, viewH: number, place: TownPlace): numbe
 const BAKE_MS = 3000;
 /** How long the mixer whirrs before the bowl is mixed. */
 const MIX_MS = 1500;
-/** How long a buddy by the mixer waits after the last thing goes in the bowl before it starts mixing. */
-const HELPER_WAIT_MS = 1800;
+/** How long a buddy at the mixer waits, once the bowl is set on the mixer (or more goes in), before it starts mixing. */
+const HELPER_WAIT_MS = 1500;
 /** How long an animal's "Moo!" stays over its head. */
 const SAY_MS = 1800;
 
@@ -450,21 +450,21 @@ export function CommunityRoom({ place, onDoor, onExit }: Props) {
   pieces.sort((a, b) => depth(a) - depth(b));
 
   // A hidden surprise (no hint says so; only a library book shows it): a buddy standing by or
-  // hanging off the bakery mixer runs it for you: once things are in the bowl and nobody
-  // has added more for a moment, it pulls the bowl onto the mixer and switches it on. Only the
+  // hanging off the bakery mixer runs it for you: once you have put the bowl on the mixer
+  // yourself and nobody has added more for a few seconds, it switches the mixer on. It never
+  // moves the bowl, so you decide when it's ready. Only the
   // buddy's own phone does this, so friends' phones don't all do it at once.
   const mixerOn = bakery && isOn('mixer');
   const atMixer = (piece: Piece) => bakery && piece.kind === 'pal' && (byMixer(piece.spot) || onMixerHang(piece.spot));
   const myHelper = pieces.some((p) => atMixer(p) && p.kind === 'pal' && p.person.id === self);
-  const helperStarts = myHelper && bowlMask !== 0 && !bowlMixed && !mixerOn;
+  const helperStarts = myHelper && bowlMask !== 0 && !bowlMixed && !mixerOn && onMixer(bowlSpot);
   const heldNow = useRef<Record<string, Spot>>({});
   useEffect(() => {
     if (!helperStarts) return;
     const timer = setTimeout(() => {
       const bowlKey = propPieceId('bakery', BOWL.id);
       const at = latest.current.bowlSpot;
-      if (heldNow.current[bowlKey] || inOven(at)) return;
-      if (!onMixer(at)) move(bowlKey, MIXER_MIDDLE, BAKERY.counter.top);
+      if (heldNow.current[bowlKey] || !onMixer(at)) return;
       move(switchPieceId('bakery', 'mixer'), 1, 0);
     }, HELPER_WAIT_MS);
     return () => clearTimeout(timer);

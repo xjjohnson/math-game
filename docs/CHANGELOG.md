@@ -1,5 +1,9 @@
 # Change log
 
+## 2026-11-08 (mixer buddy waits for the bowl)
+
+- A buddy at the bakery mixer no longer grabs the bowl. It waits until you put the bowl on the mixer yourself, then mixes it a moment later.
+
 ## 2026-11-08 (real school books in the library)
 
 - **The library's stories are now real books from Texas schools.** The 18 made-up stories on the library shelves are replaced with stories from the Texas Bluebonnet Learning readers (the state's K-5 reading program), with their real pictures: Kit, Kit's Cats, Sal's Fish Shop, Sam and the Duck and Max in the Mud (kindergarten); Where Is King?, Splash Dogs, The Fox and the Grapes, The Fox and the Crane, Big Cats, The Frog Jumping Contest and A Rainforest Ride (1st grade); The Hare and the Hedgehog, The Pancake and The Math Contest (2nd grade); and three chapter books: Alice's Adventures in Wonderland (3rd), Treasure Island (4th) and The Badlands Sleuth (5th).
