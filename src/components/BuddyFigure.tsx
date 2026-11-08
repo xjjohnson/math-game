@@ -3,6 +3,7 @@ import Animated from 'react-native-reanimated';
 
 import { Text } from '@/components/AppText';
 import { useArmWave } from '@/components/Motion';
+import { BARE_SHOES, shoeLook } from '@/components/PersonAccessories';
 import { Sticker } from '@/components/Sticker';
 
 /** What a buddy has on, ready to draw. */
@@ -12,6 +13,7 @@ export interface Dressed {
   neck?: string;
   /** Shirt color. */
   shirt?: string;
+  /** Shoe or sock wearable id, drawn in place of the bare feet. */
   feet?: string;
 }
 
@@ -30,6 +32,7 @@ interface Props {
 }
 
 const LINE = '#3E2C23';
+const SOCK_STRIPE = '#E57373';
 
 /** A buddy with a body: its face as the head, a round body, arms, feet and its clothes. */
 export function BuddyFigure({ value, size, fur, belly, dressed, gift, wave }: Props) {
@@ -47,6 +50,10 @@ export function BuddyFigure({ value, size, fur, belly, dressed, gift, wave }: Pr
   const armH = s * 0.24;
   const armTop = s - bodyBottom - bodyH + s * 0.06;
   const waving = useArmWave(wave, -20, armH, -1);
+  const shoes = shoeLook(dressed.feet);
+  const shod = shoes !== BARE_SHOES;
+  // Boots come a little higher up the leg; everything else sits where the bare foot was.
+  const shoeH = footH * (1 + shoes.tall * 5);
   return (
     <View style={{ width: s, height: s }} accessibilityElementsHidden importantForAccessibility="no">
       {/* Arms behind the body. */}
@@ -65,16 +72,28 @@ export function BuddyFigure({ value, size, fur, belly, dressed, gift, wave }: Pr
           waving,
         ]}
       />
-      {/* Feet. */}
+      {/* Feet: bare fur, or shoes and socks drawn in their place so nothing pokes out. */}
       {[-1, 1].map((side) => (
         <View
           key={side}
           style={[
             styles.part,
             edge,
-            { backgroundColor: fur, width: footW, height: footH, bottom: 0, left: s / 2 + side * s * 0.12 - footW / 2, borderRadius: footH },
+            styles.clip,
+            {
+              backgroundColor: shod ? shoes.color : fur,
+              width: footW,
+              height: shod ? shoeH : footH,
+              bottom: 0,
+              left: s / 2 + side * s * 0.12 - footW / 2,
+              borderRadius: footH,
+              justifyContent: 'flex-end',
+            },
           ]}
-        />
+        >
+          {shoes.sock ? <View style={{ position: 'absolute', top: 0, left: 0, right: 0, height: footH * 0.3, backgroundColor: SOCK_STRIPE }} /> : null}
+          {shod && !shoes.sock ? <View style={{ height: Math.max(line, footH * 0.28), backgroundColor: shoes.sole }} /> : null}
+        </View>
       ))}
       {/* Body, with a belly or a shirt. */}
       <View
@@ -93,13 +112,6 @@ export function BuddyFigure({ value, size, fur, belly, dressed, gift, wave }: Pr
           <View style={[styles.belly, { backgroundColor: belly, width: bodyW * 0.6, height: bodyH * 0.65, borderRadius: bodyW }]} />
         )}
       </View>
-      {dressed.feet
-        ? [-1, 1].map((side) => (
-            <Text key={side} style={[styles.part, { fontSize: Math.round(s * 0.13), bottom: -s * 0.02, left: s / 2 + side * s * 0.12 - s * 0.09 }]}>
-              {dressed.feet}
-            </Text>
-          ))
-        : null}
       {/* Head on top. */}
       {/* An emoji draws about 1.25 times its font size, so this fills the head's box without being cut off. */}
       <View style={[styles.part, styles.head, { top: 0, left: (s - head) / 2, width: head, height: head }]}>
@@ -131,6 +143,7 @@ const styles = StyleSheet.create({
   part: { position: 'absolute' },
   center: { left: 0, textAlign: 'center' },
   head: { alignItems: 'center', justifyContent: 'center', overflow: 'visible' },
+  clip: { overflow: 'hidden' },
   body: { overflow: 'hidden', alignItems: 'center', justifyContent: 'flex-end' },
   belly: { marginBottom: '10%' },
   shirt: { position: 'absolute', top: 0, left: 0, right: 0, alignItems: 'center' },
