@@ -404,6 +404,15 @@ export function onMixer(s: Spot): boolean {
 }
 export const MIXER_MIDDLE = (BAKERY.mixer.x0 + BAKERY.mixer.x1) / 2;
 
+/**
+ * Whether a buddy standing at `s` is by the stand mixer, ready to run it: on the floor
+ * in front of the counter, under the mixer or just beside it.
+ */
+export function byMixer(s: Spot): boolean {
+  const m = BAKERY.mixer;
+  return s.x >= m.x0 - 0.04 && s.x <= m.x1 + 0.05 && s.y > FLOOR;
+}
+
 /** Whether a spot is inside the bakery oven, where things bake while it's on. */
 export function inOven(s: Spot): boolean {
   const o = BAKERY.oven;

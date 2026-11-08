@@ -37,6 +37,17 @@ function useReplay(trigger: number | undefined, start: () => void) {
   }, [trigger]);
 }
 
+/**
+ * Counts how many times `on` has turned true, for replaying a one-off animation (a hop, a wave,
+ * a landing) from something that is a yes/no, like "is waving" or "is held".
+ */
+export function useTimesOn(on: boolean): number {
+  const seen = useRef({ on, n: 0 });
+  if (on && !seen.current.on) seen.current.n += 1;
+  seen.current.on = on;
+  return seen.current.n;
+}
+
 /** A quick wobble back to still after a squash. */
 const SETTLE = { damping: 10, stiffness: 260 };
 
@@ -400,6 +411,121 @@ export function Swing({ children, active, style }: { children: ReactNode; active
   return <Animated.View style={[{ transformOrigin: 'top' }, style, look]}>{children}</Animated.View>;
 }
 
+/**
+ * Puts what's inside at `left`/`top` (in its parent's points) and, when that changes, walks it
+ * there instead of jumping: a smooth glide with a little waddle and bounce for each step. While
+ * `instant` (a finger is carrying it) it follows exactly. `grow` scales it up, for being held.
+ * Jumps straight there when motion is off.
+ */
+export function Glide({
+  left,
+  top,
+  instant = false,
+  walk = true,
+  grow = 1,
+  bounce = 6,
+  children,
+  style,
+  pointerEvents,
+  accessibilityLabel,
+}: {
+  left: number;
+  top: number;
+  instant?: boolean;
+  /** Waddle and bounce on the way, for people and buddies; off for things that slide. */
+  walk?: boolean;
+  grow?: number;
+  /** How high each step bounces, in points. */
+  bounce?: number;
+  children: ReactNode;
+  style?: StyleProp<ViewStyle>;
+  pointerEvents?: 'auto' | 'none' | 'box-none' | 'box-only';
+  accessibilityLabel?: string;
+}) {
+  const { animate } = useMotion();
+  const x = useSharedValue(left);
+  const y = useSharedValue(top);
+  const steps = useSharedValue(0);
+  const size = useSharedValue(grow);
+  const first = useRef(true);
+  useEffect(() => {
+    if (first.current) {
+      first.current = false;
+      return;
+    }
+    const far = Math.hypot(left - x.value, top - y.value);
+    cancelAnimation(steps);
+    steps.value = 0;
+    if (!animate || instant || far < 1) {
+      cancelAnimation(x);
+      cancelAnimation(y);
+      x.value = left;
+      y.value = top;
+      return;
+    }
+    const ms = glideMs(far);
+    const ease = Easing.inOut(Easing.quad);
+    x.value = withTiming(left, { duration: ms, easing: ease });
+    y.value = withTiming(top, { duration: ms, easing: ease });
+    if (walk && far > 30) steps.value = withTiming(stepsFor(ms), { duration: ms, easing: Easing.linear });
+    // Only a new place (or picking up / letting go) moves it.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [left, top, instant, animate]);
+  useEffect(() => {
+    size.value = animate ? withSpring(grow, SETTLE) : grow;
+  }, [grow, animate, size]);
+  const look = useAnimatedStyle(() => {
+    const s = steps.value;
+    return {
+      left: x.value,
+      top: y.value,
+      transform: [
+        { translateY: -Math.abs(Math.sin(s * Math.PI)) * bounce },
+        { rotate: `${Math.sin(s * Math.PI) * 5}deg` },
+        { scale: size.value },
+      ],
+    };
+  });
+  return (
+    <Animated.View pointerEvents={pointerEvents} accessibilityLabel={accessibilityLabel} style={[styles.glide, style, look]}>
+      {children}
+    </Animated.View>
+  );
+}
+
+/** How long a walk of `far` points takes: about 450 points a second, never under 60ms or over 0.9s. */
+export function glideMs(far: number): number {
+  return Math.round(Math.min(900, Math.max(60, far * 2.2)));
+}
+
+/** How many waddle steps a walk of `ms` takes: one every 180ms or so, at least one. */
+export function stepsFor(ms: number): number {
+  return Math.max(1, Math.round(ms / 180));
+}
+
+/**
+ * Bobs and rocks quickly while `active`, like someone working hard at something (a buddy
+ * running the bakery mixer). Still when motion is off.
+ */
+export function Busy({ children, active, style }: { children: ReactNode; active: boolean; style?: StyleProp<ViewStyle> }) {
+  const { animate } = useMotion();
+  const t = useSharedValue(0);
+  useEffect(() => {
+    if (!animate || !active) {
+      cancelAnimation(t);
+      t.value = withTiming(0, { duration: 120 });
+      return;
+    }
+    const ease = Easing.inOut(Easing.sin);
+    t.value = withRepeat(withSequence(withTiming(1, { duration: 170, easing: ease }), withTiming(-1, { duration: 340, easing: ease }), withTiming(0, { duration: 170, easing: ease })), -1);
+    return () => cancelAnimation(t);
+  }, [animate, active, t]);
+  const look = useAnimatedStyle(() => ({
+    transform: [{ translateY: -Math.abs(t.value) * 4 }, { rotate: `${t.value * 6}deg` }],
+  }));
+  return <Animated.View style={[{ transformOrigin: 'bottom' }, style, look]}>{children}</Animated.View>;
+}
+
 const CONFETTI_COLORS =['#FF6B6B', '#FFD93D', '#6BCB77', '#4D96FF', '#C77DFF', '#FF9F45'];
 
 interface ConfettiProps {
@@ -459,6 +585,7 @@ function Bit({ index, burst, fall }: { index: number; burst: number; fall: numbe
 const styles = StyleSheet.create({
   // Breathing and squashing keep the feet on the floor.
   feet: { transformOrigin: 'bottom' },
+  glide: { position: 'absolute', transformOrigin: 'bottom' },
   cover: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, overflow: 'hidden' },
   bit: { position: 'absolute', top: 0, width: 8, borderRadius: 2 },
 });

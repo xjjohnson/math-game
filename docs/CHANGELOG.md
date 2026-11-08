@@ -1,5 +1,14 @@
 # Change log
 
+## 2026-11-08 (people and buddies come alive in Community)
+
+- **Same bodies as at home.** In Community your buddies look just like they do in the buddy home: Bluey is blue, the pup wears its crown, and people buddies (Mom, Dad, sisters...) and people avatars are whole drawn people instead of a face on a cartoon body. A friend's buddies come in their own colors and starting clothes.
+- **Everyone moves like at home.** People and buddies breathe, people blink, they walk (with a little waddle) to wherever they're put instead of jumping, friends' moves glide too, waving makes them hop and wave an arm, and putting someone down makes them land with a squash. Things you move slide into place.
+- **A buddy runs the bakery mixer.** Stand one of your buddies by the mixer and it says "I'll mix!". Put food in the bowl and, a moment after the last thing goes in, it pulls the bowl onto the mixer and mixes it, rocking along ("Mixing! 🥄", then "All mixed! 👍"). Tapping the mixer yourself still works.
+- **Home:** your character and buddy breathe on the Home street; tap your character to make it hop.
+- **One plan for animation:** docs/animation.md lists the moves every screen uses and what's next.
+- No new APK needed; works with the in-app Update now. Animations stop when Animations is off in Settings.
+
 ## 2026-11-08 (buddies come along on visits)
 
 - **You and your buddies come along when you visit a friend's home.** Walk into a friend's buddy home on a Community visit and you're standing just inside their front door, with the buddies you picked in **🐾 Bring** next to you. Never picked any? Your buddy comes along anyway.
