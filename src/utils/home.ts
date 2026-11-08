@@ -24,7 +24,7 @@ export interface HomeSize {
   /** All the areas side by side. */
   width: number;
   height: number;
-  /** One screen's worth of home; at least the screen's width, so a tall phone scrolls a little more. */
+  /** One phone screen's worth of home, from the height, so it keeps its shape on wide screens. */
   screen: number;
   /** One area: ROOM_SPAN screens. */
   areaWidth: number;
@@ -38,7 +38,9 @@ export interface HomeSize {
 
 export function homeSize(viewWidth: number, viewHeight: number, order: string[] = HOME_AREAS.map((a) => a.id)): HomeSize {
   const unit = Math.round(Math.min(viewHeight, viewWidth * 1.15));
-  const screen = Math.max(Math.round(viewWidth), Math.round(unit * 1.05));
+  // Sized from the height, not the width, so a wide tablet shows more of the room rather than
+  // stretching it; the room is still far wider than any screen.
+  const screen = Math.round(unit * 1.05);
   const areaWidth = Math.round(screen * ROOM_SPAN);
   return {
     width: areaWidth * AREA_COUNT,

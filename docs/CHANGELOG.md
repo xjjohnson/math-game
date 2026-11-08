@@ -1,5 +1,13 @@
 # Change log
 
+## 2026-11-08 (wide tablets)
+
+- **Home fits a tablet on its side.** When the screen is wider than tall, the street scene sits on the left and Play, Daily, Friends, Learn how and the star level sit on the right, all on one screen with no scrolling.
+- **Town and buildings keep their shape.** The street and the shop, bakery, library and park are sized from the screen's height, like a phone, instead of being stretched sideways. On a wide tablet you now see all four buildings at once, and inside each building you see more of the room.
+- **Buddy home keeps its shape too.** Doors, windows and furniture are no longer stretched wide and zoomed in; a wide tablet shows more of each room.
+- Bottom tab bars and the School / Buddy home / Do the job buttons stay a comfortable size in the middle instead of running edge to edge. The Friends and Bring panels in Town are narrower too.
+- Phones look exactly the same as before. No store or protocol change and no new APK needed.
+
 ## 2026-11-08 (library books)
 
 - **Read the library books.** Tap any book on the library shelves to open it. One big page at a time with large words and a picture, ◀ ▶ buttons to turn pages, and **🔊 Read to me** to hear the page. Dragging a book still moves it.

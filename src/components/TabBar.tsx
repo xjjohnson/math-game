@@ -19,37 +19,41 @@ const TABS: { id: TabId; emoji: string; label: string; path: string }[] = [
 export function TabBar({ active }: { active: TabId }) {
   const insets = useSafeAreaInsets();
   return (
-    <View style={[styles.bar, { paddingBottom: Math.max(insets.bottom, 6) }]} accessibilityRole="tablist">
-      {TABS.map((tab) => {
-        const on = tab.id === active;
-        return (
-          <Pressable
-            key={tab.id}
-            accessibilityRole="tab"
-            accessibilityState={{ selected: on }}
-            accessibilityLabel={tab.label}
-            onPress={() => {
-              if (!on) router.replace(tab.path as never);
-            }}
-            style={[styles.tab, on && styles.on]}
-          >
-            <Text style={styles.emoji}>{tab.emoji}</Text>
-            <Text style={[styles.label, on && styles.labelOn]}>{tab.label}</Text>
-          </Pressable>
-        );
-      })}
+    <View style={[styles.bar, { paddingBottom: Math.max(insets.bottom, 6) }]}>
+      <View style={styles.row} accessibilityRole="tablist">
+        {TABS.map((tab) => {
+          const on = tab.id === active;
+          return (
+            <Pressable
+              key={tab.id}
+              accessibilityRole="tab"
+              accessibilityState={{ selected: on }}
+              accessibilityLabel={tab.label}
+              onPress={() => {
+                if (!on) router.replace(tab.path as never);
+              }}
+              style={[styles.tab, on && styles.on]}
+            >
+              <Text style={styles.emoji}>{tab.emoji}</Text>
+              <Text style={[styles.label, on && styles.labelOn]}>{tab.label}</Text>
+            </Pressable>
+          );
+        })}
+      </View>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   bar: {
-    flexDirection: 'row',
     backgroundColor: colors.surface,
     borderTopWidth: 2,
     borderTopColor: '#E0DCCB',
     paddingTop: 6,
+    alignItems: 'center',
   },
+  // On a wide tablet the tabs stay together in the middle instead of spreading edge to edge.
+  row: { flexDirection: 'row', width: '100%', maxWidth: 720 },
   tab: { flex: 1, alignItems: 'center', minHeight: 56, justifyContent: 'center', borderRadius: 14, marginHorizontal: 2 },
   on: { backgroundColor: '#E8ECFF' },
   emoji: { fontSize: 24 },

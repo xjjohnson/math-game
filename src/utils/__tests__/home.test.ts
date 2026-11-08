@@ -28,6 +28,14 @@ const piece = (pieces: Piece[], key: string) => {
 const to = (p: Piece, x: number, y: number) => [x - p.x, y - p.y] as const;
 
 describe('home layout', () => {
+  it('keeps its shape on a wide tablet instead of stretching sideways', () => {
+    const wide = homeSize(1280, 730);
+    expect(wide.screen).toBe(Math.round(wide.unit * 1.05));
+    expect(wide.screen).toBeLessThan(1280);
+    // Still far wider than the screen, so it scrolls.
+    expect(wide.areaWidth).toBeGreaterThan(1280);
+  });
+
   it('fills a tall phone screen, with rooms a few screens wide', () => {
     expect(size.height).toBe(760);
     expect(size.screen).toBeGreaterThanOrEqual(400);

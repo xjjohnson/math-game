@@ -59,14 +59,18 @@ export function CommunityView({ place, actions, needsPermission = false, tab }: 
           </View>
         </View>
         {open ? (
-          <View style={styles.panel}>
-            {open === 'bring' ? <BringPanel /> : <VisitPanel needsPermission={needsPermission} />}
-            <Pressable onPress={() => setOpen(null)} accessibilityRole="button" style={styles.close}>
-              <Text style={styles.visitText}>Close</Text>
-            </Pressable>
+          <View style={styles.panelSpot} pointerEvents="box-none">
+            <View style={styles.panel}>
+              {open === 'bring' ? <BringPanel /> : <VisitPanel needsPermission={needsPermission} />}
+              <Pressable onPress={() => setOpen(null)} accessibilityRole="button" style={styles.close}>
+                <Text style={styles.visitText}>Close</Text>
+              </Pressable>
+            </View>
           </View>
         ) : null}
-        <View style={styles.bottom} pointerEvents="box-none">{actions}</View>
+        <View style={styles.bottomSpot} pointerEvents="box-none">
+          <View style={styles.bottom} pointerEvents="box-none">{actions}</View>
+        </View>
       </View>
       {tab ? <TabBar active={tab} /> : null}
     </SafeAreaView>
@@ -81,7 +85,10 @@ const styles = StyleSheet.create({
   pills: { flexDirection: 'row', gap: spacing.sm },
   visit: { minHeight: TAP_TARGET * 0.8 },
   visitText: { fontSize: 18, fontWeight: '800', color: colors.primary, textAlign: 'center' },
-  panel: { position: 'absolute', top: 64, left: spacing.md, right: spacing.md, padding: spacing.md, gap: spacing.sm, backgroundColor: 'rgba(255,255,255,0.96)', borderRadius: radius.lg, borderWidth: 3, borderColor: colors.border },
+  panelSpot: { position: 'absolute', top: 64, left: spacing.md, right: spacing.md, alignItems: 'center' },
+  panel: { width: '100%', maxWidth: 560, padding: spacing.md, gap: spacing.sm, backgroundColor: 'rgba(255,255,255,0.96)', borderRadius: radius.lg, borderWidth: 3, borderColor: colors.border },
   close: { alignSelf: 'center', padding: spacing.sm },
-  bottom: { position: 'absolute', bottom: spacing.sm, left: spacing.sm, right: spacing.sm, flexDirection: 'row', justifyContent: 'center', gap: spacing.sm },
+  // On a wide tablet the buttons stay a comfortable size in the middle instead of running edge to edge.
+  bottomSpot: { position: 'absolute', bottom: spacing.sm, left: spacing.sm, right: spacing.sm, alignItems: 'center' },
+  bottom: { width: '100%', maxWidth: 640, flexDirection: 'row', justifyContent: 'center', gap: spacing.sm },
 });
