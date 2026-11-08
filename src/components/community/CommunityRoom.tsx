@@ -449,7 +449,8 @@ export function CommunityRoom({ place, onDoor, onExit }: Props) {
   const depth = (p: Piece) => (bakery && p.kind === 'pal' && onMixerHang(p.spot) ? BAKERY.counter.top + 0.01 : p.spot.y);
   pieces.sort((a, b) => depth(a) - depth(b));
 
-  // A buddy standing by the bakery mixer runs it for you: once things are in the bowl and nobody
+  // A hidden surprise (no hint says so; only a library book shows it): a buddy standing by or
+  // hanging off the bakery mixer runs it for you: once things are in the bowl and nobody
   // has added more for a moment, it pulls the bowl onto the mixer and switches it on. Only the
   // buddy's own phone does this, so friends' phones don't all do it at once.
   const mixerOn = bakery && isOn('mixer');
@@ -948,7 +949,7 @@ function Pal({ figure, seed, mine, spot: at, lifted, ride, hanging, job, w, h, s
   ) : null;
   if (hanging) {
     return (
-      <Hanging at={at} w={w} h={h} size={size} color={figure.kind === 'animal' ? figure.fur : (SKIN_TONES[figure.look.skin] ?? SKIN_TONES[0])} swinging={job === 'mixing'} touchable={mine} bubble={bubble} label={job === 'mixing' ? 'A buddy riding the mixer while it mixes' : 'A buddy hanging off the mixer. Put food in the bowl and it mixes it for you.'}>
+      <Hanging at={at} w={w} h={h} size={size} color={figure.kind === 'animal' ? figure.fur : (SKIN_TONES[figure.look.skin] ?? SKIN_TONES[0])} swinging={job === 'mixing'} touchable={mine} bubble={bubble} label={job === 'mixing' ? 'A buddy riding the mixer while it mixes' : 'A buddy hanging off the mixer'}>
         <Alive figure={figure} size={size} seed={seed} waving={false} lifted={false} />
       </Hanging>
     );
@@ -967,9 +968,9 @@ function Pal({ figure, seed, mine, spot: at, lifted, ride, hanging, job, w, h, s
         job === 'mixing'
           ? 'A buddy running the mixer'
           : job
-            ? 'A buddy by the mixer. Put food in the bowl and it mixes it for you.'
+            ? 'A buddy by the mixer'
             : mine
-              ? 'Your buddy. Drag to move, or put it on the bakery mixer to help.'
+              ? 'Your buddy. Drag to move.'
               : 'A buddy'
       }
       top={
