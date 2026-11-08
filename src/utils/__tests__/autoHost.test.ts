@@ -22,8 +22,9 @@ describe('join or host', () => {
     expect(shouldYield('bbbb', 'aaaa', 0)).toBe(false);
     // A host still there after a while has friends and won't give way, so join it.
     expect(shouldYield('bbbb', 'aaaa', YIELD_AFTER_MS)).toBe(true);
-    // Older phones never give way.
-    expect(shouldYield('aaaa', null, 0)).toBe(true);
+    // Older phones start over by themselves and join us, so don't chase them.
+    expect(shouldYield('aaaa', null, 0)).toBe(false);
+    expect(shouldYield('aaaa', null, 99999)).toBe(false);
     expect(shouldYield('aaaa', 'aaaa', 99999)).toBe(false);
   });
 });
