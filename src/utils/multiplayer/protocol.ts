@@ -1,9 +1,19 @@
 import { isGrade } from '@/constants/grades';
 import type { Difficulty, Grade, Operation } from '@/types';
+import {
+  BRUSH_SIZES,
+  isPage,
+  MAX_PAINT_POINTS,
+  PAINT_COLORS,
+  PAPER_H,
+  PAPER_W,
+  type NumberLevel,
+  type PaintAction,
+} from '@/utils/easel';
 import { parseHomeSnapshot, type HomeSnapshot } from '@/utils/homeVisit';
 
 /** Bump when messages change shape, so phones on different builds say so instead of misbehaving. */
-export const PROTOCOL_VERSION = 9;
+export const PROTOCOL_VERSION = 10;
 
 /**
  * The oldest version that can still play matches with this one. v5 only added
@@ -31,6 +41,35 @@ export const SCHOOL_VERSION = 8;
  * school, an older phone would see a street without it, so it is asked to update first.
  */
 export const FARM_VERSION = 9;
+
+/**
+ * The first version with the shared School easel (v10). Its messages are new
+ * types that older phones ignore, so they can still visit; they just paint alone.
+ */
+export const EASEL_VERSION = 10;
+/** Most easel actions sent in one message; a bigger batch is split up. */
+export const MAX_PAINT_BATCH = 40;
+/** Rough most characters of easel actions in one message (Nearby takes up to 32 KB at a time). */
+const PAINT_BATCH_CHARS = 20000;
+
+/** Splits easel actions into batches small enough to send in one message each. */
+export function paintBatches(actions: PaintAction[]): PaintAction[][] {
+  const out: PaintAction[][] = [];
+  let batch: PaintAction[] = [];
+  let chars = 0;
+  for (const a of actions) {
+    const size = JSON.stringify(a).length + 1;
+    if (batch.length && (batch.length >= MAX_PAINT_BATCH || chars + size > PAINT_BATCH_CHARS)) {
+      out.push(batch);
+      batch = [];
+      chars = 0;
+    }
+    batch.push(a);
+    chars += size;
+  }
+  if (batch.length) out.push(batch);
+  return out;
+}
 
 /** Chalk colors on the school board; 0 is the eraser (it draws in the board's own green). */
 export const CHALK_COLORS = ['#2F5D46', '#FFFFFF', '#FFF176', '#F48FB1', '#81D4FA', '#FFB74D'] as const;
@@ -147,7 +186,13 @@ export type GameMessage =
   /** School (v8): a line on the chalkboard, new or grown longer. The host keeps it and passes it on. */
   | { type: 'chalk'; stroke: ChalkStroke }
   /** School (v8): the board was wiped clean. */
-  | { type: 'chalk-wipe' };
+  | { type: 'chalk-wipe' }
+  /** School easel (v10): brush lines (new or grown) and fills. The host keeps them and passes them on. */
+  | { type: 'paint'; a: PaintAction[] }
+  /** School easel (v10): one action was undone. */
+  | { type: 'paint-undo'; id: string }
+  /** School easel (v10): a fresh sheet, blank or a coloring page (`lv` is the color-by-number level, or null). */
+  | { type: 'paint-page'; page: string; lv: NumberLevel | null };
 
 export function encodeMessage(message: GameMessage): string {
   return JSON.stringify(message);
@@ -302,7 +347,31 @@ export function parseMessage(text: string): GameMessage | null {
     }
     case 'chalk-wipe':
       return { type: 'chalk-wipe' };
+    case 'paint': {
+      if (!Array.isArray(m.a) || m.a.length === 0 || m.a.length > MAX_PAINT_BATCH) return null;
+      const actions = m.a.map(parsePaintAction);
+      return actions.every((a) => a !== null) ? { type: 'paint', a: actions as PaintAction[] } : null;
+    }
+    case 'paint-undo':
+      return isId(m.id) ? { type: 'paint-undo', id: m.id } : null;
+    case 'paint-page':
+      if (!isPage(m.page)) return null;
+      if (m.lv !== null && m.lv !== 0 && m.lv !== 1 && m.lv !== 2) return null;
+      return { type: 'paint-page', page: m.page, lv: m.lv as NumberLevel | null };
     default:
       return null;
   }
+}
+
+/** One easel action from a friend, or null when it doesn't make sense. */
+function parsePaintAction(raw: unknown): PaintAction | null {
+  if (typeof raw !== 'object' || raw === null) return null;
+  const a = raw as Record<string, unknown>;
+  if (!isId(a.id) || !isInt(a.c) || a.c < 0 || a.c >= PAINT_COLORS.length) return null;
+  if (a.k === 'f') return isInt(a.r) && a.r >= 0 && a.r < 64 ? { id: a.id, k: 'f', r: a.r, c: a.c } : null;
+  if (a.k !== 's' || !isInt(a.w) || a.w < 0 || a.w >= BRUSH_SIZES.length) return null;
+  const p = a.p;
+  if (!Array.isArray(p) || p.length < 2 || p.length % 2 !== 0 || p.length > MAX_PAINT_POINTS * 2) return null;
+  if (!p.every((v, i) => isInt(v) && v >= 0 && v <= (i % 2 === 0 ? PAPER_W : PAPER_H))) return null;
+  return { id: a.id, k: 's', c: a.c, w: a.w, p: p as number[] };
 }

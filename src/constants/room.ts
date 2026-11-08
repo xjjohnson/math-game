@@ -112,7 +112,13 @@ export interface RoomItem {
   fx?: string;
   /** What the buddy says when it is tapped. */
   says?: string;
+  /** Not sold in the shop (a picture painted at the School easel). */
+  hidden?: boolean;
 }
+
+/** A picture from the School easel, hung in the buddies' home. Each one's key is PICTURE_KEY plus the picture's id. */
+export const PICTURE_ITEM = 'myPicture';
+export const PICTURE_KEY = 'art-';
 
 export const ROOM_ITEMS: RoomItem[] = [
   // Furniture to sit on and put things on
@@ -301,6 +307,8 @@ export const ROOM_ITEMS: RoomItem[] = [
   { id: 'maple', name: 'Maple leaf', emoji: '🍁', price: 10, size: 0.1, group: 'thanksgiving', month: NOVEMBER },
   { id: 'acorn', name: 'Acorn', emoji: '🌰', price: 10, size: 0.08, group: 'thanksgiving', month: NOVEMBER },
   { id: 'sunflower', name: 'Sunflower', emoji: '🌻', price: 15, size: 0.17, group: 'thanksgiving', month: NOVEMBER },
+  // Hung up from the easel's My pictures, never bought.
+  { id: PICTURE_ITEM, name: 'My picture', emoji: '🖼️', price: 0, size: 0.3, group: 'furniture', wide: 0.8, hidden: true },
 ];
 
 /** Free paint colors the player can switch between. */

@@ -4,6 +4,7 @@ import { persist } from 'zustand/middleware';
 
 import { DEFAULT_GRADE } from '@/constants/grades';
 import { DEFAULT_EQUIPPED } from '@/constants/shop';
+import { usePaintings } from '@/store/paintings';
 import { useSettings } from '@/store/settings';
 import { migrateProfiles, PROFILES_VERSION } from '@/store/profileMigrations';
 import { createSafeStorage, type LoadStatus } from '@/store/safeStorage';
@@ -17,6 +18,8 @@ import {
   buyRoom,
   buyRoomItem,
   emptyRoom,
+  hangPicture,
+  removePicture,
   moveInRoom,
   setBuddyHome,
   setPlaced,
@@ -110,6 +113,10 @@ interface ProfilesState {
   moveInRoom: (id: string, key: string, place: Placement) => void;
   setPlaced: (id: string, key: string, placed: boolean, area: number, at?: number) => void;
   paintRoom: (id: string, part: 'wall' | 'floor', color: number, area: number) => void;
+  /** Hangs a picture from the School easel in the buddies' home. */
+  hangPicture: (id: string, pictureId: string) => 'ok' | 'already' | 'full';
+  /** Takes a deleted picture out of the buddies' home. */
+  removePicture: (id: string, pictureId: string) => void;
   /** Invites a buddy into the home, or sends it off for a nap. */
   setBuddyHome: (id: string, buddyId: string, home: boolean, area: number, at?: number) => void;
   /** Puts clothes on a buddy (buying them first if needed), or takes them off. */
@@ -140,6 +147,7 @@ export const useProfiles = create<ProfilesState>()(
       },
       removeProfile: (id) =>
         set((s) => {
+          usePaintings.getState().forget(id);
           const profiles = s.profiles.filter((p) => p.id !== id);
           const activeProfileId =
             s.activeProfileId === id ? (profiles[0]?.id ?? null) : s.activeProfileId;
@@ -220,6 +228,16 @@ export const useProfiles = create<ProfilesState>()(
         set((s) => ({
           profiles: s.profiles.map((p) => (p.id === id ? moveInRoom(p, key, spot) : p)),
         })),
+      hangPicture: (id, pictureId) => {
+        const current = get().profiles.find((p) => p.id === id);
+        if (!current) return 'full';
+        const result = hangPicture(current, pictureId);
+        if (!result.ok) return result.reason;
+        set((s) => ({ profiles: s.profiles.map((p) => (p.id === id ? result.profile : p)) }));
+        return 'ok';
+      },
+      removePicture: (id, pictureId) =>
+        set((s) => ({ profiles: s.profiles.map((p) => (p.id === id ? removePicture(p, pictureId) : p)) })),
       setPlaced: (id, key, placed, area, at) =>
         set((s) => ({
           profiles: s.profiles.map((p) => (p.id === id ? setPlaced(p, key, placed, area, at) : p)),

@@ -1,4 +1,15 @@
-import { findRoomItem, FLOOR_COLORS, type HomeArea, HOME_AREAS, inSeason, MAX_ROOM_THINGS, ROOM_SPAN, WALL_COLORS } from '@/constants/room';
+import {
+  findRoomItem,
+  FLOOR_COLORS,
+  type HomeArea,
+  HOME_AREAS,
+  inSeason,
+  MAX_ROOM_THINGS,
+  PICTURE_ITEM,
+  PICTURE_KEY,
+  ROOM_SPAN,
+  WALL_COLORS,
+} from '@/constants/room';
 import type { AreaPaint, BuddySpot, Profile, Room, RoomSpot, RoomThing } from '@/types';
 
 /** Where the floor starts, as a share of the room's height. */
@@ -354,4 +365,23 @@ export function setBuddyHome(profile: Profile, buddyId: string, home: boolean, a
   }
   const n = Object.keys(profile.room.buddies).length + 2;
   return withRoom(profile, { buddies: { ...profile.room.buddies, [buddyId]: { ...floorSpot(area, n, at), y: 0.92 } } });
+}
+
+/** Hangs a picture from the School easel on the wall of the first room. Does nothing if it is already up or the home is full. */
+export function hangPicture(profile: Profile, pictureId: string): { ok: true; profile: Profile } | { ok: false; reason: 'already' | 'full' } {
+  const key = PICTURE_KEY + pictureId;
+  const there = profile.room.things.find((t) => t.key === key);
+  if (there?.placed) return { ok: false, reason: 'already' };
+  if (there) return { ok: true, profile: setPlaced(profile, key, true, 0) };
+  if (profile.room.things.length >= MAX_ROOM_THINGS) return { ok: false, reason: 'full' };
+  const spot = { x: floorSpot(0, profile.room.things.length).x, y: 0.5 };
+  return { ok: true, profile: withRoom(profile, { things: [...profile.room.things, { key, itemId: PICTURE_ITEM, ...spot, placed: true }] }) };
+}
+
+/** Takes a picture down for good (it was deleted from My pictures). */
+export function removePicture(profile: Profile, pictureId: string): Profile {
+  const key = PICTURE_KEY + pictureId;
+  if (!profile.room.things.some((t) => t.key === key)) return profile;
+  const room = dropRiders(profile.room, key, { x: 0, y: 0.88 });
+  return withRoom(profile, { ...room, things: room.things.filter((t) => t.key !== key) });
 }
