@@ -25,6 +25,8 @@
 
 ## 2026-11-08 (later)
 
+- **Several fingers at once in the Community buildings and street**, like the buddy home: hold something with one finger and slide the room along with another, carry two things at once, or hold a thing at the side of the screen to scroll that way. Works for your person, your buddies and every movable thing.
+
 - **The mixer mixes.** Put the bowl on the pink stand mixer and tap the mixer (or the bowl): it whirrs, and after a moment the food turns into batter (the bowl fills with batter and says "Mixed!"). Only mixed batter bakes into a real treat; food that goes in the oven unmixed comes out as a **lumpy mess**. Adding more food after mixing means mixing again.
 - **Friends' phones no longer undo your bowl.** When a phone joins a friend's visit, the things it changed in the last 10 minutes are put back the way it had them, instead of the friend's older room winning. While connected, each phone keeps up with every change, so a short drop in the connection doesn't bring back old things either.
 
