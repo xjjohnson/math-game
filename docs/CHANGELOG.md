@@ -5,6 +5,14 @@
 - **Play on the park things.** In the Park, drag yourself (or one of your buddies) onto a **swing** and you sit on it and swing. Drop yourself at the **slide** and you climb the ladder and slide down ("Wheee!"). Lift yourself into the **tree** to sit on a branch, or drop into the **pond** to swim. Drag yourself off to stop. Only one person fits on each swing.
 - Works on a Nearby visit too: friends see you swinging, climbing and sliding. No new APK needed.
 
+## 2026-11-08 (library books)
+
+- **Read the library books.** Tap any book on the library shelves to open it. One big page at a time with large words and a picture, ◀ ▶ buttons to turn pages, and **🔊 Read to me** to hear the page. Dragging a book still moves it.
+- **18 easy stories** for young readers (The Big Red Bus, Pip the Pup, Frog Can Hop, Ducks at the Pond, Ten Red Apples, My Rocket, Turtle Wins the Race and more), some with counting in them.
+- **9 books hide secret bakery recipes.** They start like a story, then a "Shh!" page leads to a **Secret recipe** page that shows exactly what to put in the bakery bowl, then mix and bake. All 15 bakery recipes are hidden somewhere, three books in each bookcase.
+- The open book on the reading rug is a short guide to the library.
+- Reading is just on your own phone, so no store or protocol change and no new APK needed.
+
 ## 2026-11-08 (don't chase older phones)
 
 - A host no longer gives way to a phone that hasn't updated yet. Older phones start over every 20-30 seconds and then join a host they find, so the updated phone stays the host and lets them come, instead of the two chasing each other.
@@ -21,6 +29,8 @@
 - **12 free human avatars:** boys and girls, kids, teens and grown-ups, in all six skin tones and a mix of hair (Ava, Leo, Mia, Sam, Zoe, Max, Nia, Jay, Ivy, Ben, Rosa, Omar). They're drawn the same way as the people buddies, show up in the Shop's "Free avatars" row, and are also on the new-player picker. No coins needed, and they show in the Community and on visits like any other avatar. No store or protocol change.
 
 ## 2026-11-08 (later)
+
+- **Several fingers at once in the Community buildings and street**, like the buddy home: hold something with one finger and slide the room along with another, carry two things at once, or hold a thing at the side of the screen to scroll that way. Works for your person, your buddies and every movable thing.
 
 - **The mixer mixes.** Put the bowl on the pink stand mixer and tap the mixer (or the bowl): it whirrs, and after a moment the food turns into batter (the bowl fills with batter and says "Mixed!"). Only mixed batter bakes into a real treat; food that goes in the oven unmixed comes out as a **lumpy mess**. Adding more food after mixing means mixing again.
 - **Friends' phones no longer undo your bowl.** When a phone joins a friend's visit, the things it changed in the last 10 minutes are put back the way it had them, instead of the friend's older room winning. While connected, each phone keeps up with every change, so a short drop in the connection doesn't bring back old things either.

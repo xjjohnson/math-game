@@ -1,8 +1,18 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
-import { PanResponder, ScrollView, StyleSheet, View, type ScrollViewInstance } from 'react-native';
+import {
+  ScrollView,
+  StyleSheet,
+  View,
+  type GestureResponderEvent,
+  type HostInstance,
+  type NativeScrollEvent,
+  type NativeSyntheticEvent,
+  type ScrollViewInstance,
+} from 'react-native';
 
 import { Text } from '@/components/AppText';
 import { BuddyFigure } from '@/components/BuddyFigure';
+import { BookReader } from '@/components/community/BookReader';
 import { FLOOR, Interior } from '@/components/community/Interiors';
 import { Bob, Swing } from '@/components/Motion';
 import { ACCESSORIES, GLASSES } from '@/components/VisitPanel';
@@ -40,6 +50,7 @@ import {
 } from '@/utils/multiplayer/placeProps';
 import { buddyPieceId, type TownPerson, type TownPlace } from '@/utils/multiplayer/protocol';
 import type { Spot } from '@/utils/multiplayer/scene';
+import { bookAt } from '@/utils/libraryBooks';
 import { carryInPark, offGround, parkLanding, rideAt, slidePath, SWING_PIVOT, type Ride } from '@/utils/park';
 import type { BuildingId } from '@/utils/town';
 
@@ -116,7 +127,8 @@ export function CommunityRoom({ place, onDoor, onExit }: Props) {
   const [size, setSize] = useState({ w: 0, h: 0 });
   const [soloSpots, setSoloSpots] = useState<Record<string, Spot>>(() => ({ ...soloMemory }));
   const [soloWave, setSoloWave] = useState(0);
-  const [dragging, setDragging] = useState(false);
+  /** The library book open on this phone (only this phone: friends read their own). */
+  const [reading, setReading] = useState<{ book: number; cover: string } | null>(null);
   const scroller = useRef<ScrollViewInstance>(null);
 
   const visiting = status !== 'off';
@@ -326,6 +338,7 @@ export function CommunityRoom({ place, onDoor, onExit }: Props) {
   const tapProp = (prop: PropDef): (() => void) | undefined => {
     if (prop.bowl) return () => (onMixer(latest.current.bowlSpot) ? flip('mixer') : move(bowlSwitch, 0, 0));
     if (prop.made !== undefined) return () => move(switchPieceId('bakery', madeSwitch(prop.made as number)), 0, 0);
+    if (prop.book !== undefined) return () => setReading({ book: prop.book as number, cover: prop.emoji });
     return undefined;
   };
 
@@ -365,235 +378,420 @@ export function CommunityRoom({ place, onDoor, onExit }: Props) {
         }
       : {};
 
+  // Everything that can be picked up, with where it is on screen, topmost first so a finger gets the front one.
+  const grabs: Grab[] = pieces
+    .map((piece): Grab => {
+      const x = piece.spot.x * roomW;
+      const y = piece.spot.y * h;
+      if (piece.kind === 'person') {
+        return {
+          key: piece.key,
+          enabled: piece.person.id === self,
+          spot: piece.spot,
+          box: { left: x - token / 2, top: y - token - 44, width: token, height: token + 64 },
+          fit: onFloor,
+          onTap: wave,
+          ...playground(piece.key),
+        };
+      }
+      if (piece.kind === 'pal') {
+        return {
+          key: piece.key,
+          enabled: piece.person.id === self,
+          spot: piece.spot,
+          box: { left: x - palSize / 2, top: y - palSize - 6, width: palSize, height: palSize + 6 },
+          fit: onFloor,
+          ...playground(piece.key),
+        };
+      }
+      const size = piece.prop.big ? propSize * 1.4 : propSize;
+      const box = size * 1.25;
+      const prop = piece.prop;
+      return {
+        key: piece.key,
+        enabled: true,
+        spot: piece.spot,
+        box: { left: x - box / 2, top: y - box + size * 0.1, width: box, height: box },
+        fit: inRoom,
+        land: (s) => {
+          if (intoBowl(prop, s)) return { x: prop.x, y: prop.y };
+          const at = settle(place as InsidePlace, prop, s.x, s.y);
+          return prop.bowl && onMixer(at) ? { ...at, x: MIXER_MIDDLE } : at;
+        },
+        onDrop: prop.ingredient !== undefined ? (s) => dropIngredient(prop, s) : undefined,
+        onTap: tapProp(prop),
+      };
+    })
+    .reverse();
+  const touch = useMultiTouch({ grabs, roomW, h, viewW: w, scroller, move });
+
   return (
-    <View style={styles.fill} onLayout={(e) => setSize({ w: e.nativeEvent.layout.width, h: e.nativeEvent.layout.height })}>
+    <View
+      ref={touch.frameRef}
+      style={styles.fill}
+      onLayout={(e) => {
+        setSize({ w: e.nativeEvent.layout.width, h: e.nativeEvent.layout.height });
+        touch.measure();
+      }}
+    >
       {w > 0 ? (
         <ScrollView
           ref={scroller}
           horizontal
-          scrollEnabled={!dragging}
+          scrollEnabled={!touch.holding}
+          onScroll={touch.onScroll}
+          scrollEventThrottle={16}
           showsHorizontalScrollIndicator={false}
           contentContainerStyle={{ width: roomW, height: h }}
         >
           <Interior place={place} width={roomW} viewWidth={w} height={h} switches={switches} onSwitch={flip} riding={riding} onDoor={onDoor} onExit={onExit} />
-          {pieces.map((piece) =>
-            piece.kind === 'person' ? (
-              <Person
-                key={piece.key}
-                person={piece.person}
-                isMe={piece.person.id === self}
-                waving={visiting ? Date.now() - (waves[piece.person.id] ?? 0) < WAVE_MS : piece.person.id === self && soloWave > 0}
-                spot={piece.spot}
-                w={roomW}
-                h={h}
-                token={token}
-                ride={rideOf(piece)}
-                {...playground(piece.key)}
-                onMove={(x, y) => move(piece.key, x, y)}
-                onTap={wave}
-                onDragging={setDragging}
-              />
-            ) : piece.kind === 'pal' ? (
-              <Pal
-                key={piece.key}
-                value={piece.value}
-                mine={piece.person.id === self}
-                spot={piece.spot}
-                w={roomW}
-                h={h}
-                size={palSize}
-                ride={rideOf(piece)}
-                {...playground(piece.key)}
-                onMove={(x, y) => move(piece.key, x, y)}
-                onDragging={setDragging}
-              />
-            ) : (
-              <Prop
-                key={piece.key}
-                prop={piece.prop}
-                shown={piece.shown}
-                badge={piece.badge}
-                batter={piece.batter}
-                caption={piece.caption}
-                spot={piece.spot}
-                w={roomW}
-                h={h}
-                size={piece.prop.big ? propSize * 1.4 : propSize}
-                onMove={(x, y) => move(piece.key, x, y)}
-                land={(s) => {
-                  if (intoBowl(piece.prop, s)) return { x: piece.prop.x, y: piece.prop.y };
-                  const at = settle(place as InsidePlace, piece.prop, s.x, s.y);
-                  return piece.prop.bowl && onMixer(at) ? { ...at, x: MIXER_MIDDLE } : at;
-                }}
-                onDrop={piece.prop.ingredient !== undefined ? (s) => dropIngredient(piece.prop, s) : undefined}
-                onTap={tapProp(piece.prop)}
-                onDragging={setDragging}
-              />
-            ),
-          )}
+          <View style={[styles.layer, { width: roomW, height: h }]} pointerEvents="box-none" {...touch.handlers}>
+            {pieces.map((piece) => {
+              const held = touch.dragAt[piece.key];
+              const spot = held ?? piece.spot;
+              return piece.kind === 'person' ? (
+                <Person
+                  key={piece.key}
+                  person={piece.person}
+                  isMe={piece.person.id === self}
+                  waving={visiting ? Date.now() - (waves[piece.person.id] ?? 0) < WAVE_MS : piece.person.id === self && soloWave > 0}
+                  spot={spot}
+                  lifted={!!held}
+                  ride={held ? null : rideOf(piece)}
+                  w={roomW}
+                  h={h}
+                  token={token}
+                />
+              ) : piece.kind === 'pal' ? (
+                <Pal key={piece.key} value={piece.value} mine={piece.person.id === self} spot={spot} lifted={!!held} ride={held ? null : rideOf(piece)} w={roomW} h={h} size={palSize} />
+              ) : (
+                <Prop
+                  key={piece.key}
+                  prop={piece.prop}
+                  shown={piece.shown}
+                  badge={piece.badge}
+                  batter={piece.batter}
+                  caption={piece.caption}
+                  spot={spot}
+                  lifted={!!held}
+                  w={roomW}
+                  h={h}
+                  size={piece.prop.big ? propSize * 1.4 : propSize}
+                />
+              );
+            })}
+          </View>
         </ScrollView>
       ) : null}
+      <BookReader book={reading ? bookAt(reading.book) : null} cover={reading?.cover} onClose={() => setReading(null)} />
     </View>
   );
 }
 
-interface DragArgs {
-  spot: Spot;
-  w: number;
-  h: number;
+/** A finger moved less than this (in points) is a tap. */
+const TAP_SLOP = 6;
+/** Holding something this close to the side of the screen scrolls the room that way. */
+const EDGE = 40;
+const EDGE_STEP = 10;
+
+interface Box {
+  left: number;
+  top: number;
+  width: number;
+  height: number;
+}
+
+/** Something in the room a finger can pick up. */
+interface Grab {
+  key: string;
+  /** Only your own person and buddies (and the room's things) can be picked up. */
   enabled: boolean;
-  onMove: (x: number, y: number) => void;
-  onTap?: () => void;
-  onDragging: (on: boolean) => void;
-  /** Keeps the piece in bounds while it's carried (people stay on the floor). */
-  fit?: (s: Spot) => Spot;
+  spot: Spot;
+  /** Where it is drawn, in the room's points. */
+  box: Box;
+  /** Keeps it in bounds while it's carried (people stay on the floor). */
+  fit: (s: Spot) => Spot;
   /** Where it ends up when let go (things drop onto a shelf). */
   land?: (s: Spot) => Spot;
-  /** Called with the spot it was let go at (before landing) just before it is sent, after a drag but not a tap. */
+  /** Called with the spot it was let go at (before landing), just before it's sent; after a drag, not a tap. */
   onDrop?: (s: Spot) => void;
+  onTap?: () => void;
 }
 
-/** Drag a piece with one finger. Others' pieces get no handlers, so touches pass through them. */
-function useDrag(args: DragArgs) {
-  // While a finger is down the piece follows it here; other phones get throttled updates.
-  const [drag, setDrag] = useState<Spot | null>(null);
-  const start = useRef(args.spot);
-  const last = useRef(0);
+interface Track {
+  /** What this finger carries; none means this finger slides the room along. */
+  grab: Grab | null;
+  startSpot: Spot;
+  startX: number;
+  startY: number;
+  startScroll: number;
+  pageX: number;
+  pageY: number;
+  moved: boolean;
+  sentAt: number;
+}
+
+interface TouchArgs {
+  grabs: Grab[];
+  roomW: number;
+  h: number;
+  viewW: number;
+  scroller: React.RefObject<ScrollViewInstance | null>;
+  move: (id: string, x: number, y: number) => void;
+}
+
+/**
+ * Several fingers at once, like the buddy home: each finger can carry its own
+ * thing, and a finger that lands on nothing while something is held slides the
+ * room along under it. Holding something at the side of the screen scrolls too.
+ */
+function useMultiTouch(args: TouchArgs) {
   const latest = useRef(args);
   latest.current = args;
+  const frameRef = useRef<HostInstance>(null);
+  const frame = useRef({ x: 0, y: 0 });
+  const scrollX = useRef(0);
+  const tracks = useRef(new Map<number, Track>());
+  const edgeTimer = useRef<ReturnType<typeof setInterval> | null>(null);
+  const [dragAt, setDragAt] = useState<Record<string, Spot>>({});
+  const [holding, setHolding] = useState(false);
 
-  const pan = useRef(
-    PanResponder.create({
-      onStartShouldSetPanResponder: () => latest.current.enabled,
-      onMoveShouldSetPanResponder: () => latest.current.enabled,
-      onPanResponderTerminationRequest: () => false,
-      onPanResponderGrant: () => {
-        start.current = latest.current.spot;
-        setDrag(latest.current.spot);
-        latest.current.onDragging(true);
-      },
-      onPanResponderMove: (_e, g) => {
-        const { w: cw, h: ch, onMove: send, fit = onFloor } = latest.current;
-        const next = fit({ x: start.current.x + g.dx / cw, y: start.current.y + g.dy / ch });
-        setDrag(next);
-        const now = Date.now();
-        if (now - last.current > 70) {
-          last.current = now;
-          send(next.x, next.y);
-        }
-      },
-      onPanResponderRelease: (_e, g) => {
-        const { w: cw, h: ch, onMove: send, onTap: tap, fit = onFloor, land, onDrop } = latest.current;
-        if (Math.abs(g.dx) < 6 && Math.abs(g.dy) < 6 && tap) tap();
-        else {
-          const held = fit({ x: start.current.x + g.dx / cw, y: start.current.y + g.dy / ch });
-          const next = land ? land(held) : held;
-          onDrop?.(held);
-          send(next.x, next.y);
-        }
-        setDrag(null);
-        latest.current.onDragging(false);
-      },
-      onPanResponderTerminate: () => {
-        setDrag(null);
-        latest.current.onDragging(false);
-      },
-    }),
-  ).current;
+  useEffect(() => () => {
+    if (edgeTimer.current) clearInterval(edgeTimer.current);
+  }, []);
 
-  return { handlers: args.enabled ? pan.panHandlers : {}, at: drag ?? args.spot, lifted: drag !== null };
+  const measure = () =>
+    frameRef.current?.measure((_x, _y, _w, _h, pageX, pageY) => {
+      frame.current = { x: pageX ?? 0, y: pageY ?? 0 };
+    });
+
+  const toRoom = (pageX: number, pageY: number) => ({ x: pageX - frame.current.x + scrollX.current, y: pageY - frame.current.y });
+
+  const grabAt = (pageX: number, pageY: number): Grab | null => {
+    const at = toRoom(pageX, pageY);
+    const held = new Set([...tracks.current.values()].map((t) => t.grab?.key));
+    return (
+      latest.current.grabs.find(
+        (g) => g.enabled && !held.has(g.key) && at.x >= g.box.left && at.x <= g.box.left + g.box.width && at.y >= g.box.top && at.y <= g.box.top + g.box.height,
+      ) ?? null
+    );
+  };
+
+  /** Where a carried thing is now, in shares of the room. */
+  const spotOf = (t: Track): Spot => {
+    const { roomW, h } = latest.current;
+    const dx = t.pageX - t.startX + (scrollX.current - t.startScroll);
+    const dy = t.pageY - t.startY;
+    return (t.grab as Grab).fit({ x: t.startSpot.x + dx / roomW, y: t.startSpot.y + dy / h });
+  };
+
+  const show = () => {
+    const next: Record<string, Spot> = {};
+    for (const t of tracks.current.values()) if (t.grab && t.moved) next[t.grab.key] = spotOf(t);
+    setDragAt(next);
+    setHolding(tracks.current.size > 0);
+  };
+
+  const scrollBy = (dx: number) => {
+    const { roomW, viewW, scroller } = latest.current;
+    const to = Math.min(Math.max(0, roomW - viewW), Math.max(0, scrollX.current + dx));
+    if (to === scrollX.current) return;
+    scrollX.current = to;
+    scroller.current?.scrollTo({ x: to, animated: false });
+  };
+
+  const stopEdge = () => {
+    if (edgeTimer.current) clearInterval(edgeTimer.current);
+    edgeTimer.current = null;
+  };
+  const edgeDir = () => {
+    for (const t of tracks.current.values()) {
+      if (!t.grab || !t.moved) continue;
+      const x = t.pageX - frame.current.x;
+      if (x < EDGE) return -1;
+      if (x > latest.current.viewW - EDGE) return 1;
+    }
+    return 0;
+  };
+
+  const send = (t: Track, force = false) => {
+    if (!t.grab) return;
+    const now = Date.now();
+    if (!force && now - t.sentAt < 70) return;
+    t.sentAt = now;
+    const s = spotOf(t);
+    latest.current.move(t.grab.key, s.x, s.y);
+  };
+
+  const start = (id: number, pageX: number, pageY: number) => {
+    if (tracks.current.has(id)) return;
+    const grab = grabAt(pageX, pageY);
+    // Nothing under this finger and nothing held yet: let the room scroll as usual.
+    if (!grab && tracks.current.size === 0) return;
+    tracks.current.set(id, {
+      grab,
+      startSpot: grab ? grab.spot : { x: 0, y: 0 },
+      startX: pageX,
+      startY: pageY,
+      startScroll: scrollX.current,
+      pageX,
+      pageY,
+      moved: false,
+      sentAt: 0,
+    });
+    show();
+  };
+
+  const moveTouches = (touches: readonly { identifier: number | string; pageX: number; pageY: number }[]) => {
+    let changed = false;
+    for (const touch of touches) {
+      const t = tracks.current.get(Number(touch.identifier));
+      if (!t) continue;
+      if (!t.grab) {
+        // Sliding the room: whatever is held rides along under its finger.
+        scrollBy(t.pageX - touch.pageX);
+        t.pageX = touch.pageX;
+        t.pageY = touch.pageY;
+        changed = true;
+        continue;
+      }
+      t.pageX = touch.pageX;
+      t.pageY = touch.pageY;
+      if (!t.moved && Math.abs(t.pageX - t.startX) < TAP_SLOP && Math.abs(t.pageY - t.startY) < TAP_SLOP) continue;
+      t.moved = true;
+      changed = true;
+    }
+    if (!changed) return;
+    for (const t of tracks.current.values()) if (t.grab && t.moved) send(t);
+    show();
+    if (!edgeTimer.current && edgeDir() !== 0) {
+      edgeTimer.current = setInterval(() => {
+        const dir = edgeDir();
+        if (dir === 0 || tracks.current.size === 0) return stopEdge();
+        scrollBy(dir * EDGE_STEP);
+        for (const t of tracks.current.values()) if (t.grab && t.moved) send(t);
+        show();
+      }, 16);
+    }
+  };
+
+  const end = (id: number) => {
+    const t = tracks.current.get(id);
+    if (!t) return;
+    tracks.current.delete(id);
+    if (tracks.current.size === 0) stopEdge();
+    if (t.grab) {
+      if (!t.moved) t.grab.onTap?.();
+      else {
+        const held = spotOf(t);
+        const final = t.grab.land ? t.grab.land(held) : held;
+        t.grab.onDrop?.(held);
+        latest.current.move(t.grab.key, final.x, final.y);
+      }
+    }
+    show();
+  };
+
+  const touchesOf = (e: GestureResponderEvent) => (e.nativeEvent.changedTouches?.length ? e.nativeEvent.changedTouches : [e.nativeEvent]);
+
+  const handlers = {
+    onStartShouldSetResponder: (e: GestureResponderEvent) => grabAt(e.nativeEvent.pageX, e.nativeEvent.pageY) !== null,
+    onResponderTerminationRequest: () => false,
+    onResponderGrant: (e: GestureResponderEvent) => {
+      measure();
+      start(Number(e.nativeEvent.identifier), e.nativeEvent.pageX, e.nativeEvent.pageY);
+    },
+    onResponderStart: (e: GestureResponderEvent) => touchesOf(e).forEach((t) => start(Number(t.identifier), t.pageX, t.pageY)),
+    onResponderMove: (e: GestureResponderEvent) => moveTouches(e.nativeEvent.touches?.length ? e.nativeEvent.touches : [e.nativeEvent]),
+    onResponderEnd: (e: GestureResponderEvent) => touchesOf(e).forEach((t) => end(Number(t.identifier))),
+    onResponderRelease: () => [...tracks.current.keys()].forEach(end),
+    onResponderTerminate: () => {
+      tracks.current.clear();
+      stopEdge();
+      show();
+    },
+  };
+
+  const onScroll = (e: NativeSyntheticEvent<NativeScrollEvent>) => {
+    scrollX.current = e.nativeEvent.contentOffset.x;
+  };
+
+  return { frameRef, measure, handlers, dragAt, holding, onScroll };
 }
 
-/** How a person or buddy is carried and let go in the park (the floor rules everywhere else). */
-interface PlayProps {
-  /** What they are doing in the park right now (on a swing, up the slide...). */
-  ride?: Ride | null;
-  fit?: (s: Spot) => Spot;
-  land?: (s: Spot) => Spot;
-  onDrop?: (s: Spot) => void;
-}
-
-interface PersonProps extends PlayProps {
+interface PersonProps {
   person: TownPerson;
   isMe: boolean;
   waving: boolean;
   spot: Spot;
+  lifted: boolean;
+  /** What they are doing in the park right now (on a swing, down the slide...). */
+  ride: Ride | null;
   w: number;
   h: number;
   token: number;
-  onMove: (x: number, y: number) => void;
-  onTap: () => void;
-  onDragging: (on: boolean) => void;
 }
 
-function Person({ person, isMe, waving, spot, w, h, token, ride, fit, land, onDrop, onMove, onTap, onDragging }: PersonProps) {
-  const { handlers, at, lifted } = useDrag({ spot, w, h, enabled: isMe, onMove, onTap, onDragging, fit, land, onDrop });
+function Person({ person, isMe, waving, spot: at, lifted, ride, w, h, token }: PersonProps) {
   const i = colorIndex(person.id);
   const acc = person.acc && (ACCESSORIES as readonly string[]).includes(person.acc) ? person.acc : undefined;
-  const now = lifted ? null : ride ?? null;
-  const figure = (
-    <View>
-      <BuddyFigure value={person.avatar} size={token} fur={FURS[i]} belly={BELLIES[i]} dressed={{}} />
-      {acc ? (
-        <Text
-          style={[
-            styles.acc,
-            GLASSES.includes(acc) ? { top: token * 0.2, fontSize: token * 0.34 } : { top: -token * 0.12, fontSize: token * 0.36 },
-          ]}
-        >
-          {acc}
-        </Text>
-      ) : null}
-    </View>
-  );
-  const shout = now?.kind === 'slide' ? 'Wheee!' : now?.kind === 'swing' ? (waving ? '👋' : ' ') : waving ? '👋' : ' ';
+  const sliding = ride?.kind === 'slide';
   return (
     <Riding
-      ride={now}
+      ride={ride}
       at={at}
       w={w}
       h={h}
       size={token}
       above={30}
-      handlers={handlers}
       touchable={isMe}
       lifted={lifted}
       label={isMe ? 'You. Drag to move, or onto the swings, slide, tree or pond to play.' : person.name}
-      top={<Text style={[styles.wave, now?.kind === 'slide' && styles.wheee]}>{shout}</Text>}
+      top={<Text style={[styles.wave, sliding && styles.wheee]}>{sliding ? 'Wheee!' : waving ? '👋' : ' '}</Text>}
       bottom={
         <Text style={[styles.name, isMe && styles.me]} numberOfLines={1}>
           {isMe ? 'You' : person.name}
         </Text>
       }
     >
-      {figure}
+      <View>
+        <BuddyFigure value={person.avatar} size={token} fur={FURS[i]} belly={BELLIES[i]} dressed={{}} />
+        {acc ? (
+          <Text
+            style={[
+              styles.acc,
+              GLASSES.includes(acc) ? { top: token * 0.2, fontSize: token * 0.34 } : { top: -token * 0.12, fontSize: token * 0.36 },
+            ]}
+          >
+            {acc}
+          </Text>
+        ) : null}
+      </View>
     </Riding>
   );
 }
 
-interface PalProps extends PlayProps {
+interface PalProps {
   value: string;
   mine: boolean;
   spot: Spot;
+  lifted: boolean;
+  ride: Ride | null;
   w: number;
   h: number;
   size: number;
-  onMove: (x: number, y: number) => void;
-  onDragging: (on: boolean) => void;
 }
 
 /** One of a player's buddies; only its owner can move it. */
-function Pal({ value, mine, spot, w, h, size, ride, fit, land, onDrop, onMove, onDragging }: PalProps) {
-  const { handlers, at, lifted } = useDrag({ spot, w, h, enabled: mine, onMove, onDragging, fit, land, onDrop });
+function Pal({ value, mine, spot: at, lifted, ride, w, h, size }: PalProps) {
   return (
     <Riding
-      ride={lifted ? null : ride ?? null}
+      ride={ride}
       at={at}
       w={w}
       h={h}
       size={size}
       above={0}
-      handlers={handlers}
       touchable={mine}
       lifted={lifted}
       label={mine ? 'Your buddy. Drag to move.' : 'A buddy'}
@@ -612,7 +810,6 @@ interface RidingProps {
   size: number;
   /** How tall the bit drawn over the figure (the wave) is. */
   above: number;
-  handlers: object;
   touchable: boolean;
   lifted: boolean;
   label: string;
@@ -626,12 +823,10 @@ interface RidingProps {
  * (drawn with its ropes and seat, swinging together), splashing in the pond up to their middle,
  * or anywhere else as they are (up the ladder, down the slide, on a branch).
  */
-function Riding({ ride, at, w, h, size, above, handlers, touchable, lifted, label, top, bottom, children }: RidingProps) {
+function Riding({ ride, at, w, h, size, above, touchable, lifted, label, top, bottom, children }: RidingProps) {
   const x = at.x * w;
   const y = at.y * h;
-  const common = { ...handlers, pointerEvents: touchable ? ('auto' as const) : ('none' as const), accessibilityLabel: label };
-  // The outer box (which holds the finger) stays the same kind of view whatever they are doing, so
-  // picking someone up off a swing doesn't drop the finger.
+  const common = { pointerEvents: touchable ? ('auto' as const) : ('none' as const), accessibilityLabel: label };
   if (ride?.kind === 'swing') {
     const pivot = SWING_PIVOT * h;
     const seatW = Math.max(56, size * 0.62);
@@ -691,24 +886,24 @@ interface PropProps {
   /** The bowl is full of mixed batter. */
   batter?: boolean;
   spot: Spot;
+  lifted: boolean;
   w: number;
   h: number;
   size: number;
-  onMove: (x: number, y: number) => void;
-  onTap?: () => void;
-  land: (s: Spot) => Spot;
-  onDrop?: (s: Spot) => void;
-  onDragging: (on: boolean) => void;
 }
 
 /** A thing in the room anyone can pick up: it drops onto the shelf or counter under it when let go. */
-function Prop({ prop, shown, badge, caption, batter, spot, w, h, size, onMove, onTap, land, onDrop, onDragging }: PropProps) {
-  const { handlers, at, lifted } = useDrag({ spot, w, h, enabled: true, onMove, onTap, onDragging, fit: inRoom, land, onDrop });
+function Prop({ prop, shown, badge, caption, batter, spot: at, lifted, w, h, size }: PropProps) {
   const box = size * 1.25;
-  const label = prop.bowl ? 'Mixing bowl. Drop food on it, then put it in the oven. Tap to tip it out.' : caption ? `${caption}. Tap to eat.` : `${shown}. Drag to move.`;
+  const label = prop.bowl
+    ? 'Mixing bowl. Drop food on it, then put it in the oven. Tap to tip it out.'
+    : caption
+      ? `${caption}. Tap to eat.`
+      : prop.book !== undefined
+        ? `${bookAt(prop.book).title}. Tap to read, or drag to move.`
+        : `${shown}. Drag to move.`;
   return (
     <View
-      {...handlers}
       accessibilityLabel={label}
       style={[styles.prop, { width: box, height: box, left: at.x * w - box / 2, top: at.y * h - box + size * 0.1 }, lifted && styles.lifted]}
     >
@@ -730,6 +925,7 @@ function Prop({ prop, shown, badge, caption, batter, spot, w, h, size, onMove, o
 
 const styles = StyleSheet.create({
   fill: { flex: 1, overflow: 'hidden' },
+  layer: { position: 'absolute', left: 0, top: 0 },
   person: { position: 'absolute', alignItems: 'center' },
   prop: { position: 'absolute', alignItems: 'center', justifyContent: 'flex-end' },
   tag: { position: 'absolute', textAlign: 'center', fontWeight: '800', color: '#3B2B25' },
