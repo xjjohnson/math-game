@@ -8,10 +8,26 @@ import { ACCESSORIES, GLASSES } from '@/components/VisitPanel';
 import { townSession, useTownState, WAVE_MS } from '@/services/townSession';
 import { useActiveProfile } from '@/store/profiles';
 import {
+  addToMask,
+  bake,
+  madeRecipe,
+  madeToUnit,
+  maskEmojis,
+  maskToUnit,
+  recipeFor,
+  unitToMade,
+  unitToMask,
+  MADE_SLOTS,
+} from '@/utils/bakery';
+import {
   bakedSwitch,
+  BOWL,
+  BOWL_SWITCH,
   inOven,
   INSIDE_SCREENS,
   isInside,
+  madeSwitch,
+  onBowl,
   PLACE_PROPS,
   propPieceId,
   settle,
@@ -68,7 +84,7 @@ interface Props {
 type Piece =
   | { key: string; kind: 'person'; person: TownPerson; spot: Spot }
   | { key: string; kind: 'pal'; person: TownPerson; spot: Spot; value: string }
-  | { key: string; kind: 'prop'; prop: PropDef; spot: Spot; baked: boolean };
+  | { key: string; kind: 'prop'; prop: PropDef; spot: Spot; baked: boolean; shown: string; badge?: string; caption?: string };
 
 /**
  * A full-screen, side-view place. Everyone who is here stands in it as their
@@ -143,11 +159,29 @@ export function CommunityRoom({ place, onDoor, onExit }: Props) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [place, w, roomW]);
 
+  // The bakery's mixing bowl: what is in it, kept as a switch so every phone agrees.
+  const bakery = place === 'bakery';
+  const bowlSwitch = switchPieceId('bakery', BOWL_SWITCH);
+  const bowlMask = bakery ? unitToMask(spotsNow[bowlSwitch]?.x ?? 0) : 0;
+  const bowlSpot: Spot = spotsNow[propPieceId('bakery', BOWL.id)] ?? { x: BOWL.x, y: BOWL.y };
+  const latest = useRef({ spotsNow, bowlSpot, bowlMask });
+  latest.current = { spotsNow, bowlSpot, bowlMask };
+
   const props: Piece[] = inside
-    ? PLACE_PROPS[place].map((prop) => {
+    ? PLACE_PROPS[place].flatMap((prop): Piece[] => {
         const key = propPieceId(place, prop.id);
-        const saved = spotsNow[key];
-        return { key, kind: 'prop', prop, spot: saved ?? { x: prop.x, y: prop.y }, baked: !!prop.bakeTo && isOn(bakedSwitch(prop.id)) };
+        const spot = spotsNow[key] ?? { x: prop.x, y: prop.y };
+        if (prop.made !== undefined) {
+          // A finished treat only shows while its slot says there is one.
+          const n = unitToMade(spotsNow[switchPieceId(place, madeSwitch(prop.made))]?.y ?? 0);
+          if (n === null) return [];
+          const r = madeRecipe(n);
+          return [{ key, kind: 'prop', prop, spot, baked: false, shown: r.emoji, caption: r.name }];
+        }
+        const baked = !!prop.bakeTo && isOn(bakedSwitch(prop.id));
+        const piece: Piece = { key, kind: 'prop', prop, spot, baked, shown: baked && prop.bakeTo ? prop.bakeTo : prop.emoji };
+        if (prop.bowl) piece.badge = bowlMask ? maskEmojis(bowlMask) : '⬇️ Add food';
+        return [piece];
       })
     : [];
 
@@ -165,6 +199,37 @@ export function CommunityRoom({ place, onDoor, onExit }: Props) {
     return () => clearTimeout(timer);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ovenOn, baking]);
+
+  // A bowl of ingredients left in the hot oven turns into a treat on the rack.
+  const bowlBaking = ovenOn && bowlMask !== 0 && inOven(bowlSpot);
+  useEffect(() => {
+    if (!bowlBaking) return;
+    const timer = setTimeout(() => {
+      const { spotsNow: now, bowlSpot: at, bowlMask: mask } = latest.current;
+      const recipe = bake(mask);
+      if (!recipe) return;
+      // The first free spot for it, or the first spot again when the counter is full.
+      const free = Array.from({ length: MADE_SLOTS }, (_, i) => i).find((i) => unitToMade(now[switchPieceId('bakery', madeSwitch(i))]?.y ?? 0) === null) ?? 0;
+      move(propPieceId('bakery', `made${free}`), at.x, Math.min(0.95, at.y + 0.001));
+      move(switchPieceId('bakery', madeSwitch(free)), 1, madeToUnit(recipeFor(mask)));
+      move(bowlSwitch, 0, 0);
+    }, BAKE_MS);
+    return () => clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [bowlBaking, bowlMask]);
+
+  /** An ingredient let go over the bowl goes in; the thing itself springs back to its shelf. */
+  const dropIngredient = (prop: PropDef, s: Spot) => {
+    if (prop.ingredient === undefined || !onBowl(s, latest.current.bowlSpot)) return;
+    move(bowlSwitch, maskToUnit(addToMask(latest.current.bowlMask, prop.ingredient)), 0);
+  };
+  const returnsHome = (prop: PropDef, s: Spot): Spot => (prop.ingredient !== undefined && onBowl(s, latest.current.bowlSpot) ? { x: prop.x, y: prop.y } : s);
+  /** Tap the bowl to tip it out; tap a finished treat to eat it. */
+  const tapProp = (prop: PropDef): (() => void) | undefined => {
+    if (prop.bowl) return () => move(bowlSwitch, 0, 0);
+    if (prop.made !== undefined) return () => move(switchPieceId('bakery', madeSwitch(prop.made as number)), 0, 0);
+    return undefined;
+  };
 
   const palSize = token * 0.5;
   const propSize = Math.round(token * 0.3);
@@ -227,13 +292,17 @@ export function CommunityRoom({ place, onDoor, onExit }: Props) {
               <Prop
                 key={piece.key}
                 prop={piece.prop}
-                baked={piece.baked}
+                shown={piece.shown}
+                badge={piece.badge}
+                caption={piece.caption}
                 spot={piece.spot}
                 w={roomW}
                 h={h}
                 size={piece.prop.big ? propSize * 1.4 : propSize}
                 onMove={(x, y) => move(piece.key, x, y)}
-                land={(s) => settle(place as InsidePlace, piece.prop, s.x, s.y)}
+                land={(s) => (piece.prop.ingredient !== undefined && onBowl(s, bowlSpot) ? returnsHome(piece.prop, s) : settle(place as InsidePlace, piece.prop, s.x, s.y))}
+                onDrop={(s) => dropIngredient(piece.prop, s)}
+                onTap={tapProp(piece.prop)}
                 onDragging={setDragging}
               />
             ),
@@ -256,6 +325,8 @@ interface DragArgs {
   fit?: (s: Spot) => Spot;
   /** Where it ends up when let go (things drop onto a shelf). */
   land?: (s: Spot) => Spot;
+  /** Called with the spot it was let go at (before landing), after a drag but not a tap. */
+  onDrop?: (s: Spot) => void;
 }
 
 /** Drag a piece with one finger. Others' pieces get no handlers, so touches pass through them. */
@@ -288,12 +359,13 @@ function useDrag(args: DragArgs) {
         }
       },
       onPanResponderRelease: (_e, g) => {
-        const { w: cw, h: ch, onMove: send, onTap: tap, fit = onFloor, land } = latest.current;
+        const { w: cw, h: ch, onMove: send, onTap: tap, fit = onFloor, land, onDrop } = latest.current;
         if (Math.abs(g.dx) < 6 && Math.abs(g.dy) < 6 && tap) tap();
         else {
           const held = fit({ x: start.current.x + g.dx / cw, y: start.current.y + g.dy / ch });
           const next = land ? land(held) : held;
           send(next.x, next.y);
+          onDrop?.(held);
         }
         setDrag(null);
         latest.current.onDragging(false);
@@ -383,27 +455,45 @@ function Pal({ value, mine, spot, w, h, size, onMove, onDragging }: PalProps) {
 
 interface PropProps {
   prop: PropDef;
-  baked: boolean;
+  /** What to draw: its emoji, or what it turned into. */
+  shown: string;
+  /** A little row of emoji above it (what is in the bowl). */
+  badge?: string;
+  /** A name under it (what a finished treat is). */
+  caption?: string;
   spot: Spot;
   w: number;
   h: number;
   size: number;
   onMove: (x: number, y: number) => void;
+  onTap?: () => void;
   land: (s: Spot) => Spot;
+  onDrop?: (s: Spot) => void;
   onDragging: (on: boolean) => void;
 }
 
 /** A thing in the room anyone can pick up: it drops onto the shelf or counter under it when let go. */
-function Prop({ prop, baked, spot, w, h, size, onMove, land, onDragging }: PropProps) {
-  const { handlers, at, lifted } = useDrag({ spot, w, h, enabled: true, onMove, onDragging, fit: inRoom, land });
+function Prop({ prop, shown, badge, caption, spot, w, h, size, onMove, onTap, land, onDrop, onDragging }: PropProps) {
+  const { handlers, at, lifted } = useDrag({ spot, w, h, enabled: true, onMove, onTap, onDragging, fit: inRoom, land, onDrop });
   const box = size * 1.25;
+  const label = prop.bowl ? 'Mixing bowl. Drop food in. Tap to empty.' : caption ? `${caption}. Tap to eat.` : `${shown}. Drag to move.`;
   return (
     <View
       {...handlers}
-      accessibilityLabel={`${baked && prop.bakeTo ? prop.bakeTo : prop.emoji}. Drag to move.`}
+      accessibilityLabel={label}
       style={[styles.prop, { width: box, height: box, left: at.x * w - box / 2, top: at.y * h - box + size * 0.1 }, lifted && styles.lifted]}
     >
-      <Text style={{ fontSize: size, lineHeight: box }}>{baked && prop.bakeTo ? prop.bakeTo : prop.emoji}</Text>
+      <Text style={{ fontSize: size, lineHeight: box }}>{shown}</Text>
+      {badge ? (
+        <Text pointerEvents="none" style={[styles.tag, { bottom: box * 0.95, left: -box, right: -box, fontSize: size * 0.5 }]}>
+          {badge}
+        </Text>
+      ) : null}
+      {caption ? (
+        <Text pointerEvents="none" style={[styles.tag, styles.caption, { top: box * 0.95, left: -box, right: -box, fontSize: size * 0.4 }]}>
+          {caption}
+        </Text>
+      ) : null}
     </View>
   );
 }
@@ -412,6 +502,8 @@ const styles = StyleSheet.create({
   fill: { flex: 1, overflow: 'hidden' },
   person: { position: 'absolute', alignItems: 'center' },
   prop: { position: 'absolute', alignItems: 'center', justifyContent: 'flex-end' },
+  tag: { position: 'absolute', textAlign: 'center' },
+  caption: { fontWeight: '900', color: '#3B2B25' },
   lifted: { transform: [{ scale: 1.12 }], zIndex: 50 },
   wave: { fontSize: 24, height: 30 },
   acc: { position: 'absolute', alignSelf: 'center', textAlign: 'center', left: 0, right: 0 },

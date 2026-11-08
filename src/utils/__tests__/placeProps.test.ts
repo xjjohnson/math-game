@@ -5,7 +5,11 @@ import { homeSnapshot, parseHomeSnapshot } from '@/utils/homeVisit';
 import {
   BAKERY,
   FLOOR,
+  BOWL,
+  BOWL_SWITCH,
   inOven,
+  madeSwitch,
+  onBowl,
   PLACE_PROPS,
   propPieceId,
   settle,
@@ -13,6 +17,8 @@ import {
   switchPieceId,
 } from '@/utils/multiplayer/placeProps';
 import { encodeMessage, type GameMessage, HOST_ID, MAX_SPOTS, parseMessage } from '@/utils/multiplayer/protocol';
+
+import { addToMask, madeRecipe, madeToUnit, maskToUnit, recipeFor, unitToMade, unitToMask } from '@/utils/bakery';
 
 const tick = () => new Promise((r) => setTimeout(r, 0));
 
@@ -37,8 +43,8 @@ describe('things in the community rooms', () => {
         expect(p.y).toBeGreaterThan(0);
         expect(p.y).toBeLessThan(1);
       }
-      // Each thing, a baked switch for things that bake, and a few switches.
-      total += list.length + list.filter((p) => p.bakeTo).length + 4;
+      // Each thing, a baked switch for things that bake, a switch for the bowl and each finished treat, and a few switches.
+      total += list.length + list.filter((p) => p.bakeTo).length + list.filter((p) => p.made !== undefined).length + 5;
     }
     // Plus every player and their buddies.
     expect(total + 8 * 4).toBeLessThanOrEqual(MAX_SPOTS);
@@ -62,6 +68,33 @@ describe('things in the community rooms', () => {
     expect(inOven({ x: (BAKERY.oven.x0 + BAKERY.oven.x1) / 2, y: BAKERY.oven.rack })).toBe(true);
     expect(inOven({ x: (BAKERY.oven.x0 + BAKERY.oven.x1) / 2, y: BAKERY.oven.top })).toBe(false);
     expect(inOven({ x: 0.2, y: BAKERY.counter.top })).toBe(false);
+  });
+
+  it('knows when something is let go over the mixing bowl', () => {
+    const bowl = { x: BOWL.x, y: BOWL.y };
+    expect(onBowl({ x: bowl.x, y: bowl.y - 0.08 }, bowl)).toBe(true);
+    expect(onBowl({ x: bowl.x + 0.03, y: bowl.y }, bowl)).toBe(true);
+    expect(onBowl({ x: bowl.x + 0.1, y: bowl.y }, bowl)).toBe(false);
+    expect(onBowl({ x: bowl.x, y: bowl.y + 0.2 }, bowl)).toBe(false);
+  });
+
+  it('shares the bowl and a finished treat with every phone', async () => {
+    const net = createMockNetwork(2);
+    const sessions = net.map((t) => new TownSession(() => t));
+    const [host, guest] = sessions;
+    await joinAll(sessions);
+    for (const s of sessions) s.setPlace('bakery');
+    await tick();
+    const mask = unitToMask(maskToUnit(addToMask(addToMask(0, 8), 2)));
+    guest.moveTo(switchPieceId('bakery', BOWL_SWITCH), maskToUnit(mask), 0);
+    guest.moveTo(switchPieceId('bakery', madeSwitch(0)), 1, madeToUnit(recipeFor(mask)));
+    await tick();
+    for (const s of sessions) {
+      const spots = s.getState().spots;
+      expect(unitToMask(spots[switchPieceId('bakery', BOWL_SWITCH)].x)).toBe(mask);
+      expect(madeRecipe(unitToMade(spots[switchPieceId('bakery', madeSwitch(0))].y) as number).name).toBe('Croissants');
+    }
+    expect(host.getState().status).toBe('hosting');
   });
 
   it('lets anyone move the things in a room, and every phone sees it', async () => {

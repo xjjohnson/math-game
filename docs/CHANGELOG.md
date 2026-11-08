@@ -1,5 +1,11 @@
 # Change log
 
+## 2026-11-08
+
+**Bakery baking**
+- In the Community **Bakery** you can now make your own treats. Drag ingredients (egg, milk, butter, strawberry, honey, salt, jam, chocolate, plus new flour, sugar, banana and apple on the wall shelf) onto the **mixing bowl** on the counter; each one springs back to its shelf and shows up above the bowl. Slide the bowl into the oven, turn the oven on, and after a few seconds out comes a treat: cakes, cookies, pies, bread, pancakes, waffles, cupcakes, croissants, pretzels, custard or fudge, depending on what you put in (flour plus butter and sugar makes cookies, add chocolate for chocolate chip). Anything else gives a yummy pudding. The treat sits on the rack with its name; tap it to eat it. Tap the bowl to tip it out and start again.
+- Works on a visit: everyone sees the same bowl and treats, and anyone can add to the bowl. No protocol change (it uses the same shared pieces and switches as the oven), so phones on an older version still connect.
+
 ## 2026-11-07
 
 **Community (the town)**
