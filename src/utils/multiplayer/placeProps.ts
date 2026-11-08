@@ -148,7 +148,7 @@ const books = (caseIndex: number): PropDef[] => {
 /** The bakery's mixing bowl: drop ingredients in, then slide it into the hot oven. */
 export const BOWL: PropDef = { id: 'bowl', emoji: '🥣', x: 0.225, y: BAKERY.counter.top, big: true, bowl: true };
 /** A switch that says a finished treat is waiting in this slot (y says which treat). */
-/** The switch that keeps what is in the bowl (x is the contents as a number between 0 and 1). */
+/** The switch that keeps what is in the bowl: x is the contents as a number between 0 and 1, y is 1 once it's mixed. */
 export const BOWL_SWITCH = 'bowl';
 export const madeSwitch = (slot: number): string => `made-${slot}`;
 
@@ -253,6 +253,13 @@ export function settle(place: InsidePlace, prop: Pick<PropDef, 'float'>, x: numb
 export function onBowl(s: Spot, bowl: Spot): boolean {
   return Math.abs(s.x - bowl.x) <= 0.04 && s.y >= bowl.y - 0.2 && s.y <= bowl.y + 0.05;
 }
+
+/** Whether the bowl sitting at `s` is on the stand mixer, where tapping the mixer mixes it. */
+export function onMixer(s: Spot): boolean {
+  const m = BAKERY.mixer;
+  return s.x >= m.x0 - 0.01 && s.x <= m.x1 + 0.01 && Math.abs(s.y - BAKERY.counter.top) <= 0.02;
+}
+export const MIXER_MIDDLE = (BAKERY.mixer.x0 + BAKERY.mixer.x1) / 2;
 
 /** Whether a spot is inside the bakery oven, where things bake while it's on. */
 export function inOven(s: Spot): boolean {

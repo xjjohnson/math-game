@@ -58,6 +58,12 @@ describe('baking in the bakery', () => {
     expect(recipeFor(bowl('flour', 'egg'))).toBe(recipeFor(bowl('egg', 'flour')));
   });
 
+  it('bakes unmixed food into a lumpy mess', () => {
+    expect(bake(bowl('flour', 'butter', 'sugar'), false)?.name).toBe('Lumpy mess (mix it first!)');
+    expect(bake(bowl('flour', 'butter', 'sugar'), true)?.name).toBe('Cookies');
+    expect(bake(0, false)).toBeNull();
+  });
+
   it('shows what is in the bowl', () => {
     expect(maskEmojis(bowl('flour', 'egg'))).toBe('🥚🌾');
     expect(maskEmojis(0)).toBe('');
