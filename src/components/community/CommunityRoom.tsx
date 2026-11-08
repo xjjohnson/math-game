@@ -112,16 +112,18 @@ export function CommunityRoom({ place, onDoor, onExit }: Props) {
         },
       ];
   const self = visiting ? myId : 'me';
-  const spotsNow = visiting ? spots : soloSpots;
+  // Hosting or looking, the things in the rooms stay as this phone left them; a guest sees the host's.
+  const spotsNow = visiting ? (status === 'joined' ? spots : { ...soloMemory, ...spots }) : soloSpots;
   const { w, h } = size;
   const roomW = Math.round(w * ROOM_SCREENS[place]);
   const token = Math.max(96, Math.min(160, Math.round(h * 0.3)));
 
   const move = (id: string, x: number, y: number) => {
+    // People and buddies start fresh each time; things in the rooms stay where they were put,
+    // even when the visit restarts (a phone left alone keeps looking again and again).
+    if (id.startsWith('~')) soloMemory[id] = { x, y };
     if (visiting) townSession().moveTo(id, x, y);
     else {
-      // People and buddies start fresh each time; things in the rooms stay where they were put.
-      if (id.startsWith('~')) soloMemory[id] = { x, y };
       setSoloSpots((s) => ({ ...s, [id]: { x, y } }));
     }
   };
@@ -132,6 +134,14 @@ export function CommunityRoom({ place, onDoor, onExit }: Props) {
       setTimeout(() => setSoloWave(0), WAVE_MS);
     }
   };
+
+  // A visit that starts (or starts again) hosting begins from the room as it is, not from the shelves.
+  useEffect(() => {
+    if (status !== 'hosting') return;
+    const session = townSession();
+    const known = session.getState().spots;
+    for (const [id, spot] of Object.entries(soloMemory)) if (!known[id]) session.moveTo(id, spot.x, spot.y);
+  }, [status]);
 
   // Switches (an oven, a swing) are kept like pieces: x is 1 while it's on.
   const isOn = (name: string) => inside && (spotsNow[switchPieceId(place, name)]?.x ?? 0) >= 0.5;
@@ -176,7 +186,10 @@ export function CommunityRoom({ place, onDoor, onExit }: Props) {
         }
         const baked = !!prop.bakeTo && isOn(bakedSwitch(prop.id));
         const piece: Piece = { key, kind: 'prop', prop, spot, baked, shown: baked && prop.bakeTo ? prop.bakeTo : prop.emoji };
-        if (prop.bowl) piece.badge = bowlMask ? maskEmojis(bowlMask) : '⬇️ Add food';
+        if (prop.bowl) {
+          piece.badge = bowlMask ? maskEmojis(bowlMask) : 'Drop food in';
+          if (bowlMask && !inOven(bowlSpot)) piece.caption = 'Bake it in the oven ➡️';
+        }
         return [piece];
       })
     : [];
@@ -489,7 +502,7 @@ function Prop({ prop, shown, badge, caption, spot, w, h, size, onMove, onTap, la
     >
       <Text style={{ fontSize: size, lineHeight: box }}>{shown}</Text>
       {badge ? (
-        <Text pointerEvents="none" style={[styles.tag, { bottom: box * 0.95, left: -box, right: -box, fontSize: size * 0.5 }]}>
+        <Text pointerEvents="none" style={[styles.tag, { bottom: box * 0.95, left: -box, right: -box, fontSize: /[A-Za-z]/.test(badge) ? size * 0.34 : size * 0.5 }]}>
           {badge}
         </Text>
       ) : null}
@@ -506,7 +519,7 @@ const styles = StyleSheet.create({
   fill: { flex: 1, overflow: 'hidden' },
   person: { position: 'absolute', alignItems: 'center' },
   prop: { position: 'absolute', alignItems: 'center', justifyContent: 'flex-end' },
-  tag: { position: 'absolute', textAlign: 'center' },
+  tag: { position: 'absolute', textAlign: 'center', fontWeight: '800', color: '#3B2B25' },
   caption: { fontWeight: '900', color: '#3B2B25' },
   lifted: { transform: [{ scale: 1.12 }], zIndex: 50 },
   wave: { fontSize: 24, height: 30 },
