@@ -114,5 +114,7 @@ describe('community shifts', () => {
     expect(ways).not.toContainEqual([10, 5, 1]);
     expect(ways).not.toContainEqual([10, 1, 1]); // exactly $12: no change to give
     for (let seed = 0; seed < 50; seed++) realistic(12, customerPays(12, [1, 5, 10, 20], createRng(seed)), [1, 5, 10, 20]);
+    // A $10 item is paid with a $20, not a $10 and some $1s.
+    for (let seed = 0; seed < 50; seed++) expect(customerPays(10, [1, 5, 10, 20], createRng(seed))).toEqual([20]);
   });
 });
