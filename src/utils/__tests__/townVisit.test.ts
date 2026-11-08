@@ -61,10 +61,10 @@ describe('community visits', () => {
     await joinAll(sessions, ['H', 'G']);
     const [host, guest] = sessions;
     guest.setPlace('street');
-    guest.setPlace('shop');
+    guest.setPlace('school');
     guest.clearPlace('street');
     await tick();
-    expect(host.getState().people.find((p) => p.name === 'G')?.place).toBe('shop');
+    expect(host.getState().people.find((p) => p.name === 'G')?.place).toBe('school');
   });
 
   it('sends waves to everyone', async () => {
@@ -160,7 +160,7 @@ describe('shared scene', () => {
     guest.setPlace('park');
     host.moveTo(HOST_ID, 0.3, 0.4);
     await tick();
-    guest.setPlace('shop');
+    guest.setPlace('school');
     guest.setPlace('park');
     await tick();
     expect(guest.getState().spots[HOST_ID]).toEqual({ x: 0.3, y: 0.4 });

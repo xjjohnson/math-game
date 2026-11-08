@@ -76,7 +76,7 @@ const SLIDE_STEP_MS = 60;
 const inRoom = (s: Spot): Spot => ({ x: clamp(s.x, 0.01, 0.99), y: clamp(s.y, 0.08, 0.95) });
 
 /** How many screens wide each place is; the street and the buildings are long, so they scroll. */
-export const ROOM_SCREENS: Record<TownPlace, number> = { street: 2.8, ...INSIDE_SCREENS };
+export const ROOM_SCREENS: Record<TownPlace, number> = { street: 3.4, ...INSIDE_SCREENS };
 
 /** How long something sits in the hot oven before it's baked. */
 const BAKE_MS = 3000;
@@ -87,7 +87,7 @@ const KEEP_MY_CHANGES_MS = 10 * 60 * 1000;
 
 /**
  * Where things were put while playing alone, kept while the app is open so a
- * tidy shop is still tidy after doing the job. On a visit the host keeps them instead.
+ * tidy classroom is still tidy after doing the job. On a visit the host keeps them instead.
  */
 const soloMemory: Record<string, Spot> = {};
 /** When each remembered thing last changed, by this phone or a friend. */
@@ -118,7 +118,7 @@ type Piece =
 /**
  * A full-screen, side-view place. Everyone who is here stands in it as their
  * character; you can move yourself, your buddies, and the things in the room
- * (cans on the shop shelves, books in the library). With a visit running,
+ * (pencils on the school desks, books in the library). With a visit running,
  * every phone follows live. Without one it's just you, in the same room.
  */
 export function CommunityRoom({ place, onDoor, onExit }: Props) {
@@ -127,6 +127,8 @@ export function CommunityRoom({ place, onDoor, onExit }: Props) {
   const [size, setSize] = useState({ w: 0, h: 0 });
   const [soloSpots, setSoloSpots] = useState<Record<string, Spot>>(() => ({ ...soloMemory }));
   const [soloWave, setSoloWave] = useState(0);
+  // School: while fingers are drawing on the chalkboard, the room holds still.
+  const [drawing, setDrawing] = useState(false);
   /** The library book open on this phone (only this phone: friends read their own). */
   const [reading, setReading] = useState<{ book: number; cover: string } | null>(null);
   const scroller = useRef<ScrollViewInstance>(null);
@@ -438,13 +440,13 @@ export function CommunityRoom({ place, onDoor, onExit }: Props) {
         <ScrollView
           ref={scroller}
           horizontal
-          scrollEnabled={!touch.holding}
+          scrollEnabled={!touch.holding && !drawing}
           onScroll={touch.onScroll}
           scrollEventThrottle={16}
           showsHorizontalScrollIndicator={false}
           contentContainerStyle={{ width: roomW, height: h }}
         >
-          <Interior place={place} width={roomW} viewWidth={w} height={h} switches={switches} onSwitch={flip} riding={riding} onDoor={onDoor} onExit={onExit} />
+          <Interior place={place} width={roomW} viewWidth={w} height={h} switches={switches} onSwitch={flip} riding={riding} onDoor={onDoor} onExit={onExit} onDrawing={setDrawing} />
           <View style={[styles.layer, { width: roomW, height: h }]} pointerEvents="box-none" {...touch.handlers}>
             {pieces.map((piece) => {
               const held = touch.dragAt[piece.key];
