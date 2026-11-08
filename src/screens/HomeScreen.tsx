@@ -1,10 +1,11 @@
 import { router } from 'expo-router';
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { Pressable, StyleSheet, useWindowDimensions, View } from 'react-native';
 
 import { Text } from '@/components/AppText';
 import { BigButton } from '@/components/BigButton';
 import { BuddyFace } from '@/components/BuddyFace';
+import { Lively } from '@/components/Motion';
 import { Screen } from '@/components/Screen';
 import { StarLevelCard } from '@/components/StarLevelCard';
 import { Sticker } from '@/components/Sticker';
@@ -51,6 +52,10 @@ export function HomeScreen() {
   // A tablet on its side: the street on the left, the buttons beside it, all on one screen.
   const { width, height } = useWindowDimensions();
   const wide = width >= 760 && width > height;
+  // Tapping your character makes it hop; both of them breathe while they wait.
+  const [hops, setHops] = useState(0);
+  const avatarSize = wide ? 120 : 84;
+  const buddySize = wide ? 80 : 56;
 
   const scene = (
     <View style={[styles.scene, wide && styles.sceneWide]}>
@@ -65,14 +70,20 @@ export function HomeScreen() {
             <Text style={styles.bubbleText}>{greeting(profile.name, dailyDone, tricky)}</Text>
           </View>
           <View style={[styles.cast, wide && styles.castWide]}>
-            <Sticker value={profile.avatar} size={wide ? 120 : 84} />
+            <Pressable onPress={() => setHops((n) => n + 1)} accessibilityRole="button" accessibilityLabel="Hop">
+              <Lively height={avatarSize * 1.25} seed={profile.id} breathe bounce={hops} bounceKind="hop">
+                <Sticker value={profile.avatar} size={avatarSize} />
+              </Lively>
+            </Pressable>
             {companion ? (
               <Pressable
                 onPress={() => router.push('/buddy')}
                 accessibilityRole="button"
                 accessibilityLabel="Visit my buddy"
               >
-                <BuddyFace value={companion.emoji} size={wide ? 80 : 56} gift={buddyGift(profile)} />
+                <Lively height={buddySize * 1.25} seed={companion.emoji} breathe bounce={hops} bounceKind="wiggle">
+                  <BuddyFace value={companion.emoji} size={buddySize} gift={buddyGift(profile)} />
+                </Lively>
               </Pressable>
             ) : null}
           </View>

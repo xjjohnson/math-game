@@ -11,11 +11,11 @@ import {
 } from 'react-native';
 
 import { Text } from '@/components/AppText';
-import { BuddyFigure } from '@/components/BuddyFigure';
+import { Figure } from '@/components/Figure';
 import { BookReader } from '@/components/community/BookReader';
 import { Easel } from '@/components/community/Easel';
 import { FLOOR, Interior } from '@/components/community/Interiors';
-import { Bob, Lively, Swing, Wallow } from '@/components/Motion';
+import { Bob, Busy, Glide, Lively, Swing, Wallow, useTimesOn } from '@/components/Motion';
 import { ACCESSORIES, GLASSES } from '@/components/VisitPanel';
 import { townSession, useTownState, WAVE_MS } from '@/services/townSession';
 import { useActiveProfile } from '@/store/profiles';
@@ -41,6 +41,8 @@ import {
   isInside,
   madeSwitch,
   BOWL_SWITCH,
+  BAKERY,
+  byMixer,
   EGG_BASKET,
   EGG_BASKET_MAX,
   EGG_BASKET_SWITCH,
@@ -64,6 +66,7 @@ import { buddyPieceId, type TownPerson, type TownPlace } from '@/utils/multiplay
 import type { Spot } from '@/utils/multiplayer/scene';
 import { bookAt } from '@/utils/libraryBooks';
 import { carryInPark, offGround, parkLanding, rideAt, slidePath, SWING_PIVOT, type Ride } from '@/utils/park';
+import { figureFor, type FigureLook } from '@/utils/figures';
 import type { BuildingId } from '@/utils/town';
 
 const FURS = ['#F2B880', '#E57373', '#81C784', '#64B5F6', '#BA68C8', '#FFD54F', '#4DB6AC', '#F06292'];
@@ -106,6 +109,8 @@ export function roomWidth(viewW: number, viewH: number, place: TownPlace): numbe
 const BAKE_MS = 3000;
 /** How long the mixer whirrs before the bowl is mixed. */
 const MIX_MS = 1500;
+/** How long a buddy by the mixer waits after the last thing goes in the bowl before it starts mixing. */
+const HELPER_WAIT_MS = 1800;
 /** How long an animal's "Moo!" stays over its head. */
 const SAY_MS = 1800;
 
@@ -138,8 +143,8 @@ interface Props {
 }
 
 type Piece =
-  | { key: string; kind: 'person'; person: TownPerson; spot: Spot }
-  | { key: string; kind: 'pal'; person: TownPerson; spot: Spot; value: string }
+  | { key: string; kind: 'person'; person: TownPerson; spot: Spot; figure: FigureLook }
+  | { key: string; kind: 'pal'; person: TownPerson; spot: Spot; figure: FigureLook; size: number }
   | { key: string; kind: 'prop'; prop: PropDef; spot: Spot; baked: boolean; shown: string; badge?: string; caption?: string; batter?: boolean };
 
 /** How big a room thing is drawn, compared with the usual size. */
@@ -414,23 +419,50 @@ export function CommunityRoom({ place, onDoor, onExit }: Props) {
   };
 
   const palSize = token * 0.5;
+  /** A person buddy stands as tall as a person (their own height); an animal buddy is half as big. */
+  const sizeOf = (figure: FigureLook) => (figure.kind === 'person' ? token : palSize);
   const propSize = Math.round(token * 0.3);
   /** Everything in the room: things, people, and the buddies they brought, sorted so nearer things draw on top. */
   const pieces: Piece[] = [
     ...props,
     ...here.flatMap((p, i) => {
       const spot = standSpot(spotsNow[p.id], i, inside, here.length, park);
-      const list: Piece[] = [{ key: p.id, kind: 'person', person: p, spot }];
+      // Your own buddies look just like they do at home (clothes, hair); a friend's in their own colors.
+      const owner = p.id === self ? profile : null;
+      const c = colorIndex(p.id);
+      const list: Piece[] = [{ key: p.id, kind: 'person', person: p, spot, figure: figureFor(p.avatar, owner, { fur: FURS[c], belly: BELLIES[c] }) }];
       (p.buddies ?? []).forEach((b, n) => {
         const id = buddyPieceId(p.id, n);
         // Until a buddy is moved it stands next to its owner.
         const beside = onFloor({ x: spot.x + ((n + 1) * token * 0.55) / roomW, y: spot.y });
-        list.push({ key: id, kind: 'pal', person: p, value: b, spot: spotsNow[id] ? keepSpot(park, spotsNow[id]) : beside });
+        const figure = figureFor(b, owner);
+        list.push({ key: id, kind: 'pal', person: p, figure, size: sizeOf(figure), spot: spotsNow[id] ? keepSpot(park, spotsNow[id]) : beside });
       });
       return list;
     }),
   ];
   pieces.sort((a, b) => a.spot.y - b.spot.y);
+
+  // A buddy standing by the bakery mixer runs it for you: once things are in the bowl and nobody
+  // has added more for a moment, it pulls the bowl onto the mixer and switches it on. Only the
+  // buddy's own phone does this, so friends' phones don't all do it at once.
+  const mixerOn = bakery && isOn('mixer');
+  const atMixer = (piece: Piece) => bakery && piece.kind === 'pal' && byMixer(piece.spot);
+  const myHelper = pieces.some((p) => atMixer(p) && p.kind === 'pal' && p.person.id === self);
+  const helperStarts = myHelper && bowlMask !== 0 && !bowlMixed && !mixerOn;
+  const heldNow = useRef<Record<string, Spot>>({});
+  useEffect(() => {
+    if (!helperStarts) return;
+    const timer = setTimeout(() => {
+      const bowlKey = propPieceId('bakery', BOWL.id);
+      const at = latest.current.bowlSpot;
+      if (heldNow.current[bowlKey] || inOven(at)) return;
+      if (!onMixer(at)) move(bowlKey, MIXER_MIDDLE, BAKERY.counter.top);
+      move(switchPieceId('bakery', 'mixer'), 1, 0);
+    }, HELPER_WAIT_MS);
+    return () => clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [helperStarts, bowlMask, bowlSpot.x, bowlSpot.y]);
 
   // The park's playground: who is on which swing, and where someone dropped there ends up.
   const rideOf = (piece: Piece): Ride | null => (park && piece.kind !== 'prop' ? rideAt(piece.spot) : null);
@@ -470,7 +502,7 @@ export function CommunityRoom({ place, onDoor, onExit }: Props) {
           key: piece.key,
           enabled: piece.person.id === self,
           spot: piece.spot,
-          box: { left: x - palSize / 2, top: y - palSize - 6, width: palSize, height: palSize + 6 },
+          box: { left: x - piece.size / 2, top: y - piece.size - 6, width: piece.size, height: piece.size + 6 },
           fit: onFloor,
           ...playground(piece.key),
         };
@@ -495,6 +527,7 @@ export function CommunityRoom({ place, onDoor, onExit }: Props) {
     })
     .reverse();
   const touch = useMultiTouch({ grabs, roomW, h, viewW: w, scroller, move });
+  heldNow.current = touch.dragAt;
 
   return (
     <View
@@ -524,6 +557,7 @@ export function CommunityRoom({ place, onDoor, onExit }: Props) {
                 <Person
                   key={piece.key}
                   person={piece.person}
+                  figure={piece.figure}
                   isMe={piece.person.id === self}
                   waving={visiting ? Date.now() - (waves[piece.person.id] ?? 0) < WAVE_MS : piece.person.id === self && soloWave > 0}
                   spot={spot}
@@ -534,7 +568,19 @@ export function CommunityRoom({ place, onDoor, onExit }: Props) {
                   token={token}
                 />
               ) : piece.kind === 'pal' ? (
-                <Pal key={piece.key} value={piece.value} mine={piece.person.id === self} spot={spot} lifted={!!held} ride={held ? null : rideOf(piece)} w={roomW} h={h} size={palSize} />
+                <Pal
+                  key={piece.key}
+                  figure={piece.figure}
+                  seed={piece.key}
+                  mine={piece.person.id === self}
+                  spot={spot}
+                  lifted={!!held}
+                  ride={held ? null : rideOf(piece)}
+                  job={!held && atMixer(piece) ? (mixerOn ? 'mixing' : bowlMixed && onMixer(bowlSpot) ? 'done' : 'ready') : undefined}
+                  w={roomW}
+                  h={h}
+                  size={piece.size}
+                />
               ) : (
                 <Prop
                   key={piece.key}
@@ -795,6 +841,7 @@ function useMultiTouch(args: TouchArgs) {
 
 interface PersonProps {
   person: TownPerson;
+  figure: FigureLook;
   isMe: boolean;
   waving: boolean;
   spot: Spot;
@@ -806,10 +853,39 @@ interface PersonProps {
   token: number;
 }
 
-function Person({ person, isMe, waving, spot: at, lifted, ride, w, h, token }: PersonProps) {
-  const i = colorIndex(person.id);
+/**
+ * Brings a person or buddy to life like at home: breathing in place, a hop and an arm wave
+ * when they wave, and a little squash when they're put down.
+ */
+function Alive({ figure, size, seed, waving, lifted, busy = false }: { figure: FigureLook; size: number; seed: string; waving: boolean; lifted: boolean; busy?: boolean }) {
+  const waves = useTimesOn(waving);
+  const landings = useTimesOn(!lifted);
+  // Whichever happened last plays: a wave hops, a landing squashes.
+  const last = useRef<{ waves: number; landings: number; kind: 'hop' | 'land' }>({ waves, landings, kind: 'land' });
+  if (waves !== last.current.waves) last.current = { waves, landings, kind: 'hop' };
+  else if (landings !== last.current.landings) last.current = { waves, landings, kind: 'land' };
+  return (
+    <Lively height={size} seed={seed} breathe={!lifted && !busy} bounce={waves + landings} bounceKind={last.current.kind}>
+      <Busy active={busy}>
+        <Figure figure={figure} size={size} wave={waves || undefined} />
+      </Busy>
+    </Lively>
+  );
+}
+
+function Person({ person, figure, isMe, waving, spot: at, lifted, ride, w, h, token }: PersonProps) {
   const acc = person.acc && (ACCESSORIES as readonly string[]).includes(person.acc) ? person.acc : undefined;
   const sliding = ride?.kind === 'slide';
+  // Where the head is: a drawn person's head is smaller and lower than a buddy's big face.
+  const personHead = figure.kind === 'person' ? figure.look.height : 0;
+  const glasses = acc && GLASSES.includes(acc);
+  const accStyle = personHead
+    ? glasses
+      ? { top: token * (1 - personHead) + token * personHead * 0.17, fontSize: token * personHead * 0.22 }
+      : { top: token * (1 - personHead) - token * personHead * 0.12, fontSize: token * personHead * 0.28 }
+    : glasses
+      ? { top: token * 0.2, fontSize: token * 0.34 }
+      : { top: -token * 0.12, fontSize: token * 0.36 };
   return (
     <Riding
       ride={ride}
@@ -829,35 +905,30 @@ function Person({ person, isMe, waving, spot: at, lifted, ride, w, h, token }: P
       }
     >
       <View>
-        <BuddyFigure value={person.avatar} size={token} fur={FURS[i]} belly={BELLIES[i]} dressed={{}} />
-        {acc ? (
-          <Text
-            style={[
-              styles.acc,
-              GLASSES.includes(acc) ? { top: token * 0.2, fontSize: token * 0.34 } : { top: -token * 0.12, fontSize: token * 0.36 },
-            ]}
-          >
-            {acc}
-          </Text>
-        ) : null}
+        <Alive figure={figure} size={token} seed={person.id} waving={waving} lifted={lifted} />
+        {acc ? <Text style={[styles.acc, accStyle]}>{acc}</Text> : null}
       </View>
     </Riding>
   );
 }
 
 interface PalProps {
-  value: string;
+  figure: FigureLook;
+  /** Steady for this buddy, so it keeps its own breathing rhythm. */
+  seed: string;
   mine: boolean;
   spot: Spot;
   lifted: boolean;
   ride: Ride | null;
+  /** Bakery: standing by the mixer, ready to run it, running it now, or just finished. */
+  job?: 'ready' | 'mixing' | 'done';
   w: number;
   h: number;
   size: number;
 }
 
 /** One of a player's buddies; only its owner can move it. */
-function Pal({ value, mine, spot: at, lifted, ride, w, h, size }: PalProps) {
+function Pal({ figure, seed, mine, spot: at, lifted, ride, job, w, h, size }: PalProps) {
   return (
     <Riding
       ride={ride}
@@ -868,9 +939,24 @@ function Pal({ value, mine, spot: at, lifted, ride, w, h, size }: PalProps) {
       above={0}
       touchable={mine}
       lifted={lifted}
-      label={mine ? 'Your buddy. Drag to move.' : 'A buddy'}
+      label={
+        job === 'mixing'
+          ? 'A buddy running the mixer'
+          : job
+            ? 'A buddy by the mixer. Put food in the bowl and it mixes it for you.'
+            : mine
+              ? 'Your buddy. Drag to move, or stand it by the bakery mixer to help.'
+              : 'A buddy'
+      }
+      top={
+        job ? (
+          <View pointerEvents="none" style={[styles.helperSpot, { bottom: size + 2 }]}>
+            <Text style={[styles.helper, job === 'mixing' && styles.helperBusy]}>{job === 'mixing' ? 'Mixing! 🥄' : job === 'done' ? 'All mixed! 👍' : "I'll mix!"}</Text>
+          </View>
+        ) : undefined
+      }
     >
-      <BuddyFigure value={value} size={size} fur="#F2B880" belly="#FFE3C2" dressed={{}} />
+      <Alive figure={figure} size={size} seed={seed} waving={false} lifted={lifted} busy={job === 'mixing'} />
     </Riding>
   );
 }
@@ -895,7 +981,8 @@ interface RidingProps {
 /**
  * Draws a person or buddy standing at their spot, or playing in the park: sitting on a swing
  * (drawn with its ropes and seat, swinging together), splashing in the pond up to their middle,
- * or anywhere else as they are (up the ladder, down the slide, on a branch).
+ * or anywhere else as they are (up the ladder, down the slide, on a branch). Standing about,
+ * they walk to wherever they're put (or a friend puts them) instead of jumping there.
  */
 function Riding({ ride, at, w, h, size, above, touchable, lifted, label, top, bottom, children }: RidingProps) {
   const x = at.x * w;
@@ -937,17 +1024,22 @@ function Riding({ ride, at, w, h, size, above, touchable, lifted, label, top, bo
     );
   }
   return (
-    <View
+    <Glide
       {...common}
-      style={[styles.person, { width: size, left: x - size / 2, top: y - size - above + (above ? 16 : -6) }, lifted && styles.lifted]}
+      left={x - size / 2}
+      top={y - size - above + (above ? 16 : -6)}
+      instant={lifted}
+      walk={!ride}
+      grow={lifted ? 1.12 : 1}
+      bounce={size * 0.05}
+      style={[styles.standing, { width: size }, lifted && styles.raised]}
     >
       {top}
       {children}
       {bottom}
-    </View>
+    </Glide>
   );
 }
-
 
 interface PropProps {
   prop: PropDef;
@@ -989,9 +1081,14 @@ function Prop({ prop, shown, badge, caption, batter, said, splash, spot: at, lif
         ? `${bookAt(prop.book).title}. Tap to read, or drag to move.`
         : `${shown}. Drag to move.`;
   return (
-    <View
+    <Glide
       accessibilityLabel={label}
-      style={[styles.prop, { width: box, height: box, left: at.x * w - box / 2, top: at.y * h - box + size * 0.1 }, lifted && styles.lifted]}
+      left={at.x * w - box / 2}
+      top={at.y * h - box + size * 0.1}
+      instant={lifted}
+      walk={false}
+      grow={lifted ? 1.12 : 1}
+      style={[styles.prop, { width: box, height: box }, lifted && styles.raised]}
     >
       {prop.says ? (
         <Lively height={box} seed={prop.id} breathe bounce={said?.at} bounceKind="hop">
@@ -1027,7 +1124,7 @@ function Prop({ prop, shown, badge, caption, batter, said, splash, spot: at, lif
           {caption}
         </Text>
       ) : null}
-    </View>
+    </Glide>
   );
 }
 
@@ -1054,6 +1151,11 @@ const styles = StyleSheet.create({
   },
   batter: { position: 'absolute', backgroundColor: '#E9C27D', borderRadius: 999, borderWidth: 2, borderColor: '#B98A45' },
   lifted: { transform: [{ scale: 1.12 }], zIndex: 50 },
+  raised: { zIndex: 50 },
+  standing: { alignItems: 'center' },
+  helperSpot: { position: 'absolute', left: -60, right: -60, alignItems: 'center', zIndex: 60 },
+  helper: { fontSize: 13, fontWeight: '900', color: '#3B2B25', backgroundColor: '#FFFFFF', borderWidth: 2, borderColor: '#3B2B25', borderRadius: 10, paddingHorizontal: 6, overflow: 'hidden', height: 26 },
+  helperBusy: { backgroundColor: '#FFE0EC', color: '#C2185B' },
   wave: { fontSize: 24, height: 30 },
   wheee: { fontSize: 18, fontWeight: '900', color: '#E53935' },
   rope: { position: 'absolute', top: 0, width: 3, backgroundColor: '#5D4037' },
