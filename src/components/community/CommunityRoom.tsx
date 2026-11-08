@@ -42,7 +42,6 @@ import {
   madeSwitch,
   BOWL_SWITCH,
   BAKERY,
-  byMixer,
   grabsMixer,
   MIXER_HANG,
   onMixerHang,
@@ -449,13 +448,13 @@ export function CommunityRoom({ place, onDoor, onExit }: Props) {
   const depth = (p: Piece) => (bakery && p.kind === 'pal' && onMixerHang(p.spot) ? BAKERY.counter.top + 0.01 : p.spot.y);
   pieces.sort((a, b) => depth(a) - depth(b));
 
-  // A hidden surprise (no hint says so; only a library book shows it): a buddy standing by or
-  // hanging off the bakery mixer runs it for you: once you have put the bowl on the mixer
+  // A hidden surprise (no hint says so; only a library book shows it): a buddy hanging
+  // off the bakery mixer (not just standing near it) runs it for you: once you have put the bowl on the mixer
   // yourself and nobody has added more for a few seconds, it switches the mixer on. It never
   // moves the bowl, so you decide when it's ready. Only the
   // buddy's own phone does this, so friends' phones don't all do it at once.
   const mixerOn = bakery && isOn('mixer');
-  const atMixer = (piece: Piece) => bakery && piece.kind === 'pal' && (byMixer(piece.spot) || onMixerHang(piece.spot));
+  const atMixer = (piece: Piece) => bakery && piece.kind === 'pal' && onMixerHang(piece.spot);
   const myHelper = pieces.some((p) => atMixer(p) && p.kind === 'pal' && p.person.id === self);
   const helperStarts = myHelper && bowlMask !== 0 && !bowlMixed && !mixerOn && onMixer(bowlSpot);
   const heldNow = useRef<Record<string, Spot>>({});
@@ -935,7 +934,7 @@ interface PalProps {
   ride: Ride | null;
   /** Bakery: hanging off the end of the mixer's arm. */
   hanging?: boolean;
-  /** Bakery: standing by the mixer, ready to run it, running it now, or just finished. */
+  /** Bakery: hanging on the mixer, ready to run it, running it now, or just finished. */
   job?: 'ready' | 'mixing' | 'done';
   w: number;
   h: number;

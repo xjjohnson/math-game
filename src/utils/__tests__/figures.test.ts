@@ -1,6 +1,6 @@
 import { BODY_COLORS, PEOPLE } from '@/constants/wardrobe';
 import { makeProfile } from '@/test/fixtures';
-import { BAKERY, byMixer, FLOOR, grabsMixer, MIXER_HANG, onMixerHang } from '@/utils/multiplayer/placeProps';
+import { BAKERY, FLOOR, grabsMixer, MIXER_HANG, onMixerHang } from '@/utils/multiplayer/placeProps';
 import { buddyIdOf, figureFor } from '@/utils/figures';
 
 describe('bodies in Community match the buddy home', () => {
@@ -40,16 +40,6 @@ describe('bodies in Community match the buddy home', () => {
 
   it('gives any other emoji avatar a body in the given colors', () => {
     expect(figureFor('🐸', null, { fur: '#123456', belly: '#abcdef' })).toMatchObject({ kind: 'animal', fur: '#123456', belly: '#abcdef' });
-  });
-});
-
-describe('a buddy by the bakery mixer', () => {
-  it('counts on the floor under or beside the mixer, not far off or up on the counter', () => {
-    const mid = (BAKERY.mixer.x0 + BAKERY.mixer.x1) / 2;
-    expect(byMixer({ x: mid, y: 0.75 })).toBe(true);
-    expect(byMixer({ x: BAKERY.mixer.x1 + 0.03, y: 0.8 })).toBe(true);
-    expect(byMixer({ x: 0.5, y: 0.75 })).toBe(false);
-    expect(byMixer({ x: mid, y: FLOOR - 0.1 })).toBe(false);
   });
 });
 

@@ -1,5 +1,9 @@
 # Change log
 
+## 2026-11-08 (mixer buddy has to be on the mixer)
+
+- A buddy only runs the bakery mixer when it is hanging on the mixer. Standing next to it on the floor does nothing.
+
 ## 2026-11-08 (mixer buddy waits for the bowl)
 
 - A buddy at the bakery mixer no longer grabs the bowl. It waits until you put the bowl on the mixer yourself, then mixes it a moment later.
