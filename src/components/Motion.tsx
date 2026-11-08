@@ -394,7 +394,18 @@ export function Wallow({ children, active, style }: { children: ReactNode; activ
 }
 
 /** Swings to and fro from its top edge while `active`, like a playground swing. Still when motion is off. */
-export function Swing({ children, active, style }: { children: ReactNode; active: boolean; style?: StyleProp<ViewStyle> }) {
+export function Swing({
+  children,
+  active,
+  sway = 1,
+  style,
+}: {
+  children: ReactNode;
+  active: boolean;
+  /** How far it swings, as a share of a full playground swing (30 degrees each way). */
+  sway?: number;
+  style?: StyleProp<ViewStyle>;
+}) {
   const { animate } = useMotion();
   const t = useSharedValue(0);
   useEffect(() => {
@@ -407,7 +418,7 @@ export function Swing({ children, active, style }: { children: ReactNode; active
     t.value = withRepeat(withSequence(withTiming(1, { duration: 650, easing: ease }), withTiming(-1, { duration: 1300, easing: ease }), withTiming(0, { duration: 650, easing: ease })), -1);
     return () => cancelAnimation(t);
   }, [animate, active, t]);
-  const look = useAnimatedStyle(() => ({ transform: [{ rotate: `${t.value * 30}deg` }] }));
+  const look = useAnimatedStyle(() => ({ transform: [{ rotate: `${t.value * 30 * sway}deg` }] }));
   return <Animated.View style={[{ transformOrigin: 'top' }, style, look]}>{children}</Animated.View>;
 }
 

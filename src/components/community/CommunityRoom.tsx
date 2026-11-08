@@ -43,6 +43,9 @@ import {
   BOWL_SWITCH,
   BAKERY,
   byMixer,
+  grabsMixer,
+  MIXER_HANG,
+  onMixerHang,
   EGG_BASKET,
   EGG_BASKET_MAX,
   EGG_BASKET_SWITCH,
@@ -66,6 +69,7 @@ import { buddyPieceId, type TownPerson, type TownPlace } from '@/utils/multiplay
 import type { Spot } from '@/utils/multiplayer/scene';
 import { bookAt } from '@/utils/libraryBooks';
 import { carryInPark, offGround, parkLanding, rideAt, slidePath, SWING_PIVOT, type Ride } from '@/utils/park';
+import { SKIN_TONES } from '@/constants/wardrobe';
 import { figureFor, type FigureLook } from '@/utils/figures';
 import type { BuildingId } from '@/utils/town';
 
@@ -436,18 +440,20 @@ export function CommunityRoom({ place, onDoor, onExit }: Props) {
         // Until a buddy is moved it stands next to its owner.
         const beside = onFloor({ x: spot.x + ((n + 1) * token * 0.55) / roomW, y: spot.y });
         const figure = figureFor(b, owner);
-        list.push({ key: id, kind: 'pal', person: p, figure, size: sizeOf(figure), spot: spotsNow[id] ? keepSpot(park, spotsNow[id]) : beside });
+        list.push({ key: id, kind: 'pal', person: p, figure, size: sizeOf(figure), spot: spotsNow[id] ? (bakery && onMixerHang(spotsNow[id]) ? MIXER_HANG : keepSpot(park, spotsNow[id])) : beside });
       });
       return list;
     }),
   ];
-  pieces.sort((a, b) => a.spot.y - b.spot.y);
+  // A buddy hanging off the mixer draws in front of the bowl under it.
+  const depth = (p: Piece) => (bakery && p.kind === 'pal' && onMixerHang(p.spot) ? BAKERY.counter.top + 0.01 : p.spot.y);
+  pieces.sort((a, b) => depth(a) - depth(b));
 
   // A buddy standing by the bakery mixer runs it for you: once things are in the bowl and nobody
   // has added more for a moment, it pulls the bowl onto the mixer and switches it on. Only the
   // buddy's own phone does this, so friends' phones don't all do it at once.
   const mixerOn = bakery && isOn('mixer');
-  const atMixer = (piece: Piece) => bakery && piece.kind === 'pal' && byMixer(piece.spot);
+  const atMixer = (piece: Piece) => bakery && piece.kind === 'pal' && (byMixer(piece.spot) || onMixerHang(piece.spot));
   const myHelper = pieces.some((p) => atMixer(p) && p.kind === 'pal' && p.person.id === self);
   const helperStarts = myHelper && bowlMask !== 0 && !bowlMixed && !mixerOn;
   const heldNow = useRef<Record<string, Spot>>({});
@@ -502,8 +508,13 @@ export function CommunityRoom({ place, onDoor, onExit }: Props) {
           key: piece.key,
           enabled: piece.person.id === self,
           spot: piece.spot,
-          box: { left: x - piece.size / 2, top: y - piece.size - 6, width: piece.size, height: piece.size + 6 },
+          // Hanging off the mixer, it is drawn under its hands instead of above its feet.
+          box: onMixerHang(piece.spot)
+            ? { left: x - piece.size / 2, top: y - 6, width: piece.size, height: piece.size + 12 }
+            : { left: x - piece.size / 2, top: y - piece.size - 6, width: piece.size, height: piece.size + 6 },
           fit: onFloor,
+          // In the bakery a buddy can be lifted up onto the mixer, where it hangs off the arm.
+          ...(bakery ? { fit: inRoom, land: (s: Spot) => (grabsMixer(s) ? MIXER_HANG : onFloor(s)) } : {}),
           ...playground(piece.key),
         };
       }
@@ -576,6 +587,7 @@ export function CommunityRoom({ place, onDoor, onExit }: Props) {
                   spot={spot}
                   lifted={!!held}
                   ride={held ? null : rideOf(piece)}
+                  hanging={!held && bakery && onMixerHang(piece.spot)}
                   job={!held && atMixer(piece) ? (mixerOn ? 'mixing' : bowlMixed && onMixer(bowlSpot) ? 'done' : 'ready') : undefined}
                   w={roomW}
                   h={h}
@@ -920,6 +932,8 @@ interface PalProps {
   spot: Spot;
   lifted: boolean;
   ride: Ride | null;
+  /** Bakery: hanging off the end of the mixer's arm. */
+  hanging?: boolean;
   /** Bakery: standing by the mixer, ready to run it, running it now, or just finished. */
   job?: 'ready' | 'mixing' | 'done';
   w: number;
@@ -928,7 +942,17 @@ interface PalProps {
 }
 
 /** One of a player's buddies; only its owner can move it. */
-function Pal({ figure, seed, mine, spot: at, lifted, ride, job, w, h, size }: PalProps) {
+function Pal({ figure, seed, mine, spot: at, lifted, ride, hanging, job, w, h, size }: PalProps) {
+  const bubble = job ? (
+    <Text style={[styles.helper, job === 'mixing' && styles.helperBusy]}>{job === 'mixing' ? 'Mixing! 🥄' : job === 'done' ? 'All mixed! 👍' : "I'll mix!"}</Text>
+  ) : null;
+  if (hanging) {
+    return (
+      <Hanging at={at} w={w} h={h} size={size} color={figure.kind === 'animal' ? figure.fur : (SKIN_TONES[figure.look.skin] ?? SKIN_TONES[0])} swinging={job === 'mixing'} touchable={mine} bubble={bubble} label={job === 'mixing' ? 'A buddy riding the mixer while it mixes' : 'A buddy hanging off the mixer. Put food in the bowl and it mixes it for you.'}>
+        <Alive figure={figure} size={size} seed={seed} waving={false} lifted={false} />
+      </Hanging>
+    );
+  }
   return (
     <Riding
       ride={ride}
@@ -945,19 +969,66 @@ function Pal({ figure, seed, mine, spot: at, lifted, ride, job, w, h, size }: Pa
           : job
             ? 'A buddy by the mixer. Put food in the bowl and it mixes it for you.'
             : mine
-              ? 'Your buddy. Drag to move, or stand it by the bakery mixer to help.'
+              ? 'Your buddy. Drag to move, or put it on the bakery mixer to help.'
               : 'A buddy'
       }
       top={
-        job ? (
+        bubble ? (
           <View pointerEvents="none" style={[styles.helperSpot, { bottom: size + 2 }]}>
-            <Text style={[styles.helper, job === 'mixing' && styles.helperBusy]}>{job === 'mixing' ? 'Mixing! 🥄' : job === 'done' ? 'All mixed! 👍' : "I'll mix!"}</Text>
+            {bubble}
           </View>
         ) : undefined
       }
     >
       <Alive figure={figure} size={size} seed={seed} waving={false} lifted={lifted} busy={job === 'mixing'} />
     </Riding>
+  );
+}
+
+interface HangingProps {
+  /** Where its hands hold on. */
+  at: Spot;
+  w: number;
+  h: number;
+  size: number;
+  /** Fur or skin, for the arms reaching up. */
+  color: string;
+  /** Swings to and fro (while the mixer runs); otherwise sways gently. */
+  swinging: boolean;
+  touchable: boolean;
+  bubble: ReactNode;
+  label: string;
+  children: ReactNode;
+}
+
+/** A buddy hanging by its arms from the mixer's arm, swinging while the mixer whirrs. */
+function Hanging({ at, w, h, size, color, swinging, touchable, bubble, label, children }: HangingProps) {
+  const x = at.x * w;
+  const y = at.y * h;
+  const arm = Math.max(3, size * 0.05);
+  const reach = size * 0.3;
+  return (
+    <View
+      pointerEvents={touchable ? 'auto' : 'none'}
+      accessibilityLabel={label}
+      style={[styles.person, { width: size, left: x - size / 2, top: y - arm, height: size + reach }]}
+    >
+      {bubble ? (
+        <View pointerEvents="none" style={[styles.helperSpot, { bottom: size + reach + 6 }]}>
+          {bubble}
+        </View>
+      ) : null}
+      <Swing active sway={swinging ? 0.6 : 0.15} style={StyleSheet.absoluteFill}>
+        {/* Arms reaching up to the mixer, hands holding on. */}
+        {[-1, 1].map((side) => (
+          <View key={side} style={[styles.hangArm, { backgroundColor: color, width: arm * 1.6, height: reach + arm, left: size / 2 + side * size * 0.1 - arm * 0.8, borderRadius: arm }]} />
+        ))}
+        {[-1, 1].map((side) => (
+          <View key={`h${side}`} style={[styles.hand, { backgroundColor: color, width: arm * 2.6, height: arm * 2.6, left: size / 2 + side * size * 0.1 - arm * 1.3, top: -arm * 0.6, borderRadius: arm * 2 }]} />
+        ))}
+        <View style={{ position: 'absolute', top: reach, left: 0, width: size, height: size }}>{children}</View>
+      </Swing>
+    </View>
   );
 }
 
@@ -1153,6 +1224,8 @@ const styles = StyleSheet.create({
   lifted: { transform: [{ scale: 1.12 }], zIndex: 50 },
   raised: { zIndex: 50 },
   standing: { alignItems: 'center' },
+  hangArm: { position: 'absolute', top: 0, backgroundColor: '#F2D3B3', borderWidth: 2, borderColor: '#3E2C23' },
+  hand: { position: 'absolute', backgroundColor: '#F2D3B3', borderWidth: 2, borderColor: '#3E2C23' },
   helperSpot: { position: 'absolute', left: -60, right: -60, alignItems: 'center', zIndex: 60 },
   helper: { fontSize: 13, fontWeight: '900', color: '#3B2B25', backgroundColor: '#FFFFFF', borderWidth: 2, borderColor: '#3B2B25', borderRadius: 10, paddingHorizontal: 6, overflow: 'hidden', height: 26 },
   helperBusy: { backgroundColor: '#FFE0EC', color: '#C2185B' },

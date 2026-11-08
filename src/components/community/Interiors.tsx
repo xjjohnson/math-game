@@ -6,7 +6,7 @@ import { Rumble, Spin, Swing } from '@/components/Motion';
 import { Chalkboard } from '@/components/community/Chalkboard';
 import { PaintingView } from '@/components/PaintingView';
 import { useEaselPicture } from '@/services/easel';
-import { BAKERY, FARM, FLOOR, LIBRARY, nestX, PARK, SCHOOL, SHOP, type Shelves } from '@/utils/multiplayer/placeProps';
+import { BAKERY, FARM, FLOOR, LIBRARY, MIXER_TALL, nestX, PARK, SCHOOL, SHOP, type Shelves } from '@/utils/multiplayer/placeProps';
 import { SWING_COUNT, SWING_PIVOT, SWING_SEAT_Y, swingName, swingX } from '@/utils/park';
 import type { TownPlace } from '@/utils/multiplayer/protocol';
 import { BUILDINGS, type BuildingId } from '@/utils/town';
@@ -344,7 +344,7 @@ function Bakery({ w, h, on, tap }: Part) {
         onPress={() => tap('mixer')}
         accessibilityRole="button"
         accessibilityLabel={mixing ? 'Stop the mixer' : 'Start the mixer'}
-        style={rect(w, h, m.x0, m.x1, BAKERY.counter.top - 0.17, BAKERY.counter.top)}
+        style={rect(w, h, m.x0, m.x1, BAKERY.counter.top - MIXER_TALL, BAKERY.counter.top)}
       >
         <Rumble active={mixing} style={StyleSheet.absoluteFill}>
           <View style={[edge, styles.mixerBase, { left: '10%', right: '10%', bottom: 0, height: '12%' }]} />

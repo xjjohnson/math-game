@@ -413,6 +413,25 @@ export function byMixer(s: Spot): boolean {
   return s.x >= m.x0 - 0.04 && s.x <= m.x1 + 0.05 && s.y > FLOOR;
 }
 
+/** How tall the stand mixer stands on the counter, as a share of the room's height. */
+export const MIXER_TALL = 0.17;
+/**
+ * Where a buddy hangs off the stand mixer: holding on under the end of its top arm, over the
+ * bowl. A buddy at exactly this spot is drawn hanging from it, not standing.
+ */
+export const MIXER_HANG: Spot = { x: BAKERY.mixer.x1 - 0.012, y: BAKERY.counter.top - MIXER_TALL * 0.73 };
+
+/** Whether a buddy at `s` is hanging off the mixer. */
+export function onMixerHang(s: Spot): boolean {
+  return Math.abs(s.x - MIXER_HANG.x) < 0.002 && Math.abs(s.y - MIXER_HANG.y) < 0.002;
+}
+
+/** Whether a buddy let go at `s` (its feet) grabs onto the mixer: over it or just above the counter by it. */
+export function grabsMixer(s: Spot): boolean {
+  const m = BAKERY.mixer;
+  return s.x >= m.x0 - 0.02 && s.x <= m.x1 + 0.03 && s.y >= BAKERY.counter.top - 0.26 && s.y <= BAKERY.counter.top + 0.04;
+}
+
 /** Whether a spot is inside the bakery oven, where things bake while it's on. */
 export function inOven(s: Spot): boolean {
   const o = BAKERY.oven;
