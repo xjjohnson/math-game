@@ -1,5 +1,9 @@
 package expo.modules.mathnearby
 
+import android.os.Handler
+import android.os.Looper
+import android.os.Process
+import android.os.SystemClock
 import com.google.android.gms.nearby.Nearby
 import com.google.android.gms.nearby.connection.AdvertisingOptions
 import com.google.android.gms.nearby.connection.ConnectionInfo
@@ -34,6 +38,12 @@ private const val CONNECTION_FAILED = "onConnectionFailed"
 private const val DISCONNECTED = "onDisconnected"
 private const val MESSAGE = "onMessage"
 
+/** The app closes itself after this long in the background. */
+private const val BACKGROUND_LIMIT_MS = 30L * 60L * 1000L
+
+/** How often the background clock is checked. */
+private const val BACKGROUND_CHECK_MS = 60L * 1000L
+
 /**
  * A thin bridge over Google Nearby Connections. It sends and receives short
  * text messages; the game logic and message format live in JavaScript.
@@ -44,6 +54,23 @@ class MathNearbyModule : Module() {
   }
 
   private val connected = mutableSetOf<String>()
+
+  private val mainHandler = Handler(Looper.getMainLooper())
+
+  /** When the app last went to the background, on the clock that keeps counting while the phone sleeps. */
+  private var backgroundSince = 0L
+
+  // Checks once a minute rather than waiting 30 minutes in one go, because a
+  // sleeping phone pauses timers; this way it closes soon after it wakes up.
+  private val backgroundCheck = object : Runnable {
+    override fun run() {
+      if (SystemClock.elapsedRealtime() - backgroundSince >= BACKGROUND_LIMIT_MS) {
+        closeApp()
+      } else {
+        mainHandler.postDelayed(this, BACKGROUND_CHECK_MS)
+      }
+    }
+  }
 
   private val payloads = object : PayloadCallback() {
     override fun onPayloadReceived(endpointId: String, payload: Payload) {
@@ -145,9 +172,34 @@ class MathNearbyModule : Module() {
       stopAll()
     }
 
+    // Nearby, sounds and timers would otherwise keep going while the app sits
+    // in the background, so after 30 minutes away the app closes itself.
+    OnActivityEntersBackground {
+      backgroundSince = SystemClock.elapsedRealtime()
+      mainHandler.removeCallbacks(backgroundCheck)
+      mainHandler.postDelayed(backgroundCheck, BACKGROUND_CHECK_MS)
+    }
+
+    OnActivityEntersForeground {
+      mainHandler.removeCallbacks(backgroundCheck)
+    }
+
     OnDestroy {
+      mainHandler.removeCallbacks(backgroundCheck)
       stopAll()
     }
+  }
+
+  /** Hangs up Nearby, removes the app from Recents and ends it. Progress is already saved as it changes. */
+  private fun closeApp() {
+    mainHandler.removeCallbacks(backgroundCheck)
+    try {
+      stopAll()
+    } catch (error: Exception) {
+      // Closing matters more than a clean hang-up.
+    }
+    appContext.currentActivity?.finishAndRemoveTask()
+    mainHandler.postDelayed({ Process.killProcess(Process.myPid()) }, 500L)
   }
 
   private fun stopFinding() {

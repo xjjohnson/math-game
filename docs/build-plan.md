@@ -102,6 +102,7 @@ Cross-platform interactive math learning game for kids (ages 5-15), React Native
 - Android 13+: nearby Wi-Fi devices
 - Older versions: location
 - Dedicated permission-check screen, built before multiplayer
+- After 30 minutes in the background the app closes itself (stops Nearby, leaves Recents, ends the process). The timer lives in the native Nearby module (`BACKGROUND_LIMIT_MS`) and checks once a minute on the clock that counts while the phone sleeps.
 
 ---
 
