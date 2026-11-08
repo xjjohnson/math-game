@@ -81,6 +81,15 @@ const BUILT_IN_LINES: Record<string, (name: string) => string> = {
   inTub: (name) => `${name} hops in the bathtub. Tap it to turn on the water!`,
   onToilet: (name) => `${name} sits on the toilet. Tap it to flush when done!`,
   inBallPit: (name) => `${name} dives into the ball pit! Tap it to bounce.`,
+  inTreeHouse: (name) => `${name} climbs up into the tree house! Tap it to go inside.`,
+  onSwing1: (name) => `${name} sits on a swing. Tap the swings to push!`,
+  onSwing2: (name) => `${name} sits on a swing. Tap the swings to push!`,
+  onFort: (name) => `${name} climbs up the fort. Tap the slide to go down. Wheee!`,
+  onTrampoline: (name) => `${name} bounces on the trampoline! Boing! Tap it for a super bounce.`,
+  inCar: (name) => `${name} hops in the car. Tap it to start the engine! Vroom!`,
+  inBed2: (name) => `${name} snuggles into bed. Night night! 💤`,
+  bunkTop: (name) => `${name} climbs up to the top bunk. 💤`,
+  bunkBottom: (name) => `${name} curls up in the bottom bunk. 💤`,
 };
 
 type Tab = 'care' | 'dress' | 'shop' | 'toys' | 'buddies' | 'paint';
@@ -364,6 +373,11 @@ export function BuddyScreen() {
             if (who && a.kind === 'tub') return say(on ? `${who} has a bubble bath! 🫧` : `${who} is all clean and sparkly! ✨`);
             if (who && a.kind === 'toilet' && !on) return say(`${who} flushes. Whoosh! Now wash your hands. 🧼`);
             if (who && a.kind === 'ballPit' && on) return say(`${who} bounces in the balls! Boing, boing!`);
+            if (a.kind === 'playScape') return say(who ? `${who} slides down the slide! Wheee! 🛝` : 'Drag a buddy up onto the fort, then tap the slide!');
+            if (a.kind === 'trampoline') return say(who ? `Super bounce! ${who} jumps sky high! ⭐` : 'Boing! Drag a buddy onto the trampoline to bounce.');
+            if (who && a.kind === 'swingSet' && on) return say(`Wheee! ${who} swings up high!`);
+            if (who && (a.kind === 'bed' || a.kind === 'bunkBed')) return say(on ? `${who} jumps on the bed! Boing, boing!` : `${who} lies down for a nap. 💤`);
+            if (who && a.kind === 'car' && on) return say(`${who} drives the car. Beep beep! 🚗`);
             const lines: Record<Appliance['kind'], [string, string]> = {
               fireplace: [`${name} lights a cozy fire. So warm!`, 'The fire is out.'],
               tv: [`${name} turns on the TV. Show time!`, 'TV off.'],
@@ -375,8 +389,30 @@ export function BuddyScreen() {
               dishwasher: ['The dishwasher is washing the dishes. Swish!', 'The dishes are clean!'],
               aquarium: [`${name} feeds the fish. Blub, blub!`, 'The fish settle down.'],
               fan: [`${name} turns on the fan. Whoosh, so breezy!`, 'The fan slows down.'],
+              treeHouse: [`${name} climbs into the tree house!`, ''],
+              swingSet: ['The swings are swinging. Wheee!', 'The swings slow down.'],
+              playScape: ['', ''],
+              trampoline: ['', ''],
+              computer: [`${name} turns on the computer. 3 + 4 = 7!`, 'Computer off.'],
+              globe: [`${name} spins the globe. Round and round the world! 🌍`, 'The globe stops.'],
+              garageDoor: ['The garage door rolls up. Hello, outside!', 'The garage door rolls down.'],
+              car: [`${name} starts the car. Vroom, vroom! 🚗`, 'The engine stops.'],
+              bed: [`${name} bounces on the bed! Boing!`, 'The bed is all neat again.'],
+              bunkBed: [`${name} bounces on the bunk beds! Boing!`, 'The bunk beds settle down.'],
+              starLamp: ['Stars on the walls! Turn off the lights to see them shine. ✨', 'The star lamp is off.'],
             };
                     say(lines[a.kind][on ? 0 : 1]);
+          }}
+          onNight={(night) => say(night ? 'Night time in the backyard. Look, fireflies! ✨' : 'Good morning, sunshine! ☀️')}
+          onTreeHouse={(e, inside) => {
+            const who = inside.length ? nameOf(inside[0]) : name;
+            if (e.kind === 'open') say(inside.length ? `Welcome to the tree house, ${who}! 🌳` : 'The tree house! Tap "Call the buddies up" to bring everyone in.');
+            else if (e.kind === 'callUp') say('Everybody up the ladder! 🪜');
+            else if (e.kind === 'telescope') say(`${who} looks through the telescope and sees ${e.sight}! 🔭`);
+            else if (e.kind === 'chest') say(e.open ? `${who} opens the treasure chest and finds ${e.treasure}! ✨` : 'The treasure is safe for next time.');
+            else if (e.kind === 'lights') say(e.on ? 'Twinkle, twinkle! ✨' : 'Lights off. Spooky hideout! 🔦');
+            else if (e.kind === 'bucket') say(`${who} pulls up the bucket. It has ${e.snack}! Yum! 😋`);
+            else if (e.kind === 'down') say(`${who} climbs back down the ladder.`);
           }}
         />
         <Confetti burst={party} />

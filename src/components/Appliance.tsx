@@ -1,6 +1,7 @@
 import { Pressable, StyleSheet, View, type ViewStyle } from 'react-native';
 
-import { Bob, Flicker, Spin } from '@/components/Motion';
+import { PlayScape, SwingSet, Trampoline, TreeWithHouse } from '@/components/Backyard';
+import { Bob, Flicker, Rumble, Spin } from '@/components/Motion';
 import type { Appliance } from '@/constants/room';
 
 const OUTLINE = '#5B3A24';
@@ -43,6 +44,17 @@ export function ApplianceView({ appliance: a, left, top, width: w, height: h, on
       {a.kind === 'dishwasher' ? <Dishwasher w={w} h={h} on={on} /> : null}
       {a.kind === 'aquarium' ? <Aquarium w={w} h={h} on={on} /> : null}
       {a.kind === 'fan' ? <Fan w={w} h={h} on={on} /> : null}
+      {a.kind === 'treeHouse' ? <TreeWithHouse w={w} h={h} on={on} /> : null}
+      {a.kind === 'swingSet' ? <SwingSet w={w} h={h} on={on} /> : null}
+      {a.kind === 'playScape' ? <PlayScape w={w} h={h} on={on} /> : null}
+      {a.kind === 'trampoline' ? <Trampoline w={w} h={h} on={on} /> : null}
+      {a.kind === 'computer' ? <Computer w={w} h={h} on={on} /> : null}
+      {a.kind === 'globe' ? <Globe w={w} h={h} on={on} /> : null}
+      {a.kind === 'garageDoor' ? <GarageDoor w={w} h={h} on={on} /> : null}
+      {a.kind === 'car' ? <Car w={w} h={h} on={on} /> : null}
+      {a.kind === 'bed' ? <Bed w={w} h={h} on={on} /> : null}
+      {a.kind === 'bunkBed' ? <BunkBed w={w} h={h} on={on} /> : null}
+      {a.kind === 'starLamp' ? <StarLamp w={w} h={h} on={on} /> : null}
     </Pressable>
   );
 }
@@ -354,6 +366,181 @@ function Fan({ w, h, on }: Drawn) {
   );
 }
 
+/** A computer on the desk; switched on, it shows a sum and its answer. */
+function Computer({ w, h, on }: Drawn) {
+  const screenH = h * 0.72;
+  return (
+    <>
+      <View style={[styles.monitor, at(0, 0, w, screenH)]}>
+        <View style={[styles.pcScreen, on && styles.pcOn]}>
+          {on ? (
+            <View style={styles.pcSum}>
+              {[0, 1, 2, 3, 4].map((i) => (
+                <View
+                  key={i}
+                  style={[
+                    { width: w * 0.1, height: screenH * 0.14, borderRadius: 3, marginHorizontal: 1 },
+                    { backgroundColor: i % 2 ? '#FFFFFF' : ['#FFCA28', '#66BB6A', '#EF5350'][i / 2] },
+                  ]}
+                />
+              ))}
+            </View>
+          ) : (
+            <View style={[styles.shine, at(w * 0.08, screenH * 0.1, w * 0.1, screenH * 0.4)]} />
+          )}
+        </View>
+      </View>
+      <View style={[styles.tvStand, at(w * 0.42, screenH - 2, w * 0.16, h * 0.14)]} />
+      <View style={[styles.keyboard, at(w * 0.1, h * 0.86, w * 0.8, h * 0.12)]} />
+    </>
+  );
+}
+
+/** A globe on a stand; switched on, it spins round. */
+function Globe({ w, h, on }: Drawn) {
+  const ball = Math.min(w * 0.9, h * 0.7);
+  const left = (w - ball) / 2;
+  return (
+    <>
+      <View style={[styles.globeStand, at(w * 0.46, ball * 0.9, w * 0.08, h - ball * 0.9 - h * 0.06)]} />
+      <View style={[styles.globeBase, at(w * 0.2, h * 0.93, w * 0.6, h * 0.07)]} />
+      <View style={[styles.globeSea, at(left, 0, ball, ball), { borderRadius: ball }]}>
+        <Spin active={on} style={{ flex: 1 }}>
+          <View style={[styles.land, at(ball * 0.18, ball * 0.15, ball * 0.32, ball * 0.36), { borderRadius: ball * 0.2 }]} />
+          <View style={[styles.land, at(ball * 0.55, ball * 0.45, ball * 0.26, ball * 0.32), { borderRadius: ball * 0.16 }]} />
+          <View style={[styles.land, at(ball * 0.3, ball * 0.66, ball * 0.18, ball * 0.14), { borderRadius: ball * 0.1 }]} />
+        </Spin>
+      </View>
+      <View style={[styles.meridian, at(left - 4, -4, ball + 8, ball + 8), { borderRadius: ball }]} />
+    </>
+  );
+}
+
+/** A garage door that rolls up (switched on) to show the driveway and the sky outside. */
+function GarageDoor({ w, h, on }: Drawn) {
+  const slats = 6;
+  return (
+    <>
+      <View style={[styles.garageFrame, at(0, 0, w, h)]}>
+        <View style={styles.outside}>
+          <View style={[styles.sunDot, at(w * 0.7, h * 0.12, h * 0.16, h * 0.16), { borderRadius: h }]} />
+          <View style={[styles.hill, at(-w * 0.1, h * 0.55, w * 0.7, h * 0.6), { borderRadius: w }]} />
+          <View style={[styles.hill2, at(w * 0.4, h * 0.62, w * 0.8, h * 0.6), { borderRadius: w }]} />
+          <View style={[styles.driveway, at(w * 0.2, h * 0.82, w * 0.6, h * 0.18)]} />
+        </View>
+        {/* Rolled up, only the bottom slat shows at the top. */}
+        <View style={[styles.slats, { height: on ? h * 0.12 : '100%' }]}>
+          {Array.from({ length: on ? 1 : slats }, (_, i) => (
+            <View key={i} style={styles.slat} />
+          ))}
+          <View style={styles.handle} />
+        </View>
+      </View>
+    </>
+  );
+}
+
+/** A little open-top car; switched on, the headlights shine and it rumbles. Buddies sit in the driver's seat. */
+function Car({ w, h, on }: Drawn) {
+  const wheel = h * 0.42;
+  return (
+    <Rumble active={on} style={StyleSheet.absoluteFill}>
+      {on ? <View style={[styles.beam, at(w * 0.92, h * 0.22, w * 0.3, h * 0.36), { borderTopRightRadius: h, borderBottomRightRadius: h }]} /> : null}
+      {/* Seat back and steering wheel stick up out of the car. */}
+      <View style={[styles.carSeat, at(w * 0.16, h * 0.02, w * 0.1, h * 0.4)]} />
+      <View style={[styles.windshield, at(w * 0.56, -h * 0.02, w * 0.05, h * 0.34), { transform: [{ rotate: '18deg' }] }]} />
+      <View style={[styles.wheelRing, at(w * 0.42, h * 0.04, h * 0.24, h * 0.24), { borderRadius: h, transform: [{ rotate: '-20deg' }] }]} />
+      <View style={[styles.column, at(w * 0.44 + h * 0.1, h * 0.2, w * 0.02, h * 0.12), { transform: [{ rotate: '30deg' }] }]} />
+      <View style={[styles.carBody, at(0, h * 0.28, w, h * 0.46), { borderTopLeftRadius: h * 0.35, borderTopRightRadius: h * 0.2 }]}>
+        <View style={[styles.carStripe, { top: '40%' }]} />
+      </View>
+      <View style={[styles.lightBulb, on && styles.lightOn, at(w * 0.93, h * 0.38, w * 0.05, h * 0.12)]} />
+      <View style={[styles.tail, at(w * 0.005, h * 0.38, w * 0.04, h * 0.1)]} />
+      {[0.12, 0.7].map((x) => (
+        <Spin key={x} active={on} style={at(w * x, h - wheel, wheel, wheel)}>
+          <View style={[styles.tyre, { flex: 1, borderRadius: wheel }]}>
+            <View style={[styles.hub, { width: wheel * 0.4, height: wheel * 0.4, borderRadius: wheel }]} />
+            <View style={[styles.spoke, { width: wheel * 0.8 }]} />
+          </View>
+        </Spin>
+      ))}
+    </Rumble>
+  );
+}
+
+/** A bed with a headboard and a fluffy blanket; tapped on, the blanket bounces (someone's jumping on it). */
+function Bed({ w, h, on }: Drawn) {
+  const mattress = h * (1 - 0.15 / 0.3);
+  return (
+    <>
+      <View style={[styles.headboard, at(0, 0, w * 0.1, h), { borderTopLeftRadius: w * 0.05, borderTopRightRadius: w * 0.05 }]} />
+      <View style={[styles.headboard, at(w * 0.93, h * 0.42, w * 0.07, h * 0.58)]} />
+      <View style={[styles.bedFrame, at(w * 0.04, h * 0.72, w * 0.92, h * 0.2)]} />
+      <View style={[styles.pillow, at(w * 0.11, mattress - h * 0.18, w * 0.18, h * 0.16), { borderRadius: h }]} />
+      <Bob seed="bed2" rise={h * 0.12} active={on} style={at(w * 0.08, mattress, w * 0.86, h * 0.3)}>
+        <View style={[styles.blanket, { flex: 1, borderRadius: h * 0.1 }]}>
+          {[0.2, 0.5, 0.8].map((x) => (
+            <View key={x} style={[styles.blanketDot, { left: `${x * 100}%` }]} />
+          ))}
+        </View>
+      </Bob>
+      <View style={[styles.foot, at(w * 0.06, h * 0.9, w * 0.05, h * 0.1)]} />
+      <View style={[styles.foot, at(w * 0.88, h * 0.9, w * 0.05, h * 0.1)]} />
+    </>
+  );
+}
+
+/** Bunk beds with a ladder; tapped on, both blankets bounce. */
+function BunkBed({ w, h, on }: Drawn) {
+  // Mattress tops: the bottom bunk at 0.09 and the top at 0.38 of 0.6 up.
+  const bottomTop = h * (1 - 0.09 / 0.6);
+  const topTop = h * (1 - 0.38 / 0.6);
+  const blanketH = h * 0.08;
+  const bunk = (y: number, color: string, seed: string) => (
+    <>
+      <View style={[styles.bedFrame, at(w * 0.04, y + blanketH * 0.6, w * 0.92, h * 0.05)]} />
+      <View style={[styles.pillow, at(w * 0.08, y - h * 0.07, w * 0.18, h * 0.07), { borderRadius: h }]} />
+      <Bob seed={seed} rise={h * 0.05} active={on} style={at(w * 0.06, y, w * 0.88, blanketH)}>
+        <View style={[styles.blanket, { flex: 1, borderRadius: 6, backgroundColor: color }]} />
+      </Bob>
+    </>
+  );
+  return (
+    <>
+      <View style={[styles.bunkPost, at(0, 0, w * 0.05, h)]} />
+      <View style={[styles.bunkPost, at(w * 0.95, 0, w * 0.05, h)]} />
+      <View style={[styles.bunkRail, at(w * 0.04, topTop - h * 0.12, w * 0.6, h * 0.03)]} />
+      {bunk(topTop, '#7E57C2', 'bunk-top')}
+      {bunk(bottomTop, '#26A69A', 'bunk-bottom')}
+      {/* The ladder up the side. */}
+      <View style={[styles.ladderSide, at(w * 0.74, topTop, w * 0.03, bottomTop - topTop)]} />
+      <View style={[styles.ladderSide, at(w * 0.88, topTop, w * 0.03, bottomTop - topTop)]} />
+      {[0.2, 0.45, 0.7].map((t) => (
+        <View key={t} style={[styles.ladderRung, at(w * 0.74, topTop + (bottomTop - topTop) * t, w * 0.17, h * 0.02)]} />
+      ))}
+    </>
+  );
+}
+
+/** A star night light; switched on, it glows (and stars shine on the bedroom walls). */
+function StarLamp({ w, h, on }: Drawn) {
+  return (
+    <>
+      {on ? <View style={[styles.glow, at(-w * 0.4, -h * 0.5, w * 1.8, h * 1.6)]} /> : null}
+      <View style={[styles.lampBase, at(w * 0.15, h * 0.7, w * 0.7, h * 0.3)]} />
+      <View style={[styles.starDome, on && styles.starDomeOn, at(w * 0.05, 0, w * 0.9, h * 0.76), { borderTopLeftRadius: w, borderTopRightRadius: w }]}>
+        {[
+          [0.25, 0.35],
+          [0.6, 0.25],
+          [0.45, 0.6],
+        ].map(([x, y]) => (
+          <View key={`${x}-${y}`} style={[styles.domeStar, at(w * 0.9 * x - 3, h * 0.76 * y - 3, 6, 6)]} />
+        ))}
+      </View>
+    </>
+  );
+}
+
 const styles = StyleSheet.create({
   flame: { flex: 1, transform: [{ rotate: '-8deg' }] },
   glow: { borderRadius: 999, backgroundColor: 'rgba(255, 183, 77, 0.35)' },
@@ -413,4 +600,47 @@ const styles = StyleSheet.create({
   blade: { backgroundColor: '#42A5F5', borderRadius: 99, borderWidth: 1.5, borderColor: OUTLINE },
   fanHub: { backgroundColor: '#FFCA28', borderWidth: 2, borderColor: OUTLINE },
   tray: { backgroundColor: TRIM, borderWidth: 2, borderColor: OUTLINE, borderRadius: 3 },
+  monitor: { backgroundColor: '#37474F', borderWidth: 3, borderColor: OUTLINE, borderRadius: 6, padding: 4 },
+  pcScreen: { flex: 1, backgroundColor: '#263238', borderRadius: 3, overflow: 'hidden', justifyContent: 'center' },
+  pcOn: { backgroundColor: '#3949AB' },
+  pcSum: { flexDirection: 'row', justifyContent: 'center', alignItems: 'center' },
+  keyboard: { backgroundColor: '#ECEFF1', borderWidth: 2, borderColor: OUTLINE, borderRadius: 3 },
+  globeStand: { backgroundColor: '#B0BEC5', borderWidth: 2, borderColor: OUTLINE },
+  globeBase: { backgroundColor: TRIM, borderWidth: 2, borderColor: OUTLINE, borderRadius: 6 },
+  globeSea: { backgroundColor: '#42A5F5', borderWidth: 3, borderColor: OUTLINE, overflow: 'hidden' },
+  land: { backgroundColor: '#66BB6A', borderWidth: 1.5, borderColor: '#2E7D32' },
+  meridian: { borderWidth: 3, borderColor: '#B0BEC5', borderLeftColor: 'transparent', borderBottomColor: 'transparent' },
+  garageFrame: { backgroundColor: '#90A4AE', borderWidth: 4, borderColor: OUTLINE, borderRadius: 4, overflow: 'hidden' },
+  outside: { position: 'absolute', left: 0, top: 0, right: 0, bottom: 0, backgroundColor: '#9ED8F5' },
+  sunDot: { backgroundColor: '#FFEB3B' },
+  driveway: { backgroundColor: '#B0BEC5' },
+  slats: { position: 'absolute', left: 0, right: 0, top: 0, backgroundColor: '#ECEFF1' },
+  slat: { flex: 1, borderBottomWidth: 2, borderColor: '#B0BEC5' },
+  handle: { position: 'absolute', bottom: 6, left: '44%', width: '12%', height: 6, borderRadius: 3, backgroundColor: '#546E7A' },
+  beam: { backgroundColor: 'rgba(255, 241, 118, 0.55)' },
+  carSeat: { backgroundColor: '#5D4037', borderWidth: 2, borderColor: OUTLINE, borderTopLeftRadius: 8, borderTopRightRadius: 8 },
+  wheelRing: { borderWidth: 4, borderColor: '#37474F' },
+  windshield: { backgroundColor: 'rgba(179, 229, 252, 0.8)', borderWidth: 2, borderColor: OUTLINE, borderRadius: 4 },
+  column: { backgroundColor: '#37474F' },
+  carBody: { backgroundColor: '#E53935', borderWidth: 3, borderColor: OUTLINE, borderBottomLeftRadius: 8, borderBottomRightRadius: 8, overflow: 'hidden' },
+  carStripe: { position: 'absolute', left: 0, right: 0, height: '18%', backgroundColor: '#FFFFFF' },
+  lightBulb: { backgroundColor: '#FFF9C4', borderWidth: 1.5, borderColor: OUTLINE, borderRadius: 4 },
+  lightOn: { backgroundColor: '#FFEE58' },
+  tail: { backgroundColor: '#B71C1C', borderRadius: 3 },
+  tyre: { backgroundColor: '#263238', borderWidth: 2, borderColor: OUTLINE, alignItems: 'center', justifyContent: 'center' },
+  hub: { backgroundColor: '#B0BEC5' },
+  spoke: { position: 'absolute', height: 3, backgroundColor: '#B0BEC5' },
+  headboard: { backgroundColor: TRIM, borderWidth: 3, borderColor: OUTLINE },
+  bedFrame: { backgroundColor: TRIM, borderWidth: 3, borderColor: OUTLINE, borderRadius: 4 },
+  pillow: { backgroundColor: '#FFFFFF', borderWidth: 2, borderColor: OUTLINE },
+  blanket: { backgroundColor: '#EC407A', borderWidth: 3, borderColor: OUTLINE, overflow: 'hidden' },
+  blanketDot: { position: 'absolute', top: '30%', width: 8, height: 8, borderRadius: 4, backgroundColor: 'rgba(255,255,255,0.6)' },
+  bunkPost: { backgroundColor: TRIM, borderWidth: 2, borderColor: OUTLINE, borderRadius: 3 },
+  bunkRail: { backgroundColor: TRIM, borderWidth: 2, borderColor: OUTLINE, borderRadius: 3 },
+  ladderSide: { backgroundColor: TRIM, borderWidth: 1.5, borderColor: OUTLINE },
+  ladderRung: { backgroundColor: TRIM, borderWidth: 1.5, borderColor: OUTLINE, borderRadius: 2 },
+  lampBase: { backgroundColor: '#7E57C2', borderWidth: 2, borderColor: OUTLINE, borderRadius: 6 },
+  starDome: { backgroundColor: '#B39DDB', borderWidth: 2, borderColor: OUTLINE, overflow: 'hidden' },
+  starDomeOn: { backgroundColor: '#FFF59D' },
+  domeStar: { backgroundColor: '#FFFFFF', borderRadius: 3 },
 });

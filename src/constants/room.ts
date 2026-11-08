@@ -17,8 +17,9 @@ export const HOME_AREAS: HomeArea[] = [
   { id: 'bedroom', name: 'Bedroom', emoji: '🛏️', paint: { wall: 0, floor: 0 } },
   { id: 'bathroom', name: 'Bathroom', emoji: '🛁', paint: { wall: 2, floor: 6 } },
   { id: 'playroom', name: 'Playroom', emoji: '🧸', paint: { wall: 5, floor: 3 } },
-  // Extra rooms, bought with coins. They start bare, ready to fill with things from the shop.
-  { id: 'backyard', name: 'Backyard', emoji: '🌳', paint: { wall: 2, floor: 3 }, price: 100 },
+  // Extra rooms, bought with coins. Each comes with a few built-in things to play with and room to fill from the shop.
+  // The backyard is outside: its "wall" paint colors the fence and its "floor" the grass.
+  { id: 'backyard', name: 'Backyard', emoji: '🌳', paint: { wall: 0, floor: 3 }, price: 100 },
   { id: 'study', name: 'Study', emoji: '📖', paint: { wall: 4, floor: 5 }, price: 120 },
   { id: 'bedroom2', name: 'Bedroom 2', emoji: '🛌', paint: { wall: 1, floor: 1 }, price: 80 },
   { id: 'bedroom3', name: 'Bedroom 3', emoji: '🌙', paint: { wall: 2, floor: 4 }, price: 100 },
@@ -378,6 +379,12 @@ export const CUPBOARDS: Cupboard[] = [
   { id: 'dresser', name: 'dresser', kind: 'drawers', area: 'bedroom', left: 1.78, width: 0.27, bottom: 0, height: 0.26, shelves: 3, doors: 1 },
   { id: 'washer', name: 'washing machine', kind: 'washer', area: 'bathroom', left: 2.18, width: 0.26, bottom: 0, height: 0.26, shelves: 1, doors: 1 },
   { id: 'playTvUnit', name: 'TV cabinet', kind: 'cupboard', area: 'playroom', left: 1.15, width: 0.3, bottom: 0, height: 0.14, shelves: 1, doors: 2 },
+  // The bought rooms.
+  { id: 'studyBooks', name: 'bookcase', kind: 'cupboard', area: 'study', left: 0.6, width: 0.28, bottom: 0, height: 0.5, shelves: 3, doors: 2 },
+  { id: 'toolCabinet', name: 'tool cabinet', kind: 'cupboard', area: 'garage', left: 1.85, width: 0.3, bottom: 0, height: 0.45, shelves: 3, doors: 2 },
+  { id: 'wardrobe2', name: 'wardrobe', kind: 'wardrobe', area: 'bedroom2', left: 1.25, width: 0.3, bottom: 0, height: 0.62, shelves: 3, doors: 2 },
+  { id: 'dresser2', name: 'dresser', kind: 'drawers', area: 'bedroom2', left: 1.7, width: 0.27, bottom: 0, height: 0.26, shelves: 3, doors: 1 },
+  { id: 'toyChest3', name: 'toy chest', kind: 'cupboard', area: 'bedroom3', left: 1.65, width: 0.36, bottom: 0, height: 0.2, shelves: 1, doors: 1 },
 ];
 
 /** A built-in ledge small things can stand on, `bottom` up from the floor line. */
@@ -404,6 +411,9 @@ export const SURFACES: Surface[] = [
   { id: 'mantel', area: 'living', left: 1.0, width: 0.6, bottom: 0.3, depth: 0.04 },
   { id: 'dresserTop', area: 'bedroom', left: 1.78, width: 0.27, bottom: 0.26, depth: 0.06 },
   { id: 'washerTop', area: 'bathroom', left: 2.18, width: 0.26, bottom: 0.26, depth: 0.06 },
+  { id: 'studyDesk', area: 'study', left: 1.05, width: 0.5, bottom: 0.2, depth: 0.08 },
+  { id: 'dresser2Top', area: 'bedroom2', left: 1.7, width: 0.27, bottom: 0.26, depth: 0.06 },
+  { id: 'toyChest3Top', area: 'bedroom3', left: 1.65, width: 0.36, bottom: 0.2, depth: 0.06 },
 ];
 
 /** Built-in appliances drawn into a room that switch on and off, or (a chalkboard) change on each tap. */
@@ -417,7 +427,20 @@ export type ApplianceKind =
   | 'microwave'
   | 'dishwasher'
   | 'aquarium'
-  | 'fan';
+  | 'fan'
+  // The backyard
+  | 'treeHouse'
+  | 'swingSet'
+  | 'playScape'
+  | 'trampoline'
+  // The bought rooms
+  | 'computer'
+  | 'globe'
+  | 'garageDoor'
+  | 'car'
+  | 'bed'
+  | 'bunkBed'
+  | 'starLamp';
 
 export interface Appliance extends FixtureSpot {
   id: string;
@@ -437,7 +460,27 @@ export const APPLIANCES: Appliance[] = [
   { id: 'dishwasher', name: 'dishwasher', kind: 'dishwasher', area: 'kitchen', left: 1.74, width: 0.18, bottom: 0, height: 0.2 },
   { id: 'aquarium', name: 'fish tank', kind: 'aquarium', area: 'living', left: 1.68, width: 0.34, bottom: 0, height: 0.22 },
   { id: 'fan', name: 'fan', kind: 'fan', area: 'bedroom', left: 0.99, width: 0.16, bottom: 0, height: 0.27 },
+  // The backyard: a tree with a tree house (tap it to climb inside), swings, a fort with a slide, and a trampoline.
+  { id: 'treeHouse', name: 'tree house', kind: 'treeHouse', area: 'backyard', left: 0.05, width: 0.5, bottom: 0, height: 0.56 },
+  { id: 'swingSet', name: 'swings', kind: 'swingSet', area: 'backyard', left: 0.62, width: 0.8, bottom: 0, height: 0.6 },
+  { id: 'playScape', name: 'slide', kind: 'playScape', area: 'backyard', left: 1.52, width: 0.58, bottom: 0, height: 0.55 },
+  { id: 'trampoline', name: 'trampoline', kind: 'trampoline', area: 'backyard', left: 2.15, width: 0.33, bottom: 0, height: 0.14 },
+  // The study
+  { id: 'computer', name: 'computer', kind: 'computer', area: 'study', left: 1.25, width: 0.24, bottom: 0.2, height: 0.2 },
+  { id: 'globe', name: 'globe', kind: 'globe', area: 'study', left: 1.7, width: 0.2, bottom: 0, height: 0.3 },
+  // The garage
+  { id: 'garageDoor', name: 'garage door', kind: 'garageDoor', area: 'garage', left: 0.08, width: 0.75, bottom: 0, height: 0.55 },
+  { id: 'car', name: 'car', kind: 'car', area: 'garage', left: 0.95, width: 0.72, bottom: 0, height: 0.26 },
+  // Bedroom 2 and 3
+  { id: 'bed2', name: 'bed', kind: 'bed', area: 'bedroom2', left: 0.48, width: 0.6, bottom: 0, height: 0.3 },
+  { id: 'bunkBed', name: 'bunk bed', kind: 'bunkBed', area: 'bedroom3', left: 0.1, width: 0.55, bottom: 0, height: 0.6 },
+  { id: 'starLamp', name: 'star lamp', kind: 'starLamp', area: 'bedroom3', left: 0.82, width: 0.14, bottom: 0, height: 0.14 },
 ];
+
+/** How far up the tree house's floor is, and the rest of its shape, as shares of the tree's box height. */
+export const TREE_HOUSE = { roofTop: 0, wallTop: 0.12, sill: 0.34, floor: 0.5 } as const;
+/** The fort's platform and the slide off it, as shares of the play scape's box. */
+export const FORT = { width: 0.42, platform: 0.5 } as const;
 
 /**
  * A spot in a built-in a buddy can be dropped into: in the bathtub, on the toilet, in the ball pit.
@@ -454,12 +497,31 @@ export interface BuiltInSeat {
   width: number;
   bottom: number;
   rim?: number;
+  /** Drawn this much smaller than a buddy usually is (to fit in the tree house or a bunk). */
+  scale?: number;
+  /** A bed: buddies in it nap (until it is tapped to bounce on). */
+  sleep?: boolean;
+  /** A swing hanging from a bar this high above the floor (in size units): the buddy swings from there. */
+  pivot?: number;
+  /** Only one buddy fits. */
+  one?: boolean;
 }
 
 export const BUILT_IN_SEATS: BuiltInSeat[] = [
   { id: 'inTub', appliance: 'tub', name: 'bathtub', area: 'bathroom', left: 0.3, width: 0.42, bottom: 0.06, rim: 0.22 },
   { id: 'onToilet', appliance: 'toilet', name: 'toilet', area: 'bathroom', left: 1.4, width: 0.16, bottom: 0.05, rim: 0.13 },
   { id: 'inBallPit', appliance: 'ballPit', name: 'ball pit', area: 'playroom', left: 0.6, width: 0.4, bottom: 0.02, rim: 0.12 },
+  // The backyard. The tree house sits at 0.5 of the tree's 0.56 height (0.28 up) and buddies look out over its sill.
+  { id: 'inTreeHouse', appliance: 'treeHouse', name: 'tree house', area: 'backyard', left: 0.16, width: 0.28, bottom: 0.28, rim: 0.37, scale: 0.55 },
+  { id: 'onSwing1', appliance: 'swingSet', name: 'swing', area: 'backyard', left: 0.62 + 0.8 * 0.27 - 0.03, width: 0.06, bottom: 0.1, pivot: 0.57, one: true },
+  { id: 'onSwing2', appliance: 'swingSet', name: 'swing', area: 'backyard', left: 0.62 + 0.8 * 0.73 - 0.03, width: 0.06, bottom: 0.1, pivot: 0.57, one: true },
+  { id: 'onFort', appliance: 'playScape', name: 'fort', area: 'backyard', left: 1.54, width: 0.2, bottom: 0.55 * 0.5 },
+  { id: 'onTrampoline', appliance: 'trampoline', name: 'trampoline', area: 'backyard', left: 2.19, width: 0.25, bottom: 0.1 },
+  // The bought rooms.
+  { id: 'inCar', appliance: 'car', name: 'car', area: 'garage', left: 1.1, width: 0.22, bottom: 0.06, rim: 0.17, one: true },
+  { id: 'inBed2', appliance: 'bed2', name: 'bed', area: 'bedroom2', left: 0.62, width: 0.36, bottom: 0.11, rim: 0.15, sleep: true },
+  { id: 'bunkTop', appliance: 'bunkBed', name: 'top bunk', area: 'bedroom3', left: 0.2, width: 0.35, bottom: 0.34, rim: 0.38, scale: 0.72, sleep: true },
+  { id: 'bunkBottom', appliance: 'bunkBed', name: 'bottom bunk', area: 'bedroom3', left: 0.2, width: 0.35, bottom: 0.05, rim: 0.09, scale: 0.72, sleep: true },
 ];
 
 export function findBuiltInSeat(id: string): BuiltInSeat | undefined {
@@ -499,6 +561,12 @@ export const GADGETS: Gadget[] = [
   { id: 'deskLamp', name: 'desk lamp', area: 'bedroom', x: 1.35, bottom: 0.2, size: 0.2, looks: [], lamp: true, glow: true },
   { id: 'bathSwitch', name: 'light switch', area: 'bathroom', x: 0.1, bottom: 0.3, size: 0.06, looks: [], lightSwitch: true },
   { id: 'playSwitch', name: 'light switch', area: 'playroom', x: 0.6, bottom: 0.3, size: 0.06, looks: [], lightSwitch: true },
+  { id: 'studySwitch', name: 'light switch', area: 'study', x: 0.95, bottom: 0.3, size: 0.06, looks: [], lightSwitch: true },
+  { id: 'studyLamp', name: 'desk lamp', area: 'study', x: 1.13, bottom: 0.2, size: 0.2, looks: [], lamp: true, glow: true },
+  { id: 'garageSwitch', name: 'light switch', area: 'garage', x: 2.3, bottom: 0.3, size: 0.06, looks: [], lightSwitch: true },
+  { id: 'bed2Switch', name: 'light switch', area: 'bedroom2', x: 1.16, bottom: 0.3, size: 0.06, looks: [], lightSwitch: true },
+  { id: 'bed2Lamp', name: 'lamp', area: 'bedroom2', x: 1.8, bottom: 0.26, size: 0.18, looks: [], lamp: true, glow: true },
+  { id: 'bed3Switch', name: 'light switch', area: 'bedroom3', x: 0.74, bottom: 0.3, size: 0.06, looks: [], lightSwitch: true },
 ];
 
 export function findCupboard(id: string): Cupboard | undefined {
