@@ -1,5 +1,12 @@
 # Change log
 
+## 2026-11-08 (safer saving, steadier Nearby)
+
+- **Saved players can't be wiped by an update.** Before an update changes the saved players, a copy is kept (the last 3). If the saved players ever fail to open, the app stops saving instead of saving an empty list over them, Home says to ask a grown-up, and the Parent area has a **Saved players** card with **Restore copy from (date)** (tap twice). The card only shows when there is a copy or a problem.
+- **Steadier Nearby connections.** Once a phone has joined a host, it stops searching for other phones, and a host stops searching once a friend has joined (it looks again if everyone leaves). Searching uses the radio heavily and made connections slow and drop out. Applies to Community visits and games on several phones.
+- New tests: upgrading saved players from every old version (1 to 13), and the backup and restore.
+- Needs the new APK (small native change). No protocol or store version change; older phones still connect.
+
 ## 2026-11-08 (farm)
 
 - **New Farm building**, the sixth on the street (after the park; the street scrolls a little further). Inside: a red barn with a hay loft and open doors, a silo, a hen house with nest boxes, an animal pen with a mud puddle, a duck pond, a vegetable patch, a windmill (tap to spin) and a tractor.

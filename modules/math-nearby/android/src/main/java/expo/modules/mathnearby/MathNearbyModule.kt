@@ -135,6 +135,12 @@ class MathNearbyModule : Module() {
       }
     }
 
+    // Searching uses the radio heavily and makes open connections slow and
+    // flaky, so phones stop searching once they are connected.
+    Function("stopFinding") {
+      stopFinding()
+    }
+
     Function("stop") {
       stopAll()
     }
@@ -142,6 +148,11 @@ class MathNearbyModule : Module() {
     OnDestroy {
       stopAll()
     }
+  }
+
+  private fun stopFinding() {
+    if (appContext.reactContext == null) return
+    client.stopDiscovery()
   }
 
   private fun stopAll() {

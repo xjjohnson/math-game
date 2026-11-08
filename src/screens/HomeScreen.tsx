@@ -12,7 +12,7 @@ import { UpdateBanner } from '@/components/UpdateBanner';
 import { OPERATIONS } from '@/constants/difficulty';
 import { levelName } from '@/constants/grades';
 import { colors, radius, spacing } from '@/constants/theme';
-import { useActiveProfile, useProfiles } from '@/store/profiles';
+import { useActiveProfile, useProfiles, useProfilesLoad } from '@/store/profiles';
 import { buddyGift } from '@/utils/buddy';
 import { dateKey, dayStreak } from '@/utils/dates';
 import { DAILY_CHALLENGE_BONUS, DAILY_PASS, dailyChallengeConfig } from '@/utils/rewards';
@@ -29,6 +29,7 @@ function greeting(name: string, dailyDone: boolean, tricky: number): string {
 
 export function HomeScreen() {
   const profile = useActiveProfile();
+  const load = useProfilesLoad();
   const today = dateKey();
   const adjustBalance = useProfiles((s) => s.adjustBalance);
   const profileId = profile?.id;
@@ -144,6 +145,11 @@ export function HomeScreen() {
   return (
     <Screen title={wide ? undefined : 'Math Game'} noHeader tab="home" wide={wide}>
       <UpdateBanner />
+      {load === 'failed' ? (
+        <View style={styles.warn} accessibilityLiveRegion="polite">
+          <Text style={styles.warnText}>⚠️ Your saved players didn't open. Ask a grown-up to look in the Parent area.</Text>
+        </View>
+      ) : null}
       {wide ? (
         <View style={styles.row}>
           <View style={styles.left}>{scene}</View>
@@ -168,6 +174,8 @@ function Pill({ text, label }: { text: string; label: string }) {
 }
 
 const styles = StyleSheet.create({
+  warn: { padding: spacing.md, backgroundColor: colors.surface, borderRadius: radius.lg, borderWidth: 3, borderColor: colors.primary },
+  warnText: { fontSize: 16, fontWeight: '800', color: colors.text },
   scene: {
     backgroundColor: '#BFE6FF',
     borderRadius: radius.lg,
