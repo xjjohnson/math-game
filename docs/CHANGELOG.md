@@ -6,7 +6,7 @@
 
 ## 2026-11-08 (later)
 
-- **Bakery bowl works the way Justin asked:** drop food on the bowl and it goes *into* the bowl (small icons on top of it) while the food itself goes straight back to its shelf to use again. The bowl keeps what's in it until it's baked or tapped to tip it out, and carrying the bowl carries it all. The bowl can't be left on the floor any more (let go low, it goes up onto the counter, shelf or oven rack above). The big "Drop food in" and "Bake it in the oven" labels are gone; treat names are small.
+- **Bakery bowl works the way Justin asked:** drop food on the bowl and it goes *into* the bowl (small icons on top of it) while the food itself goes straight back to its shelf to use again. The bowl keeps what's in it until it's baked or tapped to tip it out, and carrying the bowl carries it all. The big "Drop food in" and "Bake it in the oven" labels are gone; treat names are small.
 
 - **Community things no longer reset by themselves.** A phone with no friends nearby keeps restarting its visit every 20-30 seconds to look for them, and each restart used to put everything in the buildings back on the shelves. Now the room stays as you left it, and a restarted visit starts from it. The bowl's hint is smaller ("Drop food in"), and once something is in the bowl it says "Bake it in the oven ➡️" (the oven is to the right, past the counter).
 

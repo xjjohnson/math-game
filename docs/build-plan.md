@@ -193,7 +193,7 @@ Phases 1-6 deliver a complete single-player game before any native Bluetooth wor
 - [x] Community street shows the bottom tab bar, so there is always a way back
 - [x] Community jobs always pay: first play of the day full pay plus bonus (5 coins or 2 hearts), same-day replays 1 coin per right answer
 - [x] Community buildings 3 screens long (park 3.4) with 100+ movable things that land on shelves; shared over Nearby (ids starting "~"; anyone may move them)
-- [x] Bakery baking: 12 ingredients dropped on a mixing bowl go in it and spring back to their shelves (contents and finished treats kept as shared switches; bowl stays off the floor; no protocol change), wrong mixes give funny messes, bowl into the hot oven for 3 s, and the recipe (cake, cookies, pie, bread, pancakes and more; src/utils/bakery.ts) comes out on the rack; tap it to eat
+- [x] Bakery baking: 12 ingredients dropped on a mixing bowl go in it and spring back to their shelves (contents and finished treats kept as shared switches; no protocol change), wrong mixes give funny messes, bowl into the hot oven for 3 s, and the recipe (cake, cookies, pie, bread, pancakes and more; src/utils/bakery.ts) comes out on the rack; tap it to eat
 - [x] Tap-to-use things: shop fridge and till, bakery mixer and oven (bakes dough), library lamp and math computers, park swings
 - [x] Visit a friend's buddy home over Nearby (read-only copy, moves not saved; protocol v7 home-ask and home messages, relayed through the host)
 

@@ -239,17 +239,9 @@ const clamp = (v: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, v
  * up the wall it drops onto the nearest shelf or counter below, or to the
  * floor if there is none. Floating things stay put.
  */
-export function settle(place: InsidePlace, prop: Pick<PropDef, 'float' | 'bowl'>, x: number, y: number): Spot {
+export function settle(place: InsidePlace, prop: Pick<PropDef, 'float'>, x: number, y: number): Spot {
   const cx = clamp(x, 0.01, 0.99);
   if (prop.float) return { x: cx, y: clamp(y, 0.1, 0.95) };
-  if (prop.bowl) {
-    // The bowl stays up on a counter, shelf or the oven rack: let go low, it goes onto whatever is above the floor there.
-    const tops = SURFACES[place].filter((s) => cx >= s.x0 && cx <= s.x1);
-    const below = tops.filter((s) => s.y >= y - 0.015).sort((a, b) => a.y - b.y)[0];
-    const lowest = tops.sort((a, b) => b.y - a.y)[0];
-    const top = below ?? lowest;
-    return top ? { x: cx, y: top.y } : { x: BOWL.x, y: BOWL.y };
-  }
   if (y >= FLOOR + 0.02) return { x: cx, y: Math.min(0.95, y) };
   const below = SURFACES[place]
     .filter((s) => cx >= s.x0 && cx <= s.x1 && s.y >= y - 0.015)

@@ -78,15 +78,6 @@ describe('things in the community rooms', () => {
     expect(onBowl({ x: bowl.x, y: bowl.y + 0.2 }, bowl)).toBe(false);
   });
 
-  it('never leaves the bowl on the floor', () => {
-    // Let go low under the counter: it goes up onto the counter.
-    expect(settle('bakery', BOWL, 0.3, 0.85)).toEqual({ x: 0.3, y: BAKERY.counter.top });
-    // Let go low under the oven: it goes onto the rack.
-    expect(settle('bakery', BOWL, 0.5, 0.85).y).toBe(BAKERY.oven.rack);
-    // Let go over the open floor with nothing above: back to its place on the counter.
-    expect(settle('bakery', BOWL, 0.42, 0.85)).toEqual({ x: BOWL.x, y: BOWL.y });
-  });
-
   it('shares the bowl and a finished treat with every phone', async () => {
     const net = createMockNetwork(2);
     const sessions = net.map((t) => new TownSession(() => t));
