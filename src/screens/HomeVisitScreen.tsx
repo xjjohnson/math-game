@@ -6,12 +6,12 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Text } from '@/components/AppText';
 import { BigButton } from '@/components/BigButton';
 import { BuddyRoom } from '@/components/BuddyRoom';
-import { HOME_AREAS, seasonOf } from '@/constants/room';
+import { seasonOf } from '@/constants/room';
 import { colors, radius, spacing } from '@/constants/theme';
 import { townSession, useTownState } from '@/services/townSession';
 import { useActiveProfile } from '@/store/profiles';
 import type { Profile, Room } from '@/types';
-import { BUDDY_KEY, moveInRoom } from '@/utils/room';
+import { areasOf, BUDDY_KEY, moveInRoom } from '@/utils/room';
 
 /**
  * A friend's buddy home, sent over Nearby while visiting in the community.
@@ -57,9 +57,10 @@ export function HomeVisitScreen() {
 
   const snap = home.snap;
   // Moves happen on a copy, through the same rules as your own home.
-  const pretend = { ...me, room, homeRooms: snap.homeRooms } as Profile;
+  const pretend = { ...me, room, homeRooms: snap.homeRooms, homeOrder: snap.homeOrder } as Profile;
+  const areas = areasOf(snap.homeOrder);
   const owned = (i: number) => {
-    const a = HOME_AREAS[i];
+    const a = areas[i];
     return !!a && (a.price === undefined || snap.homeRooms.includes(a.id));
   };
   const buddies = snap.buddies.map((b) => ({ ...b, spot: room.buddies[b.id] ?? b.spot }));
@@ -70,8 +71,9 @@ export function HomeVisitScreen() {
       <BuddyRoom
         room={room}
         buddies={buddies}
+        areas={areas}
         area={area}
-        forSale={HOME_AREAS.filter((_, i) => !owned(i)).map((a) => a.id)}
+        forSale={areas.filter((_, i) => !owned(i)).map((a) => a.id)}
         onAreaChange={setArea}
         season={seasonOf(new Date().getMonth())}
         tidying={false}
@@ -89,7 +91,7 @@ export function HomeVisitScreen() {
             <Text style={styles.roundText}>⬅️</Text>
           </Pressable>
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.rooms}>
-            {HOME_AREAS.map((a, i) => (
+            {areas.map((a, i) => (
               <Pressable
                 key={a.id}
                 onPress={() => setArea(i)}

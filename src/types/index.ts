@@ -97,6 +97,8 @@ export interface Profile {
   looks: Record<string, PersonLook>;
   /** Ids of the extra rooms (HomeArea.price) bought for the buddies' home. */
   homeRooms: string[];
+  /** Order of the rooms in the home, left to right, as HomeArea ids. Missing means the starting order. */
+  homeOrder?: string[];
   /** Community buildings whose daily job is done, for today only. */
   town: TownVisits;
 }

@@ -30,6 +30,7 @@ import {
   FLOOR_COLORS,
   GADGETS,
   HOME_AREAS,
+  type HomeArea,
   WALL_COLORS,
   type Appliance,
   type AreaId,
@@ -73,7 +74,9 @@ export interface HomeBuddy {
 interface Props {
   room: Room;
   buddies: HomeBuddy[];
-  /** Area in view, an index into HOME_AREAS. Changing it scrolls there. */
+  /** Rooms left to right in the player's order; the starting order when missing. */
+  areas?: HomeArea[];
+  /** Area in view, a place along `areas`. Changing it scrolls there. */
   area: number;
   onAreaChange: (area: number) => void;
   /** The middle of the screen, as a share of the home's width, as the home scrolls. */
@@ -174,6 +177,7 @@ interface Pop {
 export function BuddyRoom(props: Props) {
   const { room, buddies, area, onAreaChange, onView, tidying, season, onPlaceThing, onPlaceBuddy } = props;
   const { onTapThing, onTapBuddy, onToggle, onTapGadget, onTapAppliance, onWash, cheer, forSale = [], coins = 0, onBuyRoom } = props;
+  const areas = props.areas ?? HOME_AREAS;
   const [view, setView] = useState({ width: 0, height: 0 });
   const [open, setOpen] = useState<ReadonlySet<string>>(new Set());
   const [lit, setLit] = useState<ReadonlySet<string>>(new Set());
@@ -201,7 +205,7 @@ export function BuddyRoom(props: Props) {
   const edgeTimer = useRef<ReturnType<typeof setInterval> | null>(null);
   const scrollX = useRef(0);
   const reported = useRef(area);
-  const size: HomeSize | null = view.width > 0 && view.height > 0 ? homeSize(view.width, view.height) : null;
+  const size: HomeSize | null = view.width > 0 && view.height > 0 ? homeSize(view.width, view.height, areas.map((a) => a.id)) : null;
 
   useEffect(
     () => () => {
@@ -354,7 +358,7 @@ export function BuddyRoom(props: Props) {
 
   /** Where light shines in a dark room: lit fires, candles and lamps, with how far it reaches. */
   const lightPools = () => {
-    const inDark = (x: number) => dark.has(HOME_AREAS[Math.min(AREA_COUNT - 1, Math.floor(x / size.areaWidth))]?.id);
+    const inDark = (x: number) => dark.has(areas[Math.min(AREA_COUNT - 1, Math.floor(x / size.areaWidth))]?.id);
     const pools: { key: string; x: number; y: number; r: number }[] = [];
     for (const p of pieces) {
       if (p.item?.light && lit.has(p.key)) pools.push({ key: p.key, x: p.x, y: p.y - p.height * 0.6, r: size.unit * 0.3 });
@@ -556,7 +560,7 @@ export function BuddyRoom(props: Props) {
         style={{ height: size.height }}
         contentContainerStyle={{ width: size.width, height: size.height }}
       >
-        {HOME_AREAS.map((a, i) => (
+        {areas.map((a, i) => (
           <Area
             key={a.id}
             id={a.id}
@@ -763,7 +767,7 @@ export function BuddyRoom(props: Props) {
           })}
         </View>
 
-        {HOME_AREAS.map((a, i) =>
+        {areas.map((a, i) =>
           dark.has(a.id) ? (
             <View
               key={a.id}
@@ -772,7 +776,7 @@ export function BuddyRoom(props: Props) {
             />
           ) : null,
         )}
-        {HOME_AREAS.map((a, i) =>
+        {areas.map((a, i) =>
           forSale.includes(a.id) ? (
             <ForSale key={a.id} index={i} size={size} name={a.name} emoji={a.emoji} price={a.price ?? 0} coins={coins} onBuy={() => onBuyRoom?.(a.id)} />
           ) : null,

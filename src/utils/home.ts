@@ -32,9 +32,11 @@ export interface HomeSize {
   unit: number;
   /** Where the wall meets the floor. */
   floorY: number;
+  /** Area ids left to right; built-ins sit in their room wherever it is. */
+  order: string[];
 }
 
-export function homeSize(viewWidth: number, viewHeight: number): HomeSize {
+export function homeSize(viewWidth: number, viewHeight: number, order: string[] = HOME_AREAS.map((a) => a.id)): HomeSize {
   const unit = Math.round(Math.min(viewHeight, viewWidth * 1.15));
   const screen = Math.max(Math.round(viewWidth), Math.round(unit * 1.05));
   const areaWidth = Math.round(screen * ROOM_SPAN);
@@ -45,6 +47,7 @@ export function homeSize(viewWidth: number, viewHeight: number): HomeSize {
     areaWidth,
     unit,
     floorY: Math.round(viewHeight * FLOOR_LINE),
+    order,
   };
 }
 
@@ -55,14 +58,14 @@ export interface Box {
   height: number;
 }
 
-function areaIndex(id: string): number {
-  return Math.max(0, HOME_AREAS.findIndex((a) => a.id === id));
+function areaIndex(id: string, size: HomeSize): number {
+  return Math.max(0, size.order.indexOf(id));
 }
 
 /** A built-in's box across the whole home. */
 export function fixtureBox(f: FixtureSpot, size: HomeSize): Box {
   return {
-    left: areaIndex(f.area) * size.areaWidth + f.left * size.screen,
+    left: areaIndex(f.area, size) * size.areaWidth + f.left * size.screen,
     width: f.width * size.screen,
     top: size.floorY - (f.bottom + f.height) * size.unit,
     height: f.height * size.unit,
@@ -90,13 +93,13 @@ export function shelvesOf(c: Cupboard, size: HomeSize): Shelves {
 
 /** A ledge's height and its left and right ends. */
 export function surfaceLine(s: Surface, size: HomeSize): { y: number; left: number; right: number } {
-  const left = areaIndex(s.area) * size.areaWidth + s.left * size.screen;
+  const left = areaIndex(s.area, size) * size.areaWidth + s.left * size.screen;
   return { y: size.floorY - s.bottom * size.unit, left, right: left + s.width * size.screen };
 }
 
 /** Where a buddy sits in a built-in seat, its left and right ends, and the rim it hides behind. */
 export function seatLine(s: BuiltInSeat, size: HomeSize): { y: number; left: number; right: number; rimY: number } {
-  const left = areaIndex(s.area) * size.areaWidth + s.left * size.screen;
+  const left = areaIndex(s.area, size) * size.areaWidth + s.left * size.screen;
   const y = size.floorY - s.bottom * size.unit;
   return { y, left, right: left + s.width * size.screen, rimY: size.floorY - (s.rim ?? s.bottom) * size.unit };
 }
@@ -105,7 +108,7 @@ export function seatLine(s: BuiltInSeat, size: HomeSize): { y: number; left: num
 export function gadgetBox(g: Gadget, size: HomeSize): Box {
   const side = g.size * size.unit;
   return {
-    left: areaIndex(g.area) * size.areaWidth + g.x * size.screen - side / 2,
+    left: areaIndex(g.area, size) * size.areaWidth + g.x * size.screen - side / 2,
     top: size.floorY - g.bottom * size.unit - side,
     width: side,
     height: side,

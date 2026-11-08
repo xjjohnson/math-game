@@ -65,7 +65,7 @@ import {
 import { dateKey } from '@/utils/dates';
 import { homeBuddiesOf } from '@/utils/homeVisit';
 import { generate } from '@/utils/mathEngine';
-import { BUDDY_KEY, buddiesHome, FIXTURE_KEY, ownsArea } from '@/utils/room';
+import { areasOf, BUDDY_KEY, buddiesHome, FIXTURE_KEY, ownsArea } from '@/utils/room';
 import { createRng, pick, randomSeed } from '@/utils/seededRandom';
 import { owns } from '@/utils/shop';
 import { canWear, lookOf, outfitOf } from '@/utils/wardrobe';
@@ -111,7 +111,7 @@ interface Game {
  */
 export function BuddyScreen() {
   const profile = useActiveProfile();
-  const { careForBuddy, equip, buyRoomItem, buyHomeRoom, moveInRoom, setPlaced, paintRoom, setBuddyHome, wear, undress, setLook, takeOff, moveWearable } =
+  const { careForBuddy, equip, buyRoomItem, buyHomeRoom, moveInRoom, moveHomeRoom, setPlaced, paintRoom, setBuddyHome, wear, undress, setLook, takeOff, moveWearable } =
     useProfiles();
   const insets = useSafeAreaInsets();
   const [line, setLine] = useState<string | null>(
@@ -181,7 +181,8 @@ export function BuddyScreen() {
   const hearts = buddyHearts(profile, buddyId);
   const level = buddyLevel(hearts);
   const month = new Date().getMonth();
-  const areaName = HOME_AREAS[area]?.name.toLowerCase() ?? 'room';
+  const areas = areasOf(profile.homeOrder);
+  const areaName = areas[area]?.name.toLowerCase() ?? 'room';
 
   const say = (text: string) => setLine(text);
   const home = buddiesHome(profile);
@@ -293,9 +294,10 @@ export function BuddyScreen() {
         <BuddyRoom
           room={profile.room}
           buddies={homeBuddies}
+          areas={areas}
           area={area}
           findBuddy={findBuddy}
-          forSale={HOME_AREAS.filter((_, i) => !ownsArea(profile, i)).map((a) => a.id)}
+          forSale={areas.filter((_, i) => !ownsArea(profile, i)).map((a) => a.id)}
           coins={profile.coins}
           onBuyRoom={(areaId) => {
             const r = buyHomeRoom(profile.id, areaId);
@@ -378,7 +380,7 @@ export function BuddyScreen() {
               <Text style={styles.roundText}>⬅️</Text>
             </Pressable>
             <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.roomsScroll} contentContainerStyle={styles.rooms}>
-              {HOME_AREAS.map((a, i) => (
+              {areas.map((a, i) => (
                 <Pressable
                   key={a.id}
                   onPress={() => setArea(i)}
@@ -525,7 +527,7 @@ export function BuddyScreen() {
               <ShopDrawer
                 coins={profile.coins}
                 month={month}
-                area={area}
+                areaId={areas[area]?.id ?? 'living'}
                 full={profile.room.things.length >= MAX_ROOM_THINGS}
                 onBuy={buy}
               />
@@ -555,6 +557,13 @@ export function BuddyScreen() {
                 paint={profile.room.paint[area] ?? { wall: 0, floor: 0 }}
                 areaName={areaName}
                 onPaint={(part, color) => paintRoom(profile.id, part, color, area)}
+                canLeft={area > 0}
+                canRight={area < areas.length - 1}
+                onMove={(dir) => {
+                  moveHomeRoom(profile.id, area, dir);
+                  setArea(area + dir);
+                  say(`The ${areaName} moved ${dir < 0 ? 'left' : 'right'}!`);
+                }}
               />
             ) : null}
           </View>
@@ -884,17 +893,18 @@ interface ShopDrawerProps {
   coins: number;
   /** This month, 0 = January; holiday things only show in their month. */
   month: number;
-  area: number;
+  /** The room in view. */
+  areaId: string;
   full: boolean;
   onBuy: (itemId: string) => void;
 }
 
-function ShopDrawer({ coins, month, area, full, onBuy }: ShopDrawerProps) {
+function ShopDrawer({ coins, month, areaId, full, onBuy }: ShopDrawerProps) {
   // Shop shelves with something on sale this month; the shelf starts on the room in view.
   const groups = ROOM_ITEM_GROUPS.filter((g) => ROOM_ITEMS.some((i) => i.group === g.id && inSeason(i, month)));
   const [picked, setShelf] = useState<RoomItemGroup | null>(null);
   const holiday = groups.find((g) => ROOM_ITEMS.some((i) => i.group === g.id && i.month === month));
-  const here = HOME_AREAS[area]?.id ?? 'living';
+  const here = areaId;
   const shelfOf: Partial<Record<string, RoomItemGroup>> = {
     playroom: 'toys',
     bedroom2: 'bedroom',
@@ -904,7 +914,7 @@ function ShopDrawer({ coins, month, area, full, onBuy }: ShopDrawerProps) {
     garage: 'toys',
   };
   const shelf = picked ?? holiday?.id ?? shelfOf[here] ?? (here as RoomItemGroup);
-  const areaName = HOME_AREAS[area]?.name.toLowerCase() ?? 'room';
+  const areaName = HOME_AREAS.find((a) => a.id === areaId)?.name.toLowerCase() ?? 'room';
   return (
     <>
       <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chips}>
@@ -1026,9 +1036,13 @@ interface PaintDrawerProps {
   paint: { wall: number; floor: number };
   areaName: string;
   onPaint: (part: 'wall' | 'floor', color: number) => void;
+  canLeft: boolean;
+  canRight: boolean;
+  /** Swaps this room with its neighbor: -1 left, 1 right. */
+  onMove: (dir: -1 | 1) => void;
 }
 
-function PaintDrawer({ paint, areaName, onPaint }: PaintDrawerProps) {
+function PaintDrawer({ paint, areaName, onPaint, canLeft, canRight, onMove }: PaintDrawerProps) {
   const swatches = (part: 'wall' | 'floor', list: string[]) => (
     <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chips}>
       <Text style={styles.paintLabel}>{part === 'wall' ? '🎨 Walls' : '🟫 Floor'}</Text>
@@ -1054,6 +1068,11 @@ function PaintDrawer({ paint, areaName, onPaint }: PaintDrawerProps) {
       <Text style={styles.hint}>Free paint for the {areaName}.</Text>
       {swatches('wall', WALL_COLORS)}
       {swatches('floor', FLOOR_COLORS)}
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chips}>
+        <Text style={styles.paintLabel}>↔️ Move</Text>
+        {canLeft ? <Chip label={`⬅️ ${areaName} left`} on={false} onPress={() => onMove(-1)} /> : null}
+        {canRight ? <Chip label={`${areaName} right ➡️`} on={false} onPress={() => onMove(1)} /> : null}
+      </ScrollView>
     </>
   );
 }
