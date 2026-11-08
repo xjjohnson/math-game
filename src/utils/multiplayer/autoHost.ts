@@ -48,8 +48,9 @@ export function shownName(name: string, mark: string): string {
  * tag, or null for an older phone) that it has seen for `seenMs`?
  */
 export function shouldYield(mine: string, other: string | null, seenMs: number): boolean {
-  // Older phones never give way, so join them.
-  if (other === null) return true;
+  // An older phone (no tag) starts over every 20-30 seconds and then joins a
+  // host it finds, so stay put and let it come; giving way to it would chase it.
+  if (other === null) return false;
   if (other === mine) return false;
   return mine < other || seenMs >= YIELD_AFTER_MS;
 }
