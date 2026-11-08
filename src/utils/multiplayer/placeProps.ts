@@ -6,7 +6,7 @@ import type { Spot } from '@/utils/multiplayer/scene';
 /**
  * The things inside each community building that anyone can pick up and move:
  * pencils and books at school, cans and fruit in the shop, bowls and pastries in the bakery, books in the
- * library, ducks and toys in the park. All numbers are shares of the room's
+ * library, ducks and toys in the park, animals and eggs on the farm. All numbers are shares of the room's
  * width (x) and height (y), so every phone puts them in the same place.
  *
  * The furniture they sit on is listed here too, so the drawing and the
@@ -46,6 +46,16 @@ export interface PropDef {
   made?: number;
   /** Library: which book this is (see libraryBooks.ts); tap it to read it. */
   book?: number;
+  /** Drawn this many times the usual size (a cow, a tractor). */
+  scale?: number;
+  /** Farm: an animal, and what it says when it's tapped. */
+  says?: string;
+  /** Farm: an egg; dropped in the egg basket it goes in and a new one is back in the nest. */
+  egg?: boolean;
+  /** Farm: the egg basket itself. */
+  eggBasket?: boolean;
+  /** Farm: food an animal can eat (drop it on one). */
+  food?: boolean;
 }
 
 /** A row of shelves inside one cabinet: the cabinet runs from x0 to x1, with a shelf at each height in rows. */
@@ -114,8 +124,23 @@ export const PARK = {
   blanket: { x0: 0.88, x1: 0.98, y0: 0.7, y1: 0.82 },
 };
 
+// --- Farm ---
+export const FARM = {
+  /** The red barn, with a hay loft inside, and the silo beside it. */
+  barn: { x0: 0.03, x1: 0.23, top: 0.12, loft: 0.3 },
+  silo: { x0: 0.24, x1: 0.285, top: 0.1 },
+  /** The hen house: a roof to stand on and two rows of nest boxes. */
+  coop: { x0: 0.31, x1: 0.45, top: 0.24, rows: [0.39, 0.53] } as Shelves,
+  /** The animal pen's fence, with a mud puddle inside it. */
+  pen: { x0: 0.5, x1: 0.73 },
+  mud: { x0: 0.53, x1: 0.66, y0: 0.72, y1: 0.85 },
+  pond: { x0: 0.755, x1: 0.865, y0: 0.67, y1: 0.8 },
+  /** The vegetable patch: rows of soil with food growing. */
+  garden: { x0: 0.88, x1: 0.985, y0: 0.64, y1: 0.75 },
+};
+
 /** How many screens wide each inside place is. */
-export const INSIDE_SCREENS: Record<InsidePlace, number> = { school: 3, shop: 3, bakery: 3, library: 3, park: 3.4 };
+export const INSIDE_SCREENS: Record<InsidePlace, number> = { school: 3, shop: 3, bakery: 3, library: 3, park: 3.4, farm: 3.4 };
 
 const shelfSurfaces = (s: Shelves): Surface[] => [
   { x0: s.x0 + 0.005, x1: s.x1 - 0.005, y: s.top },
@@ -152,6 +177,10 @@ export const SURFACES: Record<InsidePlace, Surface[]> = {
     { x0: PARK.slide.x0, x1: PARK.slide.x0 + 0.05, y: PARK.slide.top },
     ...PARK.tree.branches.map((y, i) => ({ x0: PARK.tree.x - 0.055 + i * 0.01, x1: PARK.tree.x + 0.055 - i * 0.01, y })),
   ],
+  farm: [
+    { x0: FARM.barn.x0 + 0.02, x1: FARM.barn.x1 - 0.02, y: FARM.barn.loft },
+    ...shelfSurfaces(FARM.coop),
+  ],
 };
 
 const row = (emojis: string[], x0: number, x1: number, y: number, tag: string): PropDef[] =>
@@ -182,6 +211,60 @@ export const BOWL_SWITCH = 'bowl';
 export const madeSwitch = (slot: number): string => `made-${slot}`;
 
 const asIngredient = (keys: string[]) => (p: PropDef, i: number): PropDef => ({ ...p, ingredient: ingredientIndex(keys[i]) });
+
+/** The farm's nest boxes, three to a row: where each one's middle is. */
+export const nestX = (i: number): number => FARM.coop.x0 + ((i + 0.5) * (FARM.coop.x1 - FARM.coop.x0)) / 3;
+
+/** The egg basket on the farm: drop eggs in it to count them. */
+export const EGG_BASKET: PropDef = { id: 'basket', emoji: '🧺', x: 0.475, y: 0.8, scale: 1.5, eggBasket: true };
+/** The switch that keeps how many eggs are in the basket: x is the count over EGG_BASKET_MAX. */
+export const EGG_BASKET_SWITCH = 'basket';
+export const EGG_BASKET_MAX = 30;
+export const eggsToUnit = (n: number): number => clamp(Math.round(n), 0, EGG_BASKET_MAX) / EGG_BASKET_MAX;
+export const unitToEggs = (u: number): number => clamp(Math.round(u * EGG_BASKET_MAX), 0, EGG_BASKET_MAX);
+
+const animal = (id: string, emoji: string, x: number, y: number, says: string, scale = 1.5): PropDef => ({ id, emoji, x, y, says, scale });
+const food = (id: string, emoji: string, x: number, y: number): PropDef => ({ id, emoji, x, y, food: true });
+const egg = (id: string, x: number, y: number): PropDef => ({ id, emoji: '🥚', x, y, egg: true });
+
+const FARM_PROPS: PropDef[] = [
+  // In the barn: hay up in the loft, a cat asleep beside it, the horse and the cow below.
+  food('hay1', '🌾', 0.07, FARM.barn.loft),
+  food('hay2', '🌾', 0.11, FARM.barn.loft),
+  animal('cat', '🐈', 0.18, FARM.barn.loft, 'Meow!', 1.1),
+  animal('horse', '🐎', 0.08, 0.8, 'Neigh!', 2),
+  animal('cow', '🐄', 0.18, 0.86, 'Moo!', 2),
+  // The hen house: a rooster on the roof, hens on their nests, and eggs to collect.
+  animal('rooster', '🐓', 0.38, FARM.coop.top, 'Cock-a-doodle-doo!', 1.2),
+  animal('hen1', '🐔', nestX(0), FARM.coop.rows[0], 'Cluck cluck!', 1.1),
+  egg('egg1', nestX(1), FARM.coop.rows[0]),
+  animal('hen2', '🐔', nestX(2), FARM.coop.rows[0], 'Cluck cluck!', 1.1),
+  egg('egg2', nestX(0), FARM.coop.rows[1]),
+  egg('egg3', nestX(1), FARM.coop.rows[1]),
+  animal('hen3', '🐔', nestX(2), FARM.coop.rows[1], 'Cluck cluck!', 1.1),
+  animal('chick1', '🐥', 0.34, 0.7, 'Peep peep!', 0.9),
+  animal('chick2', '🐤', 0.39, 0.73, 'Peep!', 0.9),
+  EGG_BASKET,
+  // The pen: a pig in the mud, a sheep and a goat.
+  animal('pig', '🐖', 0.6, 0.8, 'Oink oink!', 1.7),
+  animal('sheep', '🐑', 0.535, 0.68, 'Baa!', 1.6),
+  animal('goat', '🐐', 0.69, 0.71, 'Maa!', 1.6),
+  animal('turkey', '🦃', 0.7, 0.88, 'Gobble gobble!', 1.4),
+  // The duck pond.
+  animal('duck1', '🦆', 0.785, 0.74, 'Quack!', 1.2),
+  animal('duck2', '🦆', 0.835, 0.77, 'Quack quack!', 1.2),
+  animal('dog', '🐕', 0.8, 0.9, 'Woof woof!', 1.4),
+  // The vegetable patch, with a rabbit, and the tractor.
+  food('carrot1', '🥕', 0.895, 0.7),
+  food('carrot2', '🥕', 0.915, 0.7),
+  food('corn', '🌽', 0.94, 0.7),
+  food('lettuce', '🥬', 0.965, 0.7),
+  food('apple', '🍎', 0.875, 0.88),
+  animal('bunny', '🐇', 0.9, 0.82, 'Sniff sniff!', 1.2),
+  { id: 'tractor', emoji: '🚜', x: 0.95, y: 0.86, scale: 2.2 },
+  { id: 'fly', emoji: '🦋', x: 0.5, y: 0.4, float: true },
+  { id: 'bee', emoji: '🐝', x: 0.93, y: 0.52, float: true },
+];
 
 export const PLACE_PROPS: Record<InsidePlace, PropDef[]> = {
   school: [
@@ -258,6 +341,7 @@ export const PLACE_PROPS: Record<InsidePlace, PropDef[]> = {
     { id: 'bee', emoji: '🐝', x: 0.92, y: 0.5, float: true },
     ...row(['🌻', '🌷', '🌼'], 0.555, 0.59, 0.64, 'w'),
   ],
+  farm: FARM_PROPS,
 };
 
 /** Every prop's piece id starts with this, so the host knows anyone may move it. */
@@ -287,6 +371,26 @@ export function settle(place: InsidePlace, prop: Pick<PropDef, 'float'>, x: numb
     .sort((a, b) => a.y - b.y)[0];
   return { x: cx, y: below ? below.y : FLOOR + 0.04 };
 }
+
+/** Whether an egg let go at `s` lands in the egg basket sitting at `basket`. */
+export function onBasket(s: Spot, basket: Spot): boolean {
+  return Math.abs(s.x - basket.x) <= 0.035 && s.y >= basket.y - 0.2 && s.y <= basket.y + 0.05;
+}
+
+/** Whether food let go at `s` is on the animal standing at `at` (somewhere over its body). */
+export function onAnimal(s: Spot, at: Spot, scale = 1.5): boolean {
+  return Math.abs(s.x - at.x) <= 0.012 * scale + 0.01 && s.y >= at.y - 0.08 * scale && s.y <= at.y + 0.04;
+}
+
+const inOval = (s: Spot, o: { x0: number; x1: number; y0: number; y1: number }): boolean => {
+  const cx = (o.x0 + o.x1) / 2;
+  const cy = (o.y0 + o.y1) / 2;
+  return ((s.x - cx) / ((o.x1 - o.x0) / 2)) ** 2 + ((s.y - cy) / ((o.y1 - o.y0) / 2)) ** 2 <= 1;
+};
+/** Whether a spot is in the farm's mud puddle (an animal there rolls about in it). */
+export const inMud = (s: Spot): boolean => inOval(s, FARM.mud);
+/** Whether a spot is in the farm's duck pond (an animal there floats and bobs). */
+export const inFarmPond = (s: Spot): boolean => inOval(s, FARM.pond);
 
 /** Whether an ingredient let go at `s` lands in the mixing bowl sitting at `bowl`. */
 export function onBowl(s: Spot, bowl: Spot): boolean {

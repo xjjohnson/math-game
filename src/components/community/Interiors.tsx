@@ -4,7 +4,7 @@ import { Pressable, StyleSheet, View, type ViewStyle } from 'react-native';
 import { Text } from '@/components/AppText';
 import { Rumble, Spin, Swing } from '@/components/Motion';
 import { Chalkboard } from '@/components/community/Chalkboard';
-import { BAKERY, FLOOR, LIBRARY, PARK, SCHOOL, SHOP, type Shelves } from '@/utils/multiplayer/placeProps';
+import { BAKERY, FARM, FLOOR, LIBRARY, nestX, PARK, SCHOOL, SHOP, type Shelves } from '@/utils/multiplayer/placeProps';
 import { SWING_COUNT, SWING_PIVOT, SWING_SEAT_Y, swingName, swingX } from '@/utils/park';
 import type { TownPlace } from '@/utils/multiplayer/protocol';
 import { BUILDINGS, type BuildingId } from '@/utils/town';
@@ -55,6 +55,7 @@ export function Interior({ place, width: w, viewWidth, height: h, switches, onSw
     bakery: { wall: '#FFE9B8', floor: '#E8C9A0' },
     library: { wall: '#D7C8F0', floor: '#A1887F' },
     park: { wall: '#A5E3F7', floor: '#7CC36B' },
+    farm: { wall: '#B3E5FC', floor: '#9CCC65' },
   };
   const t = tones[place];
   const part = { w, h, floorY, on: switches, tap: onSwitch };
@@ -62,7 +63,7 @@ export function Interior({ place, width: w, viewWidth, height: h, switches, onSw
     <View style={StyleSheet.absoluteFill} pointerEvents="box-none">
       <View style={[StyleSheet.absoluteFill, { backgroundColor: t.wall }]} />
       <View style={{ position: 'absolute', left: 0, right: 0, top: floorY, bottom: 0, backgroundColor: t.floor }} />
-      {place !== 'street' && place !== 'park' ? (
+      {place !== 'street' && place !== 'park' && place !== 'farm' ? (
         <>
           {/* Floor boards and a skirting board, so the room reads as a room. */}
           {Array.from({ length: 5 }, (_, i) => (
@@ -78,6 +79,7 @@ export function Interior({ place, width: w, viewWidth, height: h, switches, onSw
       {place === 'bakery' ? <Bakery {...part} /> : null}
       {place === 'library' ? <Library {...part} /> : null}
       {place === 'park' ? <Park {...part} riding={riding} /> : null}
+      {place === 'farm' ? <Farm {...part} /> : null}
 
       {place !== 'street' ? (
         <Pressable
@@ -530,6 +532,115 @@ function Park({ w, h, floorY, on, tap, riding }: Part & { riding: number[] }) {
   );
 }
 
+/** A triangle roof from x0 to x1, its peak at `top` and its eaves at `bottom`. */
+function Roof({ w, h, x0, x1, top, bottom, color }: { w: number; h: number; x0: number; x1: number; top: number; bottom: number; color: string }) {
+  const half = ((x1 - x0) * w) / 2;
+  return (
+    <View
+      style={{
+        position: 'absolute',
+        left: x0 * w,
+        top: top * h,
+        width: 0,
+        height: 0,
+        borderLeftWidth: half,
+        borderRightWidth: half,
+        borderBottomWidth: (bottom - top) * h,
+        borderLeftColor: 'transparent',
+        borderRightColor: 'transparent',
+        borderBottomColor: color,
+      }}
+    />
+  );
+}
+
+function Farm({ w, h, floorY, on, tap }: Part) {
+  const b = FARM.barn;
+  const c = FARM.coop;
+  const eaves = b.top + 0.1;
+  const mill = { x: 0.865, top: 0.22 };
+  return (
+    <>
+      <Box w={w} h={h} x={0.015} y={0.06}><Text style={styles.sun}>☀️</Text></Box>
+      {[0.27, 0.5, 0.68, 0.95].map((x, i) => (
+        <Box key={x} w={w} h={h} x={x} y={0.07 + (i % 2) * 0.06}><Text style={styles.cloud}>☁️</Text></Box>
+      ))}
+      {/* Rolling hills behind the farm */}
+      <View style={{ position: 'absolute', left: w * 0.2, top: floorY - h * 0.16, width: w * 0.45, height: h * 0.4, borderRadius: w, backgroundColor: '#AED581' }} />
+      <View style={{ position: 'absolute', left: w * 0.58, top: floorY - h * 0.12, width: w * 0.42, height: h * 0.4, borderRadius: w, backgroundColor: '#AED581' }} />
+      <Sign w={w} h={h} x={0.455} y={0.1} text="🐄 Farm" />
+
+      {/* The red barn, open at the front so you can see the hay loft and the stalls */}
+      <Roof w={w} h={h} x0={b.x0 - 0.01} x1={b.x1 + 0.01} top={b.top} bottom={eaves} color="#8E1B1B" />
+      <View style={[edge, rect(w, h, b.x0, b.x1, eaves, FLOOR + 0.01), { backgroundColor: '#C62828' }]} />
+      <View style={[rect(w, h, b.x0 + 0.015, b.x1 - 0.015, b.loft - 0.1, FLOOR + 0.01), { backgroundColor: '#5D4037', borderTopLeftRadius: 10, borderTopRightRadius: 10 }]} />
+      <View style={[rect(w, h, b.x0 + 0.015, b.x1 - 0.015, b.loft + 0.012, FLOOR + 0.01), { backgroundColor: '#795548' }]} />
+      <Plank w={w} h={h} x0={b.x0 + 0.015} x1={b.x1 - 0.015} y={b.loft} />
+      {/* Its doors swung open, white X and all */}
+      {[b.x0 - 0.028, b.x1 + 0.003].map((x) => (
+        <View key={x} style={[edge, rect(w, h, x, x + 0.025, b.loft + 0.03, FLOOR + 0.01), styles.barnDoor]}>
+          <View style={[styles.cross, { transform: [{ rotate: '35deg' }] }]} />
+          <View style={[styles.cross, { transform: [{ rotate: '-35deg' }] }]} />
+        </View>
+      ))}
+      {/* The silo */}
+      <View style={[edge, rect(w, h, FARM.silo.x0, FARM.silo.x1, FARM.silo.top, FLOOR + 0.01), { backgroundColor: '#B0BEC5', borderTopLeftRadius: 40, borderTopRightRadius: 40 }]} />
+      {[0.25, 0.35, 0.45].map((y) => (
+        <View key={y} style={[rect(w, h, FARM.silo.x0, FARM.silo.x1, y, y + 0.006), { backgroundColor: '#78909C' }]} />
+      ))}
+
+      {/* The hen house, with straw in every nest box */}
+      <Roof w={w} h={h} x0={c.x0 - 0.008} x1={c.x1 + 0.008} top={c.top - 0.07} bottom={c.top + 0.005} color="#6D4C41" />
+      <Cabinet w={w} h={h} s={c} color="#F4E1C1" />
+      {c.rows.flatMap((y) =>
+        [0, 1, 2].map((i) => (
+          <View key={`${y}-${i}`} style={[rect(w, h, nestX(i) - 0.018, nestX(i) + 0.018, y - 0.022, y + 0.004), styles.straw]} />
+        )),
+      )}
+      <View style={[edge, rect(w, h, c.x1 - 0.004, c.x1 + 0.03, c.rows[1] + 0.01, FLOOR + 0.01), styles.ramp]} />
+
+      {/* The animal pen: a fence along the back, and the mud puddle */}
+      {Array.from({ length: 8 }, (_, i) => {
+        const x = FARM.pen.x0 + (i * (FARM.pen.x1 - FARM.pen.x0)) / 7;
+        return <View key={i} style={[edge, rect(w, h, x - 0.003, x + 0.003, FLOOR - 0.09, FLOOR + 0.03), styles.fence]} />;
+      })}
+      {[FLOOR - 0.07, FLOOR - 0.02].map((y) => (
+        <View key={y} style={[edge, rect(w, h, FARM.pen.x0 - 0.004, FARM.pen.x1 + 0.004, y, y + 0.016), styles.fence]} />
+      ))}
+      <View style={[rect(w, h, FARM.mud.x0, FARM.mud.x1, FARM.mud.y0, FARM.mud.y1), styles.mud]} />
+      <View style={[rect(w, h, FARM.mud.x0 + 0.02, FARM.mud.x0 + 0.05, FARM.mud.y0 + 0.03, FARM.mud.y0 + 0.06), styles.mudSpot]} />
+      <View style={[rect(w, h, FARM.mud.x1 - 0.05, FARM.mud.x1 - 0.025, FARM.mud.y1 - 0.06, FARM.mud.y1 - 0.035), styles.mudSpot]} />
+
+      {/* The duck pond */}
+      <View style={[edge, rect(w, h, FARM.pond.x0, FARM.pond.x1, FARM.pond.y0, FARM.pond.y1), { backgroundColor: '#4FC3F7', borderRadius: w, borderColor: '#0277BD' }]} />
+      <View style={[rect(w, h, FARM.pond.x1 - 0.03, FARM.pond.x1 - 0.012, FARM.pond.y0 + 0.02, FARM.pond.y0 + 0.045), { backgroundColor: '#66BB6A', borderRadius: 40 }]} />
+
+      {/* The windmill: tap it to spin */}
+      <View style={[edge, rect(w, h, mill.x - 0.008, mill.x + 0.008, mill.top, FLOOR + 0.01), { backgroundColor: '#ECEFF1' }]} />
+      <Pressable
+        onPress={() => tap('windmill')}
+        accessibilityRole="button"
+        accessibilityLabel={on.windmill ? 'Stop the windmill' : 'Spin the windmill'}
+        style={{ position: 'absolute', left: mill.x * w - 50, top: mill.top * h - 50, width: 100, height: 100 }}
+      >
+        <Spin active={!!on.windmill} style={{ width: 100, height: 100 }}>
+          {[45, 135].map((deg) => (
+            <View key={deg} style={[styles.blade, { transform: [{ rotate: `${deg}deg` }] }]} />
+          ))}
+          <View style={styles.hub} />
+        </Spin>
+      </Pressable>
+
+      {/* The vegetable patch */}
+      <View style={[edge, rect(w, h, FARM.garden.x0, FARM.garden.x1, FARM.garden.y0, FARM.garden.y1), styles.soil]}>
+        {[0, 1, 2].map((i) => (
+          <View key={i} style={styles.furrow} />
+        ))}
+      </View>
+    </>
+  );
+}
+
 const styles = StyleSheet.create({
   sun: { fontSize: 44 },
   tree: { position: 'absolute', fontSize: 40 },
@@ -592,4 +703,15 @@ const styles = StyleSheet.create({
   easelLeg: { position: 'absolute', top: '10%', bottom: 0, width: 6, backgroundColor: WOOD },
   easelPaper: { position: 'absolute', left: 0, right: 0, top: 0, height: '55%', backgroundColor: '#FFFFFF', borderRadius: 4, alignItems: 'center', justifyContent: 'center', padding: 4 },
   easelText: { fontSize: 13, fontWeight: '900', color: '#3B2B25', textAlign: 'center' },
+  barnDoor: { backgroundColor: '#C62828', overflow: 'hidden', alignItems: 'center', justifyContent: 'center' },
+  cross: { position: 'absolute', width: 6, height: '140%', backgroundColor: '#FFFFFF' },
+  straw: { backgroundColor: '#FBC02D', borderRadius: 30, borderWidth: 2, borderColor: '#C49000' },
+  ramp: { backgroundColor: '#A86B45', transform: [{ skewY: '30deg' }] },
+  fence: { backgroundColor: '#FFFDF5', borderWidth: 2, borderRadius: 3 },
+  mud: { backgroundColor: '#795548', borderRadius: 400, borderWidth: 3, borderColor: '#4E342E' },
+  mudSpot: { backgroundColor: '#5D4037', borderRadius: 40 },
+  blade: { position: 'absolute', left: 41, top: 0, width: 18, height: 100, borderRadius: 6, backgroundColor: '#FFFFFF', borderWidth: 2, borderColor: LINE },
+  hub: { position: 'absolute', left: 40, top: 40, width: 20, height: 20, borderRadius: 10, backgroundColor: '#E53935', borderWidth: 2, borderColor: LINE },
+  soil: { backgroundColor: '#8D6E63', borderRadius: 10, justifyContent: 'space-evenly', paddingHorizontal: 6 },
+  furrow: { height: 4, borderRadius: 2, backgroundColor: '#5D4037' },
 });

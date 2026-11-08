@@ -5,7 +5,7 @@ import { buddyCompanion } from '@/utils/buddy';
 import type { Grade, Operation, Profile, Rng, TownVisits } from '@/types';
 
 /** Places in the community the kids can visit. Each has one little job a day. */
-export type BuildingId = 'school' | 'shop' | 'bakery' | 'library' | 'park';
+export type BuildingId = 'school' | 'shop' | 'bakery' | 'library' | 'park' | 'farm';
 
 export interface Building {
   id: BuildingId;
@@ -24,6 +24,7 @@ export const BUILDINGS: Building[] = [
   { id: 'bakery', name: 'Bakery', emoji: '🥐', color: '#F9A825', job: 'Give the right change.', reward: 'coins' },
   { id: 'library', name: 'Library', emoji: '📚', color: '#5E35B1', job: 'Read number stories out loud.', reward: 'hearts' },
   { id: 'park', name: 'Park', emoji: '🌳', color: '#2E7D32', job: 'Count and share with your buddy.', reward: 'hearts' },
+  { id: 'farm', name: 'Farm', emoji: '🐄', color: '#8D4A2B', job: 'Collect the right number of eggs.', reward: 'coins' },
 ];
 
 export const SHIFT_QUESTIONS = 5;
@@ -41,7 +42,72 @@ export interface TownQuestion {
   choices: number[];
   /** Money jobs: the player hands back change with coins and bills instead of picking an answer. */
   change?: { price: number; paid: number; item: string; bills: number[] };
+  /** Farm: the player collects eggs into a basket (one at a time, or by the box) until it holds the answer. */
+  eggs?: { units: number[] };
 }
+
+/** How eggs come on the farm: one at a time, a box of 10, a crate of 100 (ten boxes), a truck of 1000. */
+export const EGG_UNITS = [1, 10, 100, 1000] as const;
+
+/** The egg sizes offered at a grade: single eggs first, then boxes of ten, then crates and trucks for big numbers. */
+export function eggUnits(grade: Grade, answer: number): number[] {
+  const units = [1];
+  if (grade >= 1 || answer >= 10) units.push(10);
+  if (grade >= 3 || answer >= 100) units.push(100);
+  if (grade >= 5 || answer >= 1000) units.push(1000);
+  return units;
+}
+
+/** Adds up the eggs in the basket. */
+export const eggsIn = (basket: number[]): number => basket.reduce((a, b) => a + b, 0);
+
+/** A gentle nudge after the wrong number of eggs. */
+export function eggHint(answer: number, have: number, grade: Grade): string {
+  const off = have > answer ? 'That is a few too many eggs.' : 'Not enough eggs yet.';
+  if (grade === 0) return `${off} Count them again, one at a time.`;
+  return `${off} You have ${have}. ${have > answer ? 'Tap some in the basket to put them back.' : 'Keep collecting.'}`;
+}
+
+const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`;
+
+/** One egg job: a little farm story whose answer is how many eggs go in the basket. */
+function eggQuestion(grade: Grade, rng: Rng): TownQuestion {
+  for (let tries = 0; tries < 20; tries++) {
+    // Kindergarten sometimes just counts eggs into the basket.
+    if (grade === 0 && rng() < 0.4) {
+      const n = randInt(rng, 2, 10);
+      return eggsAsked(`Put ${n} eggs in the basket.`, n, grade, rng);
+    }
+    const p = generate(pick(rng, schoolOps(grade)), 'easy', rng, grade);
+    let { a, b } = p;
+    let answer = p.answer;
+    if (p.operation === 'subtract' && answer < 0) [a, b, answer] = [b, a, -answer];
+    if (answer < 1) continue;
+    switch (p.operation) {
+      case 'add':
+        return eggsAsked(`The hens laid ${plural(a, 'egg', 'eggs')} this morning and ${b} more after lunch. Collect them all!`, answer, grade, rng);
+      case 'subtract':
+        return eggsAsked(`There are ${plural(a, 'egg', 'eggs')} in the hen house. ${b} go to the bakery. Collect the eggs that are left.`, answer, grade, rng);
+      case 'multiply':
+        return eggsAsked(
+          a === 1 ? `1 hen laid ${plural(b, 'egg', 'eggs')}. Collect them all!` : `${a} hens each laid ${plural(b, 'egg', 'eggs')}. Collect them all!`,
+          answer,
+          grade,
+          rng,
+        );
+      case 'divide':
+        return eggsAsked(`${a} eggs are shared equally into ${b} baskets. Fill one basket!`, answer, grade, rng);
+    }
+  }
+  return eggsAsked('Put 5 eggs in the basket.', 5, grade, rng);
+}
+
+const eggsAsked = (prompt: string, answer: number, grade: Grade, rng: Rng): TownQuestion => ({
+  prompt,
+  answer,
+  choices: generateChoices(answer, rng),
+  eggs: { units: eggUnits(grade, answer) },
+});
 
 /** The US bills offered for giving change: $1, $5, $10, $20, and bigger ones where the amounts need them. */
 export function changeBills(grade: Grade): number[] {
@@ -206,6 +272,9 @@ export function shiftQuestions(building: BuildingId, grade: Grade, rng: Rng): To
         out.push(question(`🦆 ${ducks} ducks are on the pond and ${more} more waddle over. How many ducks now?`, ducks + more, rng));
         break;
       }
+      case 'farm':
+        out.push(eggQuestion(grade, rng));
+        break;
     }
   }
   return out;

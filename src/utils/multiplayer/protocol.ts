@@ -3,7 +3,7 @@ import type { Difficulty, Grade, Operation } from '@/types';
 import { parseHomeSnapshot, type HomeSnapshot } from '@/utils/homeVisit';
 
 /** Bump when messages change shape, so phones on different builds say so instead of misbehaving. */
-export const PROTOCOL_VERSION = 8;
+export const PROTOCOL_VERSION = 9;
 
 /**
  * The oldest version that can still play matches with this one. v5 only added
@@ -16,8 +16,8 @@ export const MIN_GAME_VERSION = 4;
 export const TOWN_VERSION = 5;
 
 /** Where a visitor is in the community: the street, or inside one building. */
-export type TownPlace = 'street' | 'school' | 'shop' | 'bakery' | 'library' | 'park';
-export const TOWN_PLACES: readonly TownPlace[] = ['street', 'school', 'shop', 'bakery', 'library', 'park'];
+export type TownPlace = 'street' | 'school' | 'shop' | 'bakery' | 'library' | 'park' | 'farm';
+export const TOWN_PLACES: readonly TownPlace[] = ['street', 'school', 'shop', 'bakery', 'library', 'park', 'farm'];
 
 /**
  * The first version with the school (v8 added it next to the corner shop) and its
@@ -25,6 +25,12 @@ export const TOWN_PLACES: readonly TownPlace[] = ['street', 'school', 'shop', 'b
  * know, so they are asked to update before they can visit.
  */
 export const SCHOOL_VERSION = 8;
+
+/**
+ * The first version with the farm (v9 added it as a sixth building). Like the
+ * school, an older phone would see a street without it, so it is asked to update first.
+ */
+export const FARM_VERSION = 9;
 
 /** Chalk colors on the school board; 0 is the eraser (it draws in the board's own green). */
 export const CHALK_COLORS = ['#2F5D46', '#FFFFFF', '#FFF176', '#F48FB1', '#81D4FA', '#FFB74D'] as const;
@@ -85,7 +91,7 @@ export interface PlayerInfo {
 export const MAX_BUDDIES = 3;
 
 /** People, their buddies, and the things in the rooms (and their switches) that anyone can move. */
-export const MAX_SPOTS = 240;
+export const MAX_SPOTS = 320;
 
 /** Where a piece was put in its scene: a player's id, or `${playerId}:b${n}` for one of their buddies. */
 export interface SpotEntry {

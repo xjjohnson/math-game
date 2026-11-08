@@ -6,6 +6,7 @@ import { Text } from '@/components/AppText';
 import { BigButton } from '@/components/BigButton';
 import { ChangeGiving } from '@/components/ChangeGiving';
 import { ChoiceButtons } from '@/components/ChoiceButtons';
+import { EggCollecting } from '@/components/EggCollecting';
 import { Screen } from '@/components/Screen';
 import { colors, fontSizes, spacing } from '@/constants/theme';
 import { usePlace } from '@/hooks/usePlace';
@@ -67,6 +68,17 @@ export function ShiftScreen() {
           hand={q.change.bills}
           grade={profile.grade}
           coins={changeBills(profile.grade)}
+          onDone={(rightFirstTry) => {
+            setSelected(q.answer);
+            if (rightFirstTry) setCorrect((n) => n + 1);
+          }}
+        />
+      ) : q.eggs ? (
+        <EggCollecting
+          key={index}
+          answer={q.answer}
+          grade={profile.grade}
+          units={q.eggs.units}
           onDone={(rightFirstTry) => {
             setSelected(q.answer);
             if (rightFirstTry) setCorrect((n) => n + 1);

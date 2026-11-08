@@ -14,10 +14,12 @@ import { Text } from '@/components/AppText';
 import { BuddyFigure } from '@/components/BuddyFigure';
 import { BookReader } from '@/components/community/BookReader';
 import { FLOOR, Interior } from '@/components/community/Interiors';
-import { Bob, Swing } from '@/components/Motion';
+import { Bob, Lively, Swing, Wallow } from '@/components/Motion';
 import { ACCESSORIES, GLASSES } from '@/components/VisitPanel';
 import { townSession, useTownState, WAVE_MS } from '@/services/townSession';
 import { useActiveProfile } from '@/store/profiles';
+import { useSettings } from '@/store/settings';
+import { speakText } from '@/utils/feedback';
 import {
   bake,
   madeRecipe,
@@ -38,7 +40,16 @@ import {
   isInside,
   madeSwitch,
   BOWL_SWITCH,
+  EGG_BASKET,
+  EGG_BASKET_MAX,
+  EGG_BASKET_SWITCH,
+  eggsToUnit,
+  inFarmPond,
+  inMud,
   MIXER_MIDDLE,
+  onAnimal,
+  onBasket,
+  unitToEggs,
   onBowl,
   onMixer,
   PLACE_PROPS,
@@ -76,7 +87,7 @@ const SLIDE_STEP_MS = 60;
 const inRoom = (s: Spot): Spot => ({ x: clamp(s.x, 0.01, 0.99), y: clamp(s.y, 0.08, 0.95) });
 
 /** How many screens wide each place is; the street and the buildings are long, so they scroll. */
-export const ROOM_SCREENS: Record<TownPlace, number> = { street: 3.4, ...INSIDE_SCREENS };
+export const ROOM_SCREENS: Record<TownPlace, number> = { street: 4, ...INSIDE_SCREENS };
 
 /**
  * The widest one screen's worth of room gets, compared with its height: about a phone held
@@ -94,6 +105,9 @@ export function roomWidth(viewW: number, viewH: number, place: TownPlace): numbe
 const BAKE_MS = 3000;
 /** How long the mixer whirrs before the bowl is mixed. */
 const MIX_MS = 1500;
+/** How long an animal's "Moo!" stays over its head. */
+const SAY_MS = 1800;
+
 /** On joining a friend, things this phone moved this recently are put back the way this phone had them. */
 const KEEP_MY_CHANGES_MS = 10 * 60 * 1000;
 
@@ -127,6 +141,9 @@ type Piece =
   | { key: string; kind: 'pal'; person: TownPerson; spot: Spot; value: string }
   | { key: string; kind: 'prop'; prop: PropDef; spot: Spot; baked: boolean; shown: string; badge?: string; caption?: string; batter?: boolean };
 
+/** How big a room thing is drawn, compared with the usual size. */
+const scaleOf = (prop: PropDef): number => prop.scale ?? (prop.big ? 1.4 : 1);
+
 /**
  * A full-screen, side-view place. Everyone who is here stands in it as their
  * character; you can move yourself, your buddies, and the things in the room
@@ -143,6 +160,8 @@ export function CommunityRoom({ place, onDoor, onExit }: Props) {
   const [drawing, setDrawing] = useState(false);
   /** The library book open on this phone (only this phone: friends read their own). */
   const [reading, setReading] = useState<{ book: number; cover: string } | null>(null);
+  /** Farm: what an animal just said ("Moo!", "Yum!") and when, shown over its head on this phone. */
+  const [said, setSaid] = useState<Record<string, { text: string; at: number }>>({});
   const scroller = useRef<ScrollViewInstance>(null);
 
   const visiting = status !== 'off';
@@ -271,8 +290,16 @@ export function CommunityRoom({ place, onDoor, onExit }: Props) {
   const bowlMask = bakery ? unitToMask(spotsNow[bowlSwitch]?.x ?? 0) : 0;
   const bowlMixed = bowlMask !== 0 && (spotsNow[bowlSwitch]?.y ?? 0) >= 0.5;
   const bowlSpot: Spot = spotsNow[propPieceId('bakery', BOWL.id)] ?? { x: BOWL.x, y: BOWL.y };
-  const latest = useRef({ spotsNow, bowlSpot, bowlMask, bowlMixed });
-  latest.current = { spotsNow, bowlSpot, bowlMask, bowlMixed };
+  // The farm's egg basket: how many eggs are in it, kept as a switch too.
+  const farm = place === 'farm';
+  const basketSwitch = switchPieceId('farm', EGG_BASKET_SWITCH);
+  const eggCount = farm ? unitToEggs(spotsNow[basketSwitch]?.x ?? 0) : 0;
+  const basketSpot: Spot = spotsNow[propPieceId('farm', EGG_BASKET.id)] ?? { x: EGG_BASKET.x, y: EGG_BASKET.y };
+  const animalSpots: { key: string; spot: Spot; prop: PropDef }[] = farm
+    ? PLACE_PROPS.farm.filter((p) => p.says).map((p) => ({ key: propPieceId('farm', p.id), prop: p, spot: spotsNow[propPieceId('farm', p.id)] ?? { x: p.x, y: p.y } }))
+    : [];
+  const latest = useRef({ spotsNow, bowlSpot, bowlMask, bowlMixed, eggCount, basketSpot, animalSpots });
+  latest.current = { spotsNow, bowlSpot, bowlMask, bowlMixed, eggCount, basketSpot, animalSpots };
 
   const props: Piece[] = inside
     ? PLACE_PROPS[place].flatMap((prop): Piece[] => {
@@ -287,6 +314,7 @@ export function CommunityRoom({ place, onDoor, onExit }: Props) {
         }
         const baked = !!prop.bakeTo && isOn(bakedSwitch(prop.id));
         const piece: Piece = { key, kind: 'prop', prop, spot, baked, shown: baked && prop.bakeTo ? prop.bakeTo : prop.emoji };
+        if (prop.eggBasket && eggCount) piece.badge = `🥚 ${eggCount}`;
         if (prop.bowl && bowlMask) {
           piece.batter = bowlMixed;
           if (bowlMixed) piece.caption = 'Mixed!';
@@ -348,8 +376,35 @@ export function CommunityRoom({ place, onDoor, onExit }: Props) {
     if (!intoBowl(prop, s)) return;
     move(bowlSwitch, maskToUnit(addToMask(latest.current.bowlMask, prop.ingredient as number)), 0);
   };
+  /** An animal says something over its head for a moment, out loud too when sounds are on. */
+  const say = (key: string, text: string) => {
+    const at = Date.now();
+    setSaid((m) => ({ ...m, [key]: { text, at } }));
+    setTimeout(() => setSaid((m) => (m[key]?.at === at ? Object.fromEntries(Object.entries(m).filter(([k]) => k !== key)) : m)), SAY_MS);
+    if (useSettings.getState().sound) speakText(text.replace(/[^\p{L}\p{N}!?.,' -]/gu, '').trim(), true);
+  };
+  /** An egg let go over the basket goes in it (and a new egg is back in the nest). */
+  const intoBasket = (prop: PropDef, s: Spot): boolean => !!prop.egg && onBasket(s, latest.current.basketSpot);
+  /** The animal some food was let go on, if any. */
+  const fedAnimal = (prop: PropDef, s: Spot) => (prop.food ? latest.current.animalSpots.find((a) => onAnimal(s, a.spot, a.prop.scale)) : undefined);
+  const dropFarm = (prop: PropDef, s: Spot) => {
+    if (intoBasket(prop, s)) {
+      move(basketSwitch, eggsToUnit(Math.min(EGG_BASKET_MAX, latest.current.eggCount + 1)), 0);
+      return;
+    }
+    const fed = fedAnimal(prop, s);
+    if (fed) say(fed.key, 'Yum! ❤️');
+  };
+
   /** Tap the bowl to tip it out (on the mixer, tapping it starts the mixer); tap a finished treat to eat it. */
   const tapProp = (prop: PropDef): (() => void) | undefined => {
+    if (prop.says) return () => say(propPieceId(place as InsidePlace, prop.id), prop.says as string);
+    if (prop.eggBasket)
+      return () => {
+        const n = latest.current.eggCount;
+        say(propPieceId('farm', prop.id), n ? `${n} ${n === 1 ? 'egg' : 'eggs'}!` : 'Put eggs in me!');
+        if (n) move(basketSwitch, 0, 0);
+      };
     if (prop.bowl) return () => (onMixer(latest.current.bowlSpot) ? flip('mixer') : move(bowlSwitch, 0, 0));
     if (prop.made !== undefined) return () => move(switchPieceId('bakery', madeSwitch(prop.made as number)), 0, 0);
     if (prop.book !== undefined) return () => setReading({ book: prop.book as number, cover: prop.emoji });
@@ -418,7 +473,7 @@ export function CommunityRoom({ place, onDoor, onExit }: Props) {
           ...playground(piece.key),
         };
       }
-      const size = piece.prop.big ? propSize * 1.4 : propSize;
+      const size = propSize * scaleOf(piece.prop);
       const box = size * 1.25;
       const prop = piece.prop;
       return {
@@ -428,11 +483,11 @@ export function CommunityRoom({ place, onDoor, onExit }: Props) {
         box: { left: x - box / 2, top: y - box + size * 0.1, width: box, height: box },
         fit: inRoom,
         land: (s) => {
-          if (intoBowl(prop, s)) return { x: prop.x, y: prop.y };
+          if (intoBowl(prop, s) || intoBasket(prop, s) || fedAnimal(prop, s)) return { x: prop.x, y: prop.y };
           const at = settle(place as InsidePlace, prop, s.x, s.y);
           return prop.bowl && onMixer(at) ? { ...at, x: MIXER_MIDDLE } : at;
         },
-        onDrop: prop.ingredient !== undefined ? (s) => dropIngredient(prop, s) : undefined,
+        onDrop: prop.ingredient !== undefined ? (s) => dropIngredient(prop, s) : prop.egg || prop.food ? (s) => dropFarm(prop, s) : undefined,
         onTap: tapProp(prop),
       };
     })
@@ -486,11 +541,13 @@ export function CommunityRoom({ place, onDoor, onExit }: Props) {
                   badge={piece.badge}
                   batter={piece.batter}
                   caption={piece.caption}
+                  said={said[piece.key]}
+                  splash={!held && farm && piece.prop.says ? (inMud(spot) ? 'mud' : inFarmPond(spot) ? 'swim' : undefined) : undefined}
                   spot={spot}
                   lifted={!!held}
                   w={roomW}
                   h={h}
-                  size={piece.prop.big ? propSize * 1.4 : propSize}
+                  size={propSize * scaleOf(piece.prop)}
                 />
               );
             })}
@@ -899,6 +956,10 @@ interface PropProps {
   caption?: string;
   /** The bowl is full of mixed batter. */
   batter?: boolean;
+  /** Farm: what this animal just said, shown in a bubble over it (and it hops). */
+  said?: { text: string; at: number };
+  /** Farm: an animal rolling in the mud, or floating in the pond. */
+  splash?: 'mud' | 'swim';
   spot: Spot;
   lifted: boolean;
   w: number;
@@ -907,9 +968,17 @@ interface PropProps {
 }
 
 /** A thing in the room anyone can pick up: it drops onto the shelf or counter under it when let go. */
-function Prop({ prop, shown, badge, caption, batter, spot: at, lifted, w, h, size }: PropProps) {
+function Prop({ prop, shown, badge, caption, batter, said, splash, spot: at, lifted, w, h, size }: PropProps) {
   const box = size * 1.25;
-  const label = prop.bowl
+  const label = prop.says
+    ? `${shown}. Tap to hear it, drag to move${splash === 'mud' ? '. It is rolling in the mud' : ''}.`
+    : prop.eggBasket
+      ? 'Egg basket. Drop eggs in it, tap to count them.'
+      : prop.egg
+        ? 'Egg. Drop it in the egg basket.'
+        : prop.food
+          ? `${shown}. Drop it on an animal to feed it.`
+          : prop.bowl
     ? 'Mixing bowl. Drop food on it, then put it in the oven. Tap to tip it out.'
     : caption
       ? `${caption}. Tap to eat.`
@@ -921,9 +990,31 @@ function Prop({ prop, shown, badge, caption, batter, spot: at, lifted, w, h, siz
       accessibilityLabel={label}
       style={[styles.prop, { width: box, height: box, left: at.x * w - box / 2, top: at.y * h - box + size * 0.1 }, lifted && styles.lifted]}
     >
-      <Text style={{ fontSize: size, lineHeight: box }}>{shown}</Text>
+      {prop.says ? (
+        <Lively height={box} seed={prop.id} breathe bounce={said?.at} bounceKind="hop">
+          {splash === 'swim' ? (
+            <Bob seed={prop.id} rise={size * 0.05} active={false}>
+              <Text style={{ fontSize: size, lineHeight: box }}>{shown}</Text>
+            </Bob>
+          ) : (
+            <Wallow active={splash === 'mud'}>
+              <Text style={{ fontSize: size, lineHeight: box }}>{shown}</Text>
+            </Wallow>
+          )}
+        </Lively>
+      ) : (
+        <Text style={{ fontSize: size, lineHeight: box }}>{shown}</Text>
+      )}
+      {said || (prop.eggBasket && badge) ? (
+        // A speech bubble over an animal ("Moo!"), or the egg count over the basket.
+        <View pointerEvents="none" style={[styles.bubbleSpot, { bottom: box * 0.92, left: box / 2 - 90 }]}>
+          <Text numberOfLines={1} style={styles.speech}>
+            {said ? said.text : badge}
+          </Text>
+        </View>
+      ) : null}
       {batter ? <View pointerEvents="none" style={[styles.batter, { top: box * 0.42, left: box * 0.16, right: box * 0.16, height: box * 0.16 }]} /> : null}
-      {badge ? (
+      {badge && !prop.eggBasket ? (
         <Text pointerEvents="none" numberOfLines={2} style={[styles.tag, { bottom: box * 0.7, left: -box * 0.1, right: -box * 0.1, fontSize: 14, lineHeight: 17 }]}>
           {badge}
         </Text>
@@ -944,6 +1035,20 @@ const styles = StyleSheet.create({
   prop: { position: 'absolute', alignItems: 'center', justifyContent: 'flex-end' },
   tag: { position: 'absolute', textAlign: 'center', fontWeight: '800', color: '#3B2B25' },
   caption: { fontWeight: '900', color: '#3B2B25' },
+  bubbleSpot: { position: 'absolute', width: 180, alignItems: 'center', zIndex: 60 },
+  speech: {
+    textAlign: 'center',
+    fontSize: 16,
+    fontWeight: '900',
+    color: '#3B2B25',
+    backgroundColor: '#FFFFFF',
+    borderWidth: 2,
+    borderColor: '#3B2B25',
+    borderRadius: 12,
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    overflow: 'hidden',
+  },
   batter: { position: 'absolute', backgroundColor: '#E9C27D', borderRadius: 999, borderWidth: 2, borderColor: '#B98A45' },
   lifted: { transform: [{ scale: 1.12 }], zIndex: 50 },
   wave: { fontSize: 24, height: 30 },

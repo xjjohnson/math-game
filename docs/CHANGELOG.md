@@ -1,5 +1,14 @@
 # Change log
 
+## 2026-11-08 (farm)
+
+- **New Farm building**, the sixth on the street (after the park; the street scrolls a little further). Inside: a red barn with a hay loft and open doors, a silo, a hen house with nest boxes, an animal pen with a mud puddle, a duck pond, a vegetable patch, a windmill (tap to spin) and a tractor.
+- **Farm animals:** horse, cow, cat, rooster, three hens, two chicks, pig, sheep, goat, turkey, two ducks, dog and a bunny. Drag them anywhere (several fingers at once, like the other buildings). **Tap an animal** and it hops and says "Moo!", "Oink oink!", "Cock-a-doodle-doo!" and so on in a bubble, out loud too when Sounds are on. Put the pig (or anyone) in the **mud** and it rolls about; put an animal in the **pond** and it bobs. The animals breathe gently.
+- **Feed the animals:** drop hay, carrots, corn, lettuce or the apple on an animal and it says "Yum! ❤️" (the food goes back to where it grows).
+- **Collect eggs:** drag eggs from the nest boxes into the egg basket; the basket counts them (🥚 3) and a new egg is back in the nest. Tap the basket to count out loud and empty it. The count is shared with friends on a visit.
+- **Farm job: collect eggs.** Five farm stories at your grade ("The hens laid 4 eggs this morning and 3 more after lunch. Collect them all!"). Tap the hen house to put eggs in your basket: single eggs, boxes of 10 (1st grade up), crates of 100 (3rd grade up), trucks of 1000 (5th grade up). Single eggs line up in fives so they are easy to count. Tap one in the basket to put it back. A hint and a second try before the answer is shown. Kindergarten counts and adds only. Pays coins.
+- **Needs the new APK on every phone** (protocol v9). A phone that hasn't updated is asked to update before it can visit the Community.
+
 ## 2026-11-08 (wide tablets)
 
 - **Home fits a tablet on its side.** When the screen is wider than tall, the street scene sits on the left and Play, Daily, Friends, Learn how and the star level sit on the right, all on one screen with no scrolling.
