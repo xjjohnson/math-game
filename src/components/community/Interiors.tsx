@@ -1,9 +1,10 @@
-import { useState, type ReactNode } from 'react';
+import { Fragment, useState, type ReactNode } from 'react';
 import { Pressable, StyleSheet, View, type ViewStyle } from 'react-native';
 
 import { Text } from '@/components/AppText';
 import { Rumble, Spin, Swing } from '@/components/Motion';
-import { BAKERY, FLOOR, LIBRARY, PARK, SHOP, type Shelves } from '@/utils/multiplayer/placeProps';
+import { Chalkboard } from '@/components/community/Chalkboard';
+import { BAKERY, FLOOR, LIBRARY, PARK, SCHOOL, type Shelves } from '@/utils/multiplayer/placeProps';
 import type { TownPlace } from '@/utils/multiplayer/protocol';
 import { BUILDINGS, type BuildingId } from '@/utils/town';
 
@@ -33,6 +34,8 @@ interface Props {
   onDoor: (id: BuildingId) => void;
   /** Tap the way out, inside a building. */
   onExit: () => void;
+  /** School: fingers started or stopped drawing on the chalkboard. */
+  onDrawing?: (drawing: boolean) => void;
 }
 
 /**
@@ -40,11 +43,11 @@ interface Props {
  * wall, floor, furniture and things to tap. The things you can pick up, and
  * the people, are drawn on top by the room.
  */
-export function Interior({ place, width: w, viewWidth, height: h, switches, onSwitch, onDoor, onExit }: Props) {
+export function Interior({ place, width: w, viewWidth, height: h, switches, onSwitch, onDoor, onExit, onDrawing }: Props) {
   const floorY = h * FLOOR;
   const tones: Record<TownPlace, { wall: string; floor: string }> = {
     street: { wall: '#9BD4F5', floor: '#B0BEC5' },
-    shop: { wall: '#FFCDD2', floor: '#BCAAA4' },
+    school: { wall: '#FFF1C9', floor: '#C8A27E' },
     bakery: { wall: '#FFE9B8', floor: '#E8C9A0' },
     library: { wall: '#D7C8F0', floor: '#A1887F' },
     park: { wall: '#A5E3F7', floor: '#7CC36B' },
@@ -66,7 +69,7 @@ export function Interior({ place, width: w, viewWidth, height: h, switches, onSw
       ) : null}
 
       {place === 'street' ? <Street w={w} h={h} floorY={floorY} screenW={viewWidth} onDoor={onDoor} /> : null}
-      {place === 'shop' ? <Shop {...part} /> : null}
+      {place === 'school' ? <School {...part} onDrawing={onDrawing} /> : null}
       {place === 'bakery' ? <Bakery {...part} /> : null}
       {place === 'library' ? <Library {...part} /> : null}
       {place === 'park' ? <Park {...part} /> : null}
@@ -169,58 +172,78 @@ function Street({ w, h, floorY, screenW, onDoor }: { w: number; h: number; floor
   );
 }
 
-function Shop({ w, h, on, tap }: Part) {
-  const f = SHOP.fridge;
-  const fridgeOpen = !!on.fridge;
-  const till = !!on.till;
+function School({ w, h, on, tap, onDrawing }: Part & { onDrawing?: (drawing: boolean) => void }) {
+  const b = SCHOOL.board;
+  const t = SCHOOL.teacher;
+  const c = SCHOOL.color;
+  const bell = !!on.bell;
+  const easel = !!on.easel;
   return (
     <>
-      <Sign w={w} h={h} x={0.49} y={0.09} text="🏪 Corner shop" />
-      <Cabinet w={w} h={h} s={SHOP.shelvesA} />
-
-      {/* Fridge: tap to open the door */}
-      <Pressable
-        onPress={() => tap('fridge')}
-        accessibilityRole="button"
-        accessibilityLabel={fridgeOpen ? 'Close the fridge' : 'Open the fridge'}
-        style={[edge, rect(w, h, f.x0, f.x1, f.top, FLOOR), styles.fridge]}
-      />
-      {f.rows.map((y) => (
-        <View key={y} pointerEvents="none" style={[rect(w, h, f.x0 + 0.004, f.x1 - 0.004, y, y + 0.01), { backgroundColor: '#90A4AE' }]} />
-      ))}
-      <View
-        pointerEvents="none"
-        style={[
-          edge,
-          fridgeOpen ? rect(w, h, f.x1, f.x1 + 0.025, f.top, FLOOR) : rect(w, h, f.x0, f.x1, f.top, FLOOR),
-          { backgroundColor: fridgeOpen ? '#CFE8F7' : 'rgba(207,232,247,0.35)', borderRadius: 8 },
-        ]}
-      >
-        <View style={[styles.handle, fridgeOpen ? { right: 4 } : { left: 6 }]} />
+      <Sign w={w} h={h} x={0.45} y={0.06} text="🏫 School" />
+      {/* Number line along the top of the wall */}
+      <View style={[rect(w, h, 0.45, 0.8, 0.16, 0.22), styles.numberLine]}>
+        {Array.from({ length: 11 }, (_, i) => (
+          <Text key={i} style={styles.numberLineText}>{i}</Text>
+        ))}
       </View>
-      {fridgeOpen ? <Text pointerEvents="none" style={[styles.puff, { left: (f.x0 + 0.02) * w, top: f.top * h - 30 }]}>❄️ ❄️</Text> : null}
+      <Text style={[styles.clock, { left: 0.69 * w, top: 0.25 * h }]}>🕒</Text>
 
-      {SHOP.shelvesB.rows.map((y) => (
-        <Plank key={y} w={w} h={h} x0={SHOP.shelvesB.x0} x1={SHOP.shelvesB.x1} y={y} />
-      ))}
+      {/* The chalkboard: draw on it with your fingers */}
+      <Chalkboard left={b.x0 * w} top={b.top * h} width={(b.x1 - b.x0) * w} height={(b.bottom - b.top) * h} onDrawing={onDrawing} />
 
-      {/* Fruit stand */}
-      <View style={[edge, rect(w, h, SHOP.stand.x0, SHOP.stand.x1, SHOP.stand.top, FLOOR), { backgroundColor: '#C68B5E', borderRadius: 4 }]}>
-        {[0, 1, 2].map((i) => <View key={i} style={styles.slat} />)}
+      {/* Teacher's desk, with a bell to ring */}
+      <View style={[edge, rect(w, h, t.x0, t.x1, t.top, FLOOR), { backgroundColor: WOOD, borderRadius: 6 }]}>
+        <View style={styles.drawerFront} />
       </View>
-      <Text style={[styles.label, { left: SHOP.stand.x0 * w, top: (SHOP.stand.top + 0.03) * h }]}>Fresh fruit</Text>
-
-      {/* Counter and till: tap the till to open it */}
-      <View style={[edge, rect(w, h, SHOP.counter.x0, SHOP.counter.x1, SHOP.counter.top, FLOOR), { backgroundColor: WOOD, borderRadius: 6 }]} />
       <Pressable
-        onPress={() => tap('till')}
+        onPress={() => tap('bell')}
         accessibilityRole="button"
-        accessibilityLabel="Ring the till"
-        style={[edge, styles.till, rect(w, h, 0.9, 0.96, SHOP.counter.top - 0.08, SHOP.counter.top)]}
+        accessibilityLabel="Ring the school bell"
+        style={[styles.bellButton, rect(w, h, t.x1 - 0.03, t.x1, t.top + 0.02, t.top + 0.1)]}
       >
-        <Text style={styles.tillText}>{till ? '💵 Ka-ching!' : '🧾'}</Text>
+        <Text style={styles.bellText}>{bell ? '🔔 Ding!' : '🔔 Ring'}</Text>
       </Pressable>
-      {till ? <View pointerEvents="none" style={[edge, styles.drawer, rect(w, h, 0.9, 0.97, SHOP.counter.top + 0.005, SHOP.counter.top + 0.04)]} /> : null}
+
+      {/* Pupils' desks, each with a chair */}
+      {SCHOOL.desks.map(([x0, x1]) => (
+        <Fragment key={x0}>
+          <View style={[edge, rect(w, h, x0, x1, SCHOOL.deskTop, SCHOOL.deskTop + 0.025), { backgroundColor: '#E0A96D', borderRadius: 4 }]} />
+          {[x0 + 0.004, x1 - 0.01].map((x) => (
+            <View key={x} style={[rect(w, h, x, x + 0.006, SCHOOL.deskTop + 0.025, FLOOR + 0.03), { backgroundColor: '#78909C' }]} />
+          ))}
+          <View style={[edge, rect(w, h, x1 + 0.002, x1 + 0.006, SCHOOL.deskTop - 0.02, FLOOR + 0.03), { backgroundColor: '#42A5F5', borderWidth: 2 }]} />
+          <View style={[edge, rect(w, h, x1 - 0.012, x1 + 0.006, SCHOOL.deskTop + 0.04, SCHOOL.deskTop + 0.055), { backgroundColor: '#42A5F5', borderWidth: 2 }]} />
+        </Fragment>
+      ))}
+
+      {/* Color corner: a placeholder for coloring games */}
+      <View style={[styles.colorRug, rect(w, h, c.x0 + 0.01, c.x1 - 0.01, 0.7, 0.82)]} />
+      <Sign w={w} h={h} x={c.x0 + 0.005} y={0.08} text="🎨 Color corner" />
+      <View style={[rect(w, h, c.x0 + 0.01, c.x1 - 0.01, 0.2, 0.3), styles.artWall]}>
+        {['🌈', '🦋', '🏠', '🌻'].map((e) => (
+          <View key={e} style={[edge, styles.artPaper]}>
+            <Text style={styles.artText}>{e}</Text>
+          </View>
+        ))}
+      </View>
+      {/* Easel: tap it to see what is coming */}
+      <Pressable
+        onPress={() => tap('easel')}
+        accessibilityRole="button"
+        accessibilityLabel="Easel. Coloring games are coming soon."
+        style={rect(w, h, c.x0 + 0.005, c.x0 + 0.06, 0.32, FLOOR + 0.04)}
+      >
+        <View style={[styles.easelLeg, { left: '15%', transform: [{ rotate: '8deg' }] }]} />
+        <View style={[styles.easelLeg, { right: '15%', transform: [{ rotate: '-8deg' }] }]} />
+        <View style={[edge, styles.easelPaper]}>
+          <Text style={styles.easelText}>{easel ? 'Coloring games coming soon!' : '🖍️'}</Text>
+        </View>
+      </Pressable>
+      <View style={[edge, rect(w, h, SCHOOL.crayonTable.x0, SCHOOL.crayonTable.x1, SCHOOL.crayonTable.top, SCHOOL.crayonTable.top + 0.025), { backgroundColor: '#EC407A', borderRadius: 4 }]} />
+      {[SCHOOL.crayonTable.x0 + 0.006, SCHOOL.crayonTable.x1 - 0.012].map((x) => (
+        <View key={x} style={[rect(w, h, x, x + 0.006, SCHOOL.crayonTable.top + 0.025, FLOOR + 0.03), { backgroundColor: '#AD1457' }]} />
+      ))}
     </>
   );
 }
@@ -461,13 +484,6 @@ const styles = StyleSheet.create({
   door: { position: 'absolute', bottom: 0, backgroundColor: '#8D6E63', borderTopLeftRadius: 10, borderTopRightRadius: 10, justifyContent: 'center', alignItems: 'flex-end', paddingRight: 6 },
   knob: { width: 10, height: 10, borderRadius: 5, backgroundColor: '#FFCA28' },
   plank: { position: 'absolute', height: 12, backgroundColor: WOOD, borderRadius: 3, borderWidth: 2 },
-  fridge: { backgroundColor: '#E3F2FD', borderRadius: 8 },
-  handle: { position: 'absolute', top: '40%', width: 6, height: 40, borderRadius: 3, backgroundColor: '#78909C' },
-  puff: { position: 'absolute', fontSize: 22 },
-  slat: { height: 3, backgroundColor: 'rgba(0,0,0,0.18)', marginTop: 14 },
-  till: { backgroundColor: '#90A4AE', borderRadius: 6, alignItems: 'center', justifyContent: 'center' },
-  tillText: { fontSize: 14, fontWeight: '900', color: '#fff', textAlign: 'center' },
-  drawer: { backgroundColor: '#B0BEC5', borderRadius: 4 },
   bigWindow: { backgroundColor: '#BBDEFB', borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
   tiles: { backgroundColor: '#FFFFFF', opacity: 0.55, borderRadius: 4 },
   cupboard: { flex: 1, margin: 6, borderWidth: 2, borderColor: 'rgba(0,0,0,0.25)', borderRadius: 4 },
@@ -494,4 +510,17 @@ const styles = StyleSheet.create({
   slide: { position: 'absolute', height: 18, borderRadius: 9, backgroundColor: '#FFB300' },
   blanket: { backgroundColor: '#EF5350', borderRadius: 6, flexDirection: 'row', flexWrap: 'wrap', overflow: 'hidden' },
   check: { width: '33.3%', height: '50%', backgroundColor: 'rgba(255,255,255,0.35)', opacity: 0.6 },
+  numberLine: { flexDirection: 'row', justifyContent: 'space-around', alignItems: 'center', backgroundColor: '#FFFFFF', borderRadius: 6, borderWidth: 2, borderColor: LINE },
+  numberLineText: { fontSize: 16, fontWeight: '900', color: '#1E88E5' },
+  clock: { position: 'absolute', fontSize: 34 },
+  drawerFront: { margin: 8, height: 18, borderWidth: 2, borderColor: 'rgba(0,0,0,0.25)', borderRadius: 4 },
+  bellButton: { backgroundColor: '#FFF3D6', borderRadius: 10, borderWidth: 2, borderColor: LINE, alignItems: 'center', justifyContent: 'center' },
+  bellText: { fontSize: 12, fontWeight: '900', color: '#3B2B25', textAlign: 'center' },
+  colorRug: { backgroundColor: '#FFCC80', borderRadius: 60, borderWidth: 3, borderColor: '#FB8C00' },
+  artWall: { flexDirection: 'row', justifyContent: 'space-around', alignItems: 'center' },
+  artPaper: { backgroundColor: '#FFFFFF', borderRadius: 4, borderWidth: 2, paddingHorizontal: 4, paddingVertical: 2 },
+  artText: { fontSize: 22 },
+  easelLeg: { position: 'absolute', top: '10%', bottom: 0, width: 6, backgroundColor: WOOD },
+  easelPaper: { position: 'absolute', left: 0, right: 0, top: 0, height: '55%', backgroundColor: '#FFFFFF', borderRadius: 4, alignItems: 'center', justifyContent: 'center', padding: 4 },
+  easelText: { fontSize: 13, fontWeight: '900', color: '#3B2B25', textAlign: 'center' },
 });

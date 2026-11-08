@@ -2,6 +2,7 @@ import { useSyncExternalStore } from 'react';
 
 import { stickerText } from '@/constants/art';
 import type { Peer, Transport } from '@/services/multiplayer';
+import { chalkboard, type Chalkboard } from '@/services/chalkboard';
 import { createNearbyTransport } from '@/services/nearbyTransport';
 import type { HomeSnapshot } from '@/utils/homeVisit';
 import { advertName, newToken, shouldYield, tokenOf } from '@/utils/multiplayer/autoHost';
@@ -11,8 +12,9 @@ import {
   MAX_PLAYERS,
   ownerOf,
   PROTOCOL_VERSION,
+  SCHOOL_VERSION,
   TOWN_MARK,
-  TOWN_VERSION,
+  type ChalkStroke,
   type GameMessage,
   type PlayerInfo,
   type TownPerson,
@@ -89,7 +91,11 @@ export class TownSession {
   /** When a guest last connected, while its hello is on the way. */
   private lastConnect = 0;
 
-  constructor(private readonly makeTransport: () => Transport | null) {}
+  constructor(
+    private readonly makeTransport: () => Transport | null,
+    /** The school chalkboard this phone shows (tests give each phone its own). */
+    private readonly board: Chalkboard = chalkboard(),
+  ) {}
 
   // --- store for React ---
   getState = () => this.state;
@@ -294,6 +300,21 @@ export class TownSession {
     }
   }
 
+  // --- the school chalkboard ---
+  /** Draws (or grows) a line on the chalkboard, here and on every friend's board. */
+  drawChalk(stroke: ChalkStroke) {
+    this.board.put(stroke);
+    if (this.state.status === 'hosting') this.sendToGuests({ type: 'chalk', stroke });
+    else if (this.state.status === 'joined') this.send({ type: 'chalk', stroke });
+  }
+
+  /** Wipes the chalkboard clean, here and for everyone. */
+  wipeChalk() {
+    this.board.wipe();
+    if (this.state.status === 'hosting') this.sendToGuests({ type: 'chalk-wipe' });
+    else if (this.state.status === 'joined') this.send({ type: 'chalk-wipe' });
+  }
+
   // --- friends' homes ---
   /** Tells the session how to get this player's home when a friend asks to see it. */
   setHomeSource(source: (() => HomeSnapshot | null) | null) {
@@ -401,8 +422,8 @@ export class TownSession {
     switch (message.type) {
       case 'hello':
         this.send({ type: 'welcome', version: PROTOCOL_VERSION, you: id }, id);
-        if (message.version < TOWN_VERSION) {
-          // An older phone can play matches but doesn't know the community.
+        if (message.version < SCHOOL_VERSION) {
+          // An older phone can play matches but doesn't know this community (it still has the corner shop).
           this.send({ type: 'bye' }, id);
           this.set({ notice: `${message.name}'s phone needs the newest Math Game to visit the community.` });
           return;
@@ -419,6 +440,9 @@ export class TownSession {
           },
         ];
         this.publish();
+        // The newcomer's chalkboard shows what is on this one.
+        this.send({ type: 'chalk-wipe' }, id);
+        for (const stroke of this.board.getStrokes()) this.send({ type: 'chalk', stroke }, id);
         break;
       case 'visit':
         if (!this.roster.some((p) => p.id === id)) return;
@@ -451,6 +475,13 @@ export class TownSession {
         if (message.for && message.for !== HOST_ID) {
           if (this.roster.some((p) => p.id === message.for)) this.send(message, message.for);
         } else this.gotHome(id, message.home);
+        break;
+      case 'chalk':
+      case 'chalk-wipe':
+        if (!this.roster.some((p) => p.id === id)) return;
+        if (message.type === 'chalk') this.board.put(message.stroke);
+        else this.board.wipe();
+        this.sendToGuests(message, id);
         break;
       case 'hi':
         if (!this.roster.some((p) => p.id === id)) return;
@@ -490,6 +521,12 @@ export class TownSession {
         break;
       case 'home':
         this.gotHome(message.of, message.home);
+        break;
+      case 'chalk':
+        this.board.put(message.stroke);
+        break;
+      case 'chalk-wipe':
+        this.board.wipe();
         break;
       case 'bye':
         this.leave('The host closed the visit.');

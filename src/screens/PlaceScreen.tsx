@@ -15,15 +15,22 @@ export function PlaceScreen() {
   const profile = useActiveProfile();
   if (!building || !profile) return <Text>Nothing here.</Text>;
   const done = shiftDone(profile, building.id, dateKey());
+  const school = building.id === 'school';
   return (
     <CommunityView
       place={building.id}
       actions={
-        <BigButton
-          label={`${building.emoji} ${done ? 'Practice' : 'Do the job'}: ${building.reward === 'coins' ? 'earn coins' : 'earn hearts'}`}
-          color={done ? colors.accent : colors.correct}
-          onPress={() => router.push({ pathname: '/shift', params: { building: building.id } })}
-        />
+        <>
+          <BigButton
+            style={school ? { flex: 1, paddingHorizontal: 8 } : undefined}
+            label={`${building.emoji} ${done ? 'Practice' : 'Do the job'}: ${building.reward === 'coins' ? 'earn coins' : 'earn hearts'}`}
+            color={done ? colors.accent : colors.correct}
+            onPress={() => router.push({ pathname: '/shift', params: { building: building.id } })}
+          />
+          {school ? (
+            <BigButton style={{ flex: 1, paddingHorizontal: 8 }} label="📖 Learn how" color={colors.primary} onPress={() => router.push('/learn')} />
+          ) : null}
+        </>
       }
     />
   );

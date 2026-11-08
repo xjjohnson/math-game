@@ -3,7 +3,7 @@ import type { Difficulty, Grade, Operation } from '@/types';
 import { parseHomeSnapshot, type HomeSnapshot } from '@/utils/homeVisit';
 
 /** Bump when messages change shape, so phones on different builds say so instead of misbehaving. */
-export const PROTOCOL_VERSION = 7;
+export const PROTOCOL_VERSION = 8;
 
 /**
  * The oldest version that can still play matches with this one. v5 only added
@@ -16,8 +16,30 @@ export const MIN_GAME_VERSION = 4;
 export const TOWN_VERSION = 5;
 
 /** Where a visitor is in the community: the street, or inside one building. */
-export type TownPlace = 'street' | 'shop' | 'bakery' | 'library' | 'park';
-export const TOWN_PLACES: readonly TownPlace[] = ['street', 'shop', 'bakery', 'library', 'park'];
+export type TownPlace = 'street' | 'school' | 'bakery' | 'library' | 'park';
+export const TOWN_PLACES: readonly TownPlace[] = ['street', 'school', 'bakery', 'library', 'park'];
+
+/**
+ * The first version with the school (v8 turned the corner shop into it) and its
+ * shared chalkboard. Older phones would see a street with a building they don't
+ * know, so they are asked to update before they can visit.
+ */
+export const SCHOOL_VERSION = 8;
+
+/** Chalk colors on the school board; 0 is the eraser (it draws in the board's own green). */
+export const CHALK_COLORS = ['#2F5D46', '#FFFFFF', '#FFF176', '#F48FB1', '#81D4FA', '#FFB74D'] as const;
+/** Points in one chalk line, x then y, each 0 to CHALK_SCALE across the board. A longer line carries on as a new one. */
+export const MAX_CHALK_POINTS = 120;
+export const CHALK_SCALE = 1000;
+
+/** One line drawn on the chalkboard. */
+export interface ChalkStroke {
+  id: string;
+  /** Index into CHALK_COLORS. */
+  c: number;
+  /** x0, y0, x1, y1, ... */
+  p: number[];
+}
 
 /** The first version that can show a friend's buddy home (and move things in the community rooms). */
 export const HOME_VERSION = 7;
@@ -115,7 +137,11 @@ export type GameMessage =
    */
   | { type: 'home-ask'; of: string; for?: string }
   /** Homes (v7): player `of`'s home, or null if it can't be shown. The host passes it on to `for`. */
-  | { type: 'home'; of: string; for?: string; home: HomeSnapshot | null };
+  | { type: 'home'; of: string; for?: string; home: HomeSnapshot | null }
+  /** School (v8): a line on the chalkboard, new or grown longer. The host keeps it and passes it on. */
+  | { type: 'chalk'; stroke: ChalkStroke }
+  /** School (v8): the board was wiped clean. */
+  | { type: 'chalk-wipe' };
 
 export function encodeMessage(message: GameMessage): string {
   return JSON.stringify(message);
@@ -260,6 +286,16 @@ export function parseMessage(text: string): GameMessage | null {
       if (m.home !== null && !home) return null;
       return { type: 'home', of: m.of, ...(isId(m.for) ? { for: m.for } : {}), home };
     }
+    case 'chalk': {
+      const st = m.stroke as Record<string, unknown> | undefined;
+      if (!st || !isId(st.id) || !isInt(st.c) || st.c < 0 || st.c >= CHALK_COLORS.length) return null;
+      const pts = st.p;
+      if (!Array.isArray(pts) || pts.length < 2 || pts.length % 2 !== 0 || pts.length > MAX_CHALK_POINTS * 2) return null;
+      if (!pts.every((v) => isInt(v) && v >= 0 && v <= CHALK_SCALE)) return null;
+      return { type: 'chalk', stroke: { id: st.id, c: st.c, p: pts as number[] } };
+    }
+    case 'chalk-wipe':
+      return { type: 'chalk-wipe' };
     default:
       return null;
   }

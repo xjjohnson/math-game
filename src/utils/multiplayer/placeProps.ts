@@ -4,7 +4,7 @@ import type { Spot } from '@/utils/multiplayer/scene';
 
 /**
  * The things inside each community building that anyone can pick up and move:
- * cans and fruit in the shop, bowls and pastries in the bakery, books in the
+ * pencils and books at school, bowls and pastries in the bakery, books in the
  * library, ducks and toys in the park. All numbers are shares of the room's
  * width (x) and height (y), so every phone puts them in the same place.
  *
@@ -53,13 +53,21 @@ export interface Shelves {
   rows: number[];
 }
 
-// --- Corner shop ---
-export const SHOP = {
-  shelvesA: { x0: 0.09, x1: 0.29, top: 0.16, rows: [0.27, 0.4, 0.53] } as Shelves,
-  fridge: { x0: 0.33, x1: 0.43, top: 0.16, rows: [0.29, 0.42, 0.55] } as Shelves,
-  shelvesB: { x0: 0.47, x1: 0.65, top: 0.2, rows: [0.3, 0.45] } as Shelves,
-  stand: { x0: 0.69, x1: 0.79, top: 0.48 },
-  counter: { x0: 0.83, x1: 0.97, top: 0.45 },
+// --- School ---
+export const SCHOOL = {
+  /** The chalkboard you can draw on, with its chalk tray along the bottom. */
+  board: { x0: 0.1, x1: 0.42, top: 0.1, bottom: 0.52 },
+  teacher: { x0: 0.45, x1: 0.55, top: 0.46 },
+  /** Pupils' desks: each one's left and right edge; all the same height. */
+  desks: [
+    [0.585, 0.635],
+    [0.66, 0.71],
+    [0.735, 0.785],
+  ] as [number, number][],
+  deskTop: 0.5,
+  /** The color corner: an easel and a little crayon table, ready for coloring games. */
+  color: { x0: 0.82, x1: 0.98 },
+  crayonTable: { x0: 0.885, x1: 0.975, top: 0.5 },
 };
 
 // --- Bakery ---
@@ -95,7 +103,7 @@ export const PARK = {
 };
 
 /** How many screens wide each inside place is. */
-export const INSIDE_SCREENS: Record<InsidePlace, number> = { shop: 3, bakery: 3, library: 3, park: 3.4 };
+export const INSIDE_SCREENS: Record<InsidePlace, number> = { school: 3, bakery: 3, library: 3, park: 3.4 };
 
 const shelfSurfaces = (s: Shelves): Surface[] => [
   { x0: s.x0 + 0.005, x1: s.x1 - 0.005, y: s.top },
@@ -103,12 +111,11 @@ const shelfSurfaces = (s: Shelves): Surface[] => [
 ];
 
 export const SURFACES: Record<InsidePlace, Surface[]> = {
-  shop: [
-    ...shelfSurfaces(SHOP.shelvesA),
-    ...shelfSurfaces(SHOP.fridge).slice(1),
-    ...shelfSurfaces(SHOP.shelvesB).slice(1),
-    { ...SHOP.stand, y: SHOP.stand.top },
-    { ...SHOP.counter, y: SHOP.counter.top },
+  school: [
+    { x0: SCHOOL.board.x0 + 0.01, x1: SCHOOL.board.x1 - 0.01, y: SCHOOL.board.bottom + 0.015 },
+    { ...SCHOOL.teacher, y: SCHOOL.teacher.top },
+    ...SCHOOL.desks.map(([x0, x1]) => ({ x0, x1, y: SCHOOL.deskTop })),
+    { ...SCHOOL.crayonTable, y: SCHOOL.crayonTable.top },
   ],
   bakery: [
     { ...BAKERY.counter, y: BAKERY.counter.top },
@@ -155,21 +162,15 @@ export const madeSwitch = (slot: number): string => `made-${slot}`;
 const asIngredient = (keys: string[]) => (p: PropDef, i: number): PropDef => ({ ...p, ingredient: ingredientIndex(keys[i]) });
 
 export const PLACE_PROPS: Record<InsidePlace, PropDef[]> = {
-  shop: [
-    ...row(['🥫', '🥫', '🧂', '🍯'], SHOP.shelvesA.x0, SHOP.shelvesA.x1, SHOP.shelvesA.rows[0], 'a'),
-    ...row(['🍪', '🍫', '🍬', '🥨'], SHOP.shelvesA.x0, SHOP.shelvesA.x1, SHOP.shelvesA.rows[1], 'b'),
-    ...row(['🧻', '🧼', '🧽'], SHOP.shelvesA.x0, SHOP.shelvesA.x1, SHOP.shelvesA.rows[2], 'c'),
-    ...row(['🥛', '🧃'], SHOP.fridge.x0, SHOP.fridge.x1, SHOP.fridge.rows[0], 'f'),
-    ...row(['🧀', '🥚'], SHOP.fridge.x0, SHOP.fridge.x1, SHOP.fridge.rows[1], 'g'),
-    ...row(['🧈', '🍦'], SHOP.fridge.x0, SHOP.fridge.x1, SHOP.fridge.rows[2], 'h'),
-    ...row(['🍞', '🥐', '🥯', '🥖'], SHOP.shelvesB.x0, SHOP.shelvesB.x1, SHOP.shelvesB.rows[0], 'd'),
-    ...row(['🍚', '🫖', '🥜'], SHOP.shelvesB.x0, SHOP.shelvesB.x1, SHOP.shelvesB.rows[1], 'e'),
-    ...row(['🍎', '🍌', '🍊'], SHOP.stand.x0, SHOP.stand.x1, SHOP.stand.top, 'p'),
-    { id: 'melon', emoji: '🍉', x: 0.72, y: 0.68 },
-    { id: 'carrot', emoji: '🥕', x: 0.77, y: 0.7 },
-    { id: 'bag', emoji: '🛍️', x: 0.86, y: SHOP.counter.top },
-    { id: 'cart', emoji: '🛒', x: 0.55, y: 0.82, big: true },
-    { id: 'basket', emoji: '🧺', x: 0.2, y: 0.8 },
+  school: [
+    ...row(['🍎', '📚', '🖊️'], SCHOOL.teacher.x0, SCHOOL.teacher.x1, SCHOOL.teacher.top, 't'),
+    ...SCHOOL.desks.flatMap(([x0, x1], i) =>
+      row([['✏️', '📓'], ['📏', '📒'], ['✂️', '📘']][i], x0, x1, SCHOOL.deskTop, `d${i}`),
+    ),
+    ...row(['🖍️', '🖌️', '🎨'], SCHOOL.crayonTable.x0, SCHOOL.crayonTable.x1, SCHOOL.crayonTable.top, 'c'),
+    { id: 'globe', emoji: '🌍', x: 0.52, y: 0.84 },
+    { id: 'bag', emoji: '🎒', x: 0.63, y: 0.86 },
+    { id: 'ball', emoji: '🏀', x: 0.77, y: 0.88 },
   ],
   bakery: [
     BOWL,
