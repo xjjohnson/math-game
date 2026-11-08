@@ -1,5 +1,9 @@
 # Change log
 
+## 2026-11-08 (don't chase older phones)
+
+- A host no longer gives way to a phone that hasn't updated yet. Older phones start over every 20-30 seconds and then join a host they find, so the updated phone stays the host and lets them come, instead of the two chasing each other.
+
 ## 2026-11-08 (stay the host)
 
 - **Join or host, then stay.** Community and Several phones now work the same way: when you open them, the phone looks once for someone already hosting and joins them. If nobody is, it hosts and **stays the host**, with no more restarting every 20-30 seconds.
