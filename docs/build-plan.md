@@ -197,6 +197,7 @@ Phases 1-6 deliver a complete single-player game before any native Bluetooth wor
 - [x] Community buildings 3 screens long (park 3.4) with 100+ movable things that land on shelves; shared over Nearby (ids starting "~"; anyone may move them)
 - [x] Bakery baking: 12 ingredients dropped on a mixing bowl go in it and spring back to their shelves (contents and finished treats kept as shared switches; no protocol change), wrong mixes give funny messes, bowl on the stand mixer and tap it to mix (unmixed food bakes into a lumpy mess), bowl into the hot oven for 3 s, and the recipe (cake, cookies, pie, bread, pancakes and more; src/utils/bakery.ts) comes out on the rack; tap it to eat
 - [x] Tap-to-use things: shop fridge and till, bakery mixer and oven (bakes dough), library lamp and math computers, park swings
+- [x] Park playground: drop yourself or a buddy on a swing to sit and swing, at the slide to climb the ladder and slide down, in the tree to sit on a branch, or in the pond to swim; worked out from spots alone (src/utils/park.ts), so it shows on every phone with no protocol change
 - [x] Visit a friend's buddy home over Nearby (read-only copy, moves not saved; protocol v7 home-ask and home messages, relayed through the host)
 
 ### Profiles

@@ -1,5 +1,10 @@
 # Change log
 
+## 2026-11-08 (park playground)
+
+- **Play on the park things.** In the Park, drag yourself (or one of your buddies) onto a **swing** and you sit on it and swing. Drop yourself at the **slide** and you climb the ladder and slide down ("Wheee!"). Lift yourself into the **tree** to sit on a branch, or drop into the **pond** to swim. Drag yourself off to stop. Only one person fits on each swing.
+- Works on a Nearby visit too: friends see you swinging, climbing and sliding. No new APK needed.
+
 ## 2026-11-08 (don't chase older phones)
 
 - A host no longer gives way to a phone that hasn't updated yet. Older phones start over every 20-30 seconds and then join a host they find, so the updated phone stays the host and lets them come, instead of the two chasing each other.
