@@ -89,7 +89,7 @@ export const LIBRARY = {
 
 // --- Park ---
 export const PARK = {
-  swings: { x0: 0.08, x1: 0.2, top: 0.3 },
+  swings: { x0: 0.07, x1: 0.21, top: 0.12 },
   slide: { x0: 0.24, x1: 0.37, top: 0.34 },
   sandbox: { x0: 0.41, x1: 0.55, y0: 0.66, y1: 0.78 },
   pond: { x0: 0.59, x1: 0.75, y0: 0.66, y1: 0.82 },

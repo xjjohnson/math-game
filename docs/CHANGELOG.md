@@ -1,5 +1,10 @@
 # Change log
 
+## 2026-11-08 (park playground)
+
+- **Play on the park things.** In the Park, drag yourself (or one of your buddies) onto a **swing** and you sit on it and swing. Drop yourself at the **slide** and you climb the ladder and slide down ("Wheee!"). Lift yourself into the **tree** to sit on a branch, or drop into the **pond** to swim. Drag yourself off to stop. Only one person fits on each swing.
+- Works on a Nearby visit too: friends see you swinging, climbing and sliding. No new APK needed.
+
 ## 2026-11-08 (library books)
 
 - **Read the library books.** Tap any book on the library shelves to open it. One big page at a time with large words and a picture, ◀ ▶ buttons to turn pages, and **🔊 Read to me** to hear the page. Dragging a book still moves it.

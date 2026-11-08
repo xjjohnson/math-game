@@ -198,6 +198,7 @@ Phases 1-6 deliver a complete single-player game before any native Bluetooth wor
 - [x] Bakery baking: 12 ingredients dropped on a mixing bowl go in it and spring back to their shelves (contents and finished treats kept as shared switches; no protocol change), wrong mixes give funny messes, bowl on the stand mixer and tap it to mix (unmixed food bakes into a lumpy mess), bowl into the hot oven for 3 s, and the recipe (cake, cookies, pie, bread, pancakes and more; src/utils/bakery.ts) comes out on the rack; tap it to eat
 - [x] Community rooms take several fingers at once like the buddy home (one finger carries, another scrolls; edge-scroll while holding)
 - [x] Tap-to-use things: shop fridge and till, bakery mixer and oven (bakes dough), library lamp and math computers, park swings
+- [x] Park playground: drop yourself or a buddy on a swing to sit and swing, at the slide to climb the ladder and slide down, in the tree to sit on a branch, or in the pond to swim; worked out from spots alone (src/utils/park.ts), so it shows on every phone with no protocol change
 - [x] Library books: tap any of the 27 shelf books to read it (big words, page arrows, Read to me); 18 easy stories, and 9 story books that hide all 15 bakery recipes as "secret recipe" pages built from src/utils/bakery.ts; the open book on the rug is a guide (src/utils/libraryBooks.ts; reading is on this phone only, no store or protocol change)
 - [x] Visit a friend's buddy home over Nearby (read-only copy, moves not saved; protocol v7 home-ask and home messages, relayed through the host)
 

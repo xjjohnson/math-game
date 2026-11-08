@@ -4,6 +4,7 @@ import { Pressable, StyleSheet, View, type ViewStyle } from 'react-native';
 import { Text } from '@/components/AppText';
 import { Rumble, Spin, Swing } from '@/components/Motion';
 import { BAKERY, FLOOR, LIBRARY, PARK, SHOP, type Shelves } from '@/utils/multiplayer/placeProps';
+import { SWING_COUNT, SWING_PIVOT, SWING_SEAT_Y, swingName, swingX } from '@/utils/park';
 import type { TownPlace } from '@/utils/multiplayer/protocol';
 import { BUILDINGS, type BuildingId } from '@/utils/town';
 
@@ -29,6 +30,8 @@ interface Props {
   switches: Record<string, boolean>;
   /** Tap something that turns on and off. */
   onSwitch: (name: string) => void;
+  /** Park: the swings someone is sitting on (the room draws those, with the rider on them). */
+  riding?: number[];
   /** Tap a building's door on the street. */
   onDoor: (id: BuildingId) => void;
   /** Tap the way out, inside a building. */
@@ -40,7 +43,7 @@ interface Props {
  * wall, floor, furniture and things to tap. The things you can pick up, and
  * the people, are drawn on top by the room.
  */
-export function Interior({ place, width: w, viewWidth, height: h, switches, onSwitch, onDoor, onExit }: Props) {
+export function Interior({ place, width: w, viewWidth, height: h, switches, onSwitch, riding = [], onDoor, onExit }: Props) {
   const floorY = h * FLOOR;
   const tones: Record<TownPlace, { wall: string; floor: string }> = {
     street: { wall: '#9BD4F5', floor: '#B0BEC5' },
@@ -69,7 +72,7 @@ export function Interior({ place, width: w, viewWidth, height: h, switches, onSw
       {place === 'shop' ? <Shop {...part} /> : null}
       {place === 'bakery' ? <Bakery {...part} /> : null}
       {place === 'library' ? <Library {...part} /> : null}
-      {place === 'park' ? <Park {...part} /> : null}
+      {place === 'park' ? <Park {...part} riding={riding} /> : null}
 
       {place !== 'street' ? (
         <Pressable
@@ -370,10 +373,10 @@ function Library({ w, h, on, tap }: Part) {
   );
 }
 
-function Park({ w, h, floorY, on, tap }: Part) {
+function Park({ w, h, floorY, on, tap, riding }: Part & { riding: number[] }) {
   const s = PARK.swings;
   const sl = PARK.slide;
-  const swingLen = (FLOOR - 0.05 - s.top) * h;
+  const swingLen = (SWING_SEAT_Y - SWING_PIVOT) * h;
   // The slide runs from the top of its ladder down to the grass.
   const run = (sl.x1 - sl.x0 - 0.05) * w;
   const drop = (FLOOR - sl.top) * h;
@@ -382,23 +385,24 @@ function Park({ w, h, floorY, on, tap }: Part) {
   return (
     <>
       <Box w={w} h={h} x={0.02} y={0.07}><Text style={styles.sun}>☀️</Text></Box>
-      {[0.2, 0.47, 0.7, 0.9].map((x, i) => (
+      {[0.25, 0.47, 0.7, 0.9].map((x, i) => (
         <Box key={x} w={w} h={h} x={x} y={0.08 + (i % 2) * 0.06}><Text style={styles.cloud}>☁️</Text></Box>
       ))}
       <View style={{ position: 'absolute', left: -w * 0.05, top: floorY - h * 0.14, width: w * 0.4, height: h * 0.4, borderRadius: w, backgroundColor: '#8BD17C' }} />
       <View style={{ position: 'absolute', left: w * 0.5, top: floorY - h * 0.1, width: w * 0.45, height: h * 0.4, borderRadius: w, backgroundColor: '#8BD17C' }} />
       <Sign w={w} h={h} x={0.36} y={0.1} text="🌳 Park" />
 
-      {/* Swings: tap a seat to swing it */}
+      {/* Swings: tap a seat to push it, or put someone on it to swing */}
       <View style={[edge, rect(w, h, s.x0, s.x1, s.top, s.top + 0.015), { backgroundColor: '#E53935' }]} />
       {[s.x0, s.x1 - 0.008].map((x) => (
         <View key={x} style={[edge, rect(w, h, x, x + 0.008, s.top, FLOOR + 0.03), { backgroundColor: '#E53935' }]} />
       ))}
-      {[0, 1].map((i) => {
-        const x = s.x0 + (s.x1 - s.x0) * (i ? 0.68 : 0.32);
-        const name = `swing${i}`;
+      {Array.from({ length: SWING_COUNT }, (_, i) => {
+        if (riding.includes(i)) return null;
+        const x = swingX(i);
+        const name = swingName(i);
         return (
-          <Swing key={i} active={!!on[name]} style={{ position: 'absolute', left: x * w - 30, top: (s.top + 0.015) * h, width: 60, height: swingLen + 18 }}>
+          <Swing key={i} active={!!on[name]} style={{ position: 'absolute', left: x * w - 30, top: SWING_PIVOT * h, width: 60, height: swingLen + 16 }}>
             <Pressable onPress={() => tap(name)} accessibilityRole="button" accessibilityLabel={on[name] ? 'Stop the swing' : 'Push the swing'} style={styles.swingHit}>
               <View style={[styles.rope, { left: 8, height: swingLen }]} />
               <View style={[styles.rope, { right: 8, height: swingLen }]} />
