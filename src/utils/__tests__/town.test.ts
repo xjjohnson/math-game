@@ -16,9 +16,9 @@ describe('community shifts', () => {
     }
   });
 
-  it('makes the bakery hand back change from grade 1 up, with coins that can make the answer', () => {
+  it('makes the shop and bakery hand back change from grade 1 up, with coins that can make the answer', () => {
     for (const grade of [1, 3, 6] as const) {
-      for (const id of ['bakery'] as const) {
+      for (const id of ['shop', 'bakery'] as const) {
         const qs = shiftQuestions(id, grade, createRng(11));
         qs.forEach((q) => {
           expect(q.change).toBeDefined();
@@ -27,9 +27,7 @@ describe('community shifts', () => {
         });
       }
     }
-    expect(shiftQuestions('bakery', 0, createRng(3)).every((q) => !q.change)).toBe(true);
-    // The old corner shop's customers buy two things at the bakery counter now.
-    expect(shiftQuestions('bakery', 2, createRng(5)).some((q) => /buys a .* and a /.test(q.prompt))).toBe(true);
+    expect(shiftQuestions('shop', 0, createRng(3)).every((q) => !q.change)).toBe(true);
     expect(handedBack([5, 2, 1])).toBe(8);
   });
 
@@ -52,16 +50,16 @@ describe('community shifts', () => {
   });
 
   it('pays full rate plus a bonus on the first play, and a little on replays', () => {
-    const first = finishShift(makeProfile(), 'school', 4, today);
+    const first = finishShift(makeProfile(), 'shop', 4, today);
     expect(first.pay).toEqual({ coins: 8 + FIRST_BONUS_COINS, hearts: 0, bonus: FIRST_BONUS_COINS });
     expect(first.profile.coins - makeProfile().coins).toBe(8 + FIRST_BONUS_COINS);
-    expect(shiftDone(first.profile, 'school', today)).toBe(true);
-    const again = finishShift(first.profile, 'school', 5, today);
+    expect(shiftDone(first.profile, 'shop', today)).toBe(true);
+    const again = finishShift(first.profile, 'shop', 5, today);
     expect(again.pay).toEqual({ coins: 5 * REPLAY_COINS_PER_RIGHT, hearts: 0, bonus: 0 });
     expect(again.profile.coins - first.profile.coins).toBe(5);
-    expect(shiftDone(first.profile, 'school', '2026-11-08')).toBe(false);
+    expect(shiftDone(first.profile, 'shop', '2026-11-08')).toBe(false);
     // no bonus when nothing was right, and nothing paid on a replay with nothing right
-    expect(finishShift(makeProfile(), 'school', 0, today).pay.coins).toBe(0);
+    expect(finishShift(makeProfile(), 'shop', 0, today).pay.coins).toBe(0);
   });
 
   it('uses US bills with no 2, and pays with a few bills', () => {
@@ -97,7 +95,7 @@ describe('community shifts', () => {
     for (let grade = 1; grade <= 6; grade++) {
       const bills = changeBills(grade as 1);
       for (let seed = 0; seed < 150; seed++) {
-        for (const building of ['bakery'] as const) {
+        for (const building of ['shop', 'bakery'] as const) {
           for (const q of shiftQuestions(building, grade as 1, createRng(seed * 7 + grade))) {
             expect(q.change).toBeDefined();
             const c = q.change!;

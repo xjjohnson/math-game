@@ -5,7 +5,7 @@ import { buddyCompanion } from '@/utils/buddy';
 import type { Grade, Operation, Profile, Rng, TownVisits } from '@/types';
 
 /** Places in the community the kids can visit. Each has one little job a day. */
-export type BuildingId = 'school' | 'bakery' | 'library' | 'park';
+export type BuildingId = 'school' | 'shop' | 'bakery' | 'library' | 'park';
 
 export interface Building {
   id: BuildingId;
@@ -20,8 +20,8 @@ export interface Building {
 
 export const BUILDINGS: Building[] = [
   { id: 'school', name: 'School', emoji: '🏫', color: '#1E88E5', job: 'Answer the questions on the board.', reward: 'coins' },
-  // The bakery counter took over the old corner shop's customers: add up what they buy, then give change.
-  { id: 'bakery', name: 'Bakery', emoji: '🥐', color: '#F9A825', job: 'Add up what customers buy and give the right change.', reward: 'coins' },
+  { id: 'shop', name: 'Corner shop', emoji: '🏪', color: '#E53935', job: 'Add up what the customers buy.', reward: 'coins' },
+  { id: 'bakery', name: 'Bakery', emoji: '🥐', color: '#F9A825', job: 'Give the right change.', reward: 'coins' },
   { id: 'library', name: 'Library', emoji: '📚', color: '#5E35B1', job: 'Read number stories out loud.', reward: 'hearts' },
   { id: 'park', name: 'Park', emoji: '🌳', color: '#2E7D32', job: 'Count and share with your buddy.', reward: 'hearts' },
 ];
@@ -131,6 +131,15 @@ function schoolOps(grade: Grade): Operation[] {
   return ['add', 'subtract', 'multiply', 'divide'];
 }
 
+const SHOP_ITEMS = [
+  ['🍎', 'apple'],
+  ['🥛', 'milk'],
+  ['🍞', 'bread'],
+  ['🧃', 'juice'],
+  ['🍌', 'banana'],
+  ['🥕', 'carrot'],
+] as const;
+
 const BAKES = ['🥐 croissant', '🍪 cookie', '🧁 cupcake', '🍩 donut', '🥖 baguette'] as const;
 
 function question(prompt: string, answer: number, rng: Rng): TownQuestion {
@@ -149,27 +158,39 @@ export function shiftQuestions(building: BuildingId, grade: Grade, rng: Rng): To
         out.push({ prompt: `Teacher asks: ${p.prompt} = ?`, answer: p.answer, choices: p.choices });
         break;
       }
-      case 'bakery': {
-        // Every other customer buys two things, like the old corner shop: add them up, then give change.
-        const two = i % 2 === 1;
-        const half = Math.max(2, Math.floor(max / 2));
-        let price = randInt(rng, 1, half);
-        let second = two ? randInt(rng, 1, Math.max(1, Math.floor(max / 2))) : 0;
-        const [e1, n1] = pick(rng, BAKES).split(' ');
-        const [e2, n2] = pick(rng, BAKES).split(' ');
+      case 'shop': {
+        const [e1, n1] = pick(rng, SHOP_ITEMS);
+        const [e2, n2] = pick(rng, SHOP_ITEMS);
+        let a = randInt(rng, 1, Math.max(1, Math.floor(max / 2)));
+        let b = randInt(rng, 1, Math.max(1, Math.floor(max / 2)));
         if (grade === 0) {
-          // Kindergarten has not met subtraction, so the bakery counts up instead.
-          const more = randInt(rng, 1, Math.max(1, max - price));
-          out.push(question(`One ${n1} costs ${price} and a ${n2} costs ${more}. How much for both?`, price + more, rng));
+          out.push(question(`A customer buys a ${e1} ${n1} for ${a} and a ${e2} ${n2} for ${b}. How many coins is that?`, a + b, rng));
         } else {
-          let hand = customerPays(price + second, changeBills(grade), rng);
+          // Grown-ups' shop: add it up, take the money, give the change.
+          let hand = customerPays(a + b, changeBills(grade), rng);
           for (let tries = 0; !hand.length && tries < 20; tries++) {
-            price = randInt(rng, 1, half);
-            if (two) second = randInt(rng, 1, Math.max(1, Math.floor(max / 2)));
-            hand = customerPays(price + second, changeBills(grade), rng);
+            a = randInt(rng, 1, Math.max(1, Math.floor(max / 2)));
+            b = randInt(rng, 1, Math.max(1, Math.floor(max / 2)));
+            hand = customerPays(a + b, changeBills(grade), rng);
           }
-          if (two) out.push(changeQuestion(`A customer buys a ${e1} ${n1} for $${price} and a ${e2} ${n2} for $${second}.`, price + second, hand, `${e1}${e2}`));
-          else out.push(changeQuestion(`A ${n1} costs $${price}.`, price, hand, e1));
+          out.push(changeQuestion(`A customer buys a ${e1} ${n1} for $${a} and a ${e2} ${n2} for $${b}.`, a + b, hand, `${e1}${e2}`));
+        }
+        break;
+      }
+      case 'bakery': {
+        // Kindergarten has not met subtraction, so the bakery counts up instead.
+        let price = randInt(rng, 1, Math.max(2, Math.floor(max / 2)));
+        const [bakeEmoji, label] = pick(rng, BAKES).split(' ');
+        if (grade === 0) {
+          const second = randInt(rng, 1, Math.max(1, max - price));
+          out.push(question(`One ${label} costs ${price} and another costs ${second}. How much for both?`, price + second, rng));
+        } else {
+          let hand = customerPays(price, changeBills(grade), rng);
+          for (let tries = 0; !hand.length && tries < 20; tries++) {
+            price = randInt(rng, 1, Math.max(2, Math.floor(max / 2)));
+            hand = customerPays(price, changeBills(grade), rng);
+          }
+          out.push(changeQuestion(`A ${label} costs $${price}.`, price, hand, bakeEmoji));
         }
         break;
       }

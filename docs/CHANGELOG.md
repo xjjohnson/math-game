@@ -2,11 +2,11 @@
 
 ## 2026-11-08 (school)
 
-- **The corner shop is now a School.** Inside: a big **chalkboard** you draw or write on with your finger (or several fingers at once), with white, yellow, pink, blue and orange chalk, an eraser and a Wipe button. A teacher's desk with a bell to ring, three pupils' desks with chairs, a number line and things to move around (pencils, books, ruler, scissors, backpack).
+- **New School building** on the street, next to the corner shop. Inside: a big **chalkboard** you draw or write on with your finger (or several fingers at once), with white, yellow, pink, blue and orange chalk, an eraser and a Wipe button. A teacher's desk with a bell to ring, three pupils' desks with chairs, a number line and things to move around (pencils, books, ruler, scissors, backpack).
 - **Shared chalkboard:** on a Community visit everyone draws on the same board and sees each other's lines appear live. A friend who joins later sees what is already on it.
 - **Color corner:** an easel, a crayon table and kids' pictures on the wall, ready for coloring games later. Tap the easel: "Coloring games coming soon!"
 - **School job:** "Teacher asks" sums at your grade (kindergarten only adds). The 🏫 School button on the street now walks you into the school, and **Learn how** is a button inside it.
-- **The shop's customers moved to the Bakery counter:** the bakery job now mixes one-item customers with two-item customers you add up first, then give change with dollar bills, just like the shop did.
+- The **corner shop and its checkout job stay** as they were, so the street now has five buildings (it scrolls a little further).
 - **Needs the new APK on every phone** (protocol v8). A phone that hasn't updated is asked to update before it can visit the Community.
 
 ## 2026-11-08 (park playground)

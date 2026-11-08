@@ -4,7 +4,7 @@ import { Pressable, StyleSheet, View, type ViewStyle } from 'react-native';
 import { Text } from '@/components/AppText';
 import { Rumble, Spin, Swing } from '@/components/Motion';
 import { Chalkboard } from '@/components/community/Chalkboard';
-import { BAKERY, FLOOR, LIBRARY, PARK, SCHOOL, type Shelves } from '@/utils/multiplayer/placeProps';
+import { BAKERY, FLOOR, LIBRARY, PARK, SCHOOL, SHOP, type Shelves } from '@/utils/multiplayer/placeProps';
 import { SWING_COUNT, SWING_PIVOT, SWING_SEAT_Y, swingName, swingX } from '@/utils/park';
 import type { TownPlace } from '@/utils/multiplayer/protocol';
 import { BUILDINGS, type BuildingId } from '@/utils/town';
@@ -51,6 +51,7 @@ export function Interior({ place, width: w, viewWidth, height: h, switches, onSw
   const tones: Record<TownPlace, { wall: string; floor: string }> = {
     street: { wall: '#9BD4F5', floor: '#B0BEC5' },
     school: { wall: '#FFF1C9', floor: '#C8A27E' },
+    shop: { wall: '#FFCDD2', floor: '#BCAAA4' },
     bakery: { wall: '#FFE9B8', floor: '#E8C9A0' },
     library: { wall: '#D7C8F0', floor: '#A1887F' },
     park: { wall: '#A5E3F7', floor: '#7CC36B' },
@@ -73,6 +74,7 @@ export function Interior({ place, width: w, viewWidth, height: h, switches, onSw
 
       {place === 'street' ? <Street w={w} h={h} floorY={floorY} screenW={viewWidth} onDoor={onDoor} /> : null}
       {place === 'school' ? <School {...part} onDrawing={onDrawing} /> : null}
+      {place === 'shop' ? <Shop {...part} /> : null}
       {place === 'bakery' ? <Bakery {...part} /> : null}
       {place === 'library' ? <Library {...part} /> : null}
       {place === 'park' ? <Park {...part} riding={riding} /> : null}
@@ -247,6 +249,62 @@ function School({ w, h, on, tap, onDrawing }: Part & { onDrawing?: (drawing: boo
       {[SCHOOL.crayonTable.x0 + 0.006, SCHOOL.crayonTable.x1 - 0.012].map((x) => (
         <View key={x} style={[rect(w, h, x, x + 0.006, SCHOOL.crayonTable.top + 0.025, FLOOR + 0.03), { backgroundColor: '#AD1457' }]} />
       ))}
+    </>
+  );
+}
+
+function Shop({ w, h, on, tap }: Part) {
+  const f = SHOP.fridge;
+  const fridgeOpen = !!on.fridge;
+  const till = !!on.till;
+  return (
+    <>
+      <Sign w={w} h={h} x={0.49} y={0.09} text="🏪 Corner shop" />
+      <Cabinet w={w} h={h} s={SHOP.shelvesA} />
+
+      {/* Fridge: tap to open the door */}
+      <Pressable
+        onPress={() => tap('fridge')}
+        accessibilityRole="button"
+        accessibilityLabel={fridgeOpen ? 'Close the fridge' : 'Open the fridge'}
+        style={[edge, rect(w, h, f.x0, f.x1, f.top, FLOOR), styles.fridge]}
+      />
+      {f.rows.map((y) => (
+        <View key={y} pointerEvents="none" style={[rect(w, h, f.x0 + 0.004, f.x1 - 0.004, y, y + 0.01), { backgroundColor: '#90A4AE' }]} />
+      ))}
+      <View
+        pointerEvents="none"
+        style={[
+          edge,
+          fridgeOpen ? rect(w, h, f.x1, f.x1 + 0.025, f.top, FLOOR) : rect(w, h, f.x0, f.x1, f.top, FLOOR),
+          { backgroundColor: fridgeOpen ? '#CFE8F7' : 'rgba(207,232,247,0.35)', borderRadius: 8 },
+        ]}
+      >
+        <View style={[styles.handle, fridgeOpen ? { right: 4 } : { left: 6 }]} />
+      </View>
+      {fridgeOpen ? <Text pointerEvents="none" style={[styles.puff, { left: (f.x0 + 0.02) * w, top: f.top * h - 30 }]}>❄️ ❄️</Text> : null}
+
+      {SHOP.shelvesB.rows.map((y) => (
+        <Plank key={y} w={w} h={h} x0={SHOP.shelvesB.x0} x1={SHOP.shelvesB.x1} y={y} />
+      ))}
+
+      {/* Fruit stand */}
+      <View style={[edge, rect(w, h, SHOP.stand.x0, SHOP.stand.x1, SHOP.stand.top, FLOOR), { backgroundColor: '#C68B5E', borderRadius: 4 }]}>
+        {[0, 1, 2].map((i) => <View key={i} style={styles.slat} />)}
+      </View>
+      <Text style={[styles.label, { left: SHOP.stand.x0 * w, top: (SHOP.stand.top + 0.03) * h }]}>Fresh fruit</Text>
+
+      {/* Counter and till: tap the till to open it */}
+      <View style={[edge, rect(w, h, SHOP.counter.x0, SHOP.counter.x1, SHOP.counter.top, FLOOR), { backgroundColor: WOOD, borderRadius: 6 }]} />
+      <Pressable
+        onPress={() => tap('till')}
+        accessibilityRole="button"
+        accessibilityLabel="Ring the till"
+        style={[edge, styles.till, rect(w, h, 0.9, 0.96, SHOP.counter.top - 0.08, SHOP.counter.top)]}
+      >
+        <Text style={styles.tillText}>{till ? '💵 Ka-ching!' : '🧾'}</Text>
+      </Pressable>
+      {till ? <View pointerEvents="none" style={[edge, styles.drawer, rect(w, h, 0.9, 0.97, SHOP.counter.top + 0.005, SHOP.counter.top + 0.04)]} /> : null}
     </>
   );
 }
@@ -514,6 +572,13 @@ const styles = StyleSheet.create({
   slide: { position: 'absolute', height: 18, borderRadius: 9, backgroundColor: '#FFB300' },
   blanket: { backgroundColor: '#EF5350', borderRadius: 6, flexDirection: 'row', flexWrap: 'wrap', overflow: 'hidden' },
   check: { width: '33.3%', height: '50%', backgroundColor: 'rgba(255,255,255,0.35)', opacity: 0.6 },
+  fridge: { backgroundColor: '#E3F2FD', borderRadius: 8 },
+  handle: { position: 'absolute', top: '40%', width: 6, height: 40, borderRadius: 3, backgroundColor: '#78909C' },
+  puff: { position: 'absolute', fontSize: 22 },
+  slat: { height: 3, backgroundColor: 'rgba(0,0,0,0.18)', marginTop: 14 },
+  till: { backgroundColor: '#90A4AE', borderRadius: 6, alignItems: 'center', justifyContent: 'center' },
+  tillText: { fontSize: 14, fontWeight: '900', color: '#fff', textAlign: 'center' },
+  drawer: { backgroundColor: '#B0BEC5', borderRadius: 4 },
   numberLine: { flexDirection: 'row', justifyContent: 'space-around', alignItems: 'center', backgroundColor: '#FFFFFF', borderRadius: 6, borderWidth: 2, borderColor: LINE },
   numberLineText: { fontSize: 16, fontWeight: '900', color: '#1E88E5' },
   clock: { position: 'absolute', fontSize: 34 },

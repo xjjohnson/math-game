@@ -76,7 +76,7 @@ const SLIDE_STEP_MS = 60;
 const inRoom = (s: Spot): Spot => ({ x: clamp(s.x, 0.01, 0.99), y: clamp(s.y, 0.08, 0.95) });
 
 /** How many screens wide each place is; the street and the buildings are long, so they scroll. */
-export const ROOM_SCREENS: Record<TownPlace, number> = { street: 2.8, ...INSIDE_SCREENS };
+export const ROOM_SCREENS: Record<TownPlace, number> = { street: 3.4, ...INSIDE_SCREENS };
 
 /** How long something sits in the hot oven before it's baked. */
 const BAKE_MS = 3000;

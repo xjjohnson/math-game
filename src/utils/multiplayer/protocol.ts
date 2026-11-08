@@ -16,11 +16,11 @@ export const MIN_GAME_VERSION = 4;
 export const TOWN_VERSION = 5;
 
 /** Where a visitor is in the community: the street, or inside one building. */
-export type TownPlace = 'street' | 'school' | 'bakery' | 'library' | 'park';
-export const TOWN_PLACES: readonly TownPlace[] = ['street', 'school', 'bakery', 'library', 'park'];
+export type TownPlace = 'street' | 'school' | 'shop' | 'bakery' | 'library' | 'park';
+export const TOWN_PLACES: readonly TownPlace[] = ['street', 'school', 'shop', 'bakery', 'library', 'park'];
 
 /**
- * The first version with the school (v8 turned the corner shop into it) and its
+ * The first version with the school (v8 added it next to the corner shop) and its
  * shared chalkboard. Older phones would see a street with a building they don't
  * know, so they are asked to update before they can visit.
  */
