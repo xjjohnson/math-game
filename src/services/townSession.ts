@@ -3,7 +3,9 @@ import { useSyncExternalStore } from 'react';
 import { stickerText } from '@/constants/art';
 import type { Peer, Transport } from '@/services/multiplayer';
 import { chalkboard, type Chalkboard } from '@/services/chalkboard';
+import { easelBoard, type EaselBoard } from '@/services/easel';
 import { createNearbyTransport } from '@/services/nearbyTransport';
+import type { NumberLevel, PaintAction } from '@/utils/easel';
 import type { HomeSnapshot } from '@/utils/homeVisit';
 import { advertName, newToken, shouldYield, tokenOf } from '@/utils/multiplayer/autoHost';
 import { isSharedPiece } from '@/utils/multiplayer/placeProps';
@@ -11,6 +13,7 @@ import {
   HOST_ID,
   MAX_PLAYERS,
   ownerOf,
+  paintBatches,
   PROTOCOL_VERSION,
   FARM_VERSION,
   TOWN_MARK,
@@ -95,6 +98,8 @@ export class TownSession {
     private readonly makeTransport: () => Transport | null,
     /** The school chalkboard this phone shows (tests give each phone its own). */
     private readonly board: Chalkboard = chalkboard(),
+    /** The School easel this phone shows (tests give each phone its own). */
+    private readonly easel: EaselBoard = easelBoard(),
   ) {}
 
   // --- store for React ---
@@ -327,6 +332,32 @@ export class TownSession {
     else if (this.state.status === 'joined') this.send({ type: 'chalk-wipe' });
   }
 
+  // --- the school easel ---
+  /** Paints on the easel (new or grown brush lines, and fills), here and on every friend's easel. */
+  paint(actions: PaintAction[]) {
+    if (!actions.length) return;
+    this.easel.put(actions);
+    for (const a of paintBatches(actions)) {
+      if (this.state.status === 'hosting') this.sendToGuests({ type: 'paint', a });
+      else if (this.state.status === 'joined') this.send({ type: 'paint', a });
+    }
+  }
+
+  /** Takes back one action on the easel, here and for everyone. */
+  undoPaint(id: string) {
+    this.easel.remove(id);
+    if (this.state.status === 'hosting') this.sendToGuests({ type: 'paint-undo', id });
+    else if (this.state.status === 'joined') this.send({ type: 'paint-undo', id });
+  }
+
+  /** Puts a fresh sheet on the easel for everyone, and (when opening a saved picture) paints it back on. */
+  newPaper(page: string, lv: NumberLevel | null, actions: PaintAction[] = []) {
+    this.easel.reset(page, lv);
+    if (this.state.status === 'hosting') this.sendToGuests({ type: 'paint-page', page, lv });
+    else if (this.state.status === 'joined') this.send({ type: 'paint-page', page, lv });
+    this.paint(actions);
+  }
+
   // --- friends' homes ---
   /** Tells the session how to get this player's home when a friend asks to see it. */
   setHomeSource(source: (() => HomeSnapshot | null) | null) {
@@ -457,6 +488,8 @@ export class TownSession {
         // The newcomer's chalkboard shows what is on this one.
         this.send({ type: 'chalk-wipe' }, id);
         for (const stroke of this.board.getStrokes()) this.send({ type: 'chalk', stroke }, id);
+        // And its easel shows the picture on this one.
+        this.sendEasel(id);
         break;
       case 'visit':
         if (!this.roster.some((p) => p.id === id)) return;
@@ -495,6 +528,15 @@ export class TownSession {
         if (!this.roster.some((p) => p.id === id)) return;
         if (message.type === 'chalk') this.board.put(message.stroke);
         else this.board.wipe();
+        this.sendToGuests(message, id);
+        break;
+      case 'paint':
+      case 'paint-undo':
+      case 'paint-page':
+        if (!this.roster.some((p) => p.id === id)) return;
+        if (message.type === 'paint') this.easel.put(message.a);
+        else if (message.type === 'paint-undo') this.easel.remove(message.id);
+        else this.easel.reset(message.page, message.lv);
         this.sendToGuests(message, id);
         break;
       case 'hi':
@@ -541,6 +583,15 @@ export class TownSession {
         break;
       case 'chalk-wipe':
         this.board.wipe();
+        break;
+      case 'paint':
+        this.easel.put(message.a);
+        break;
+      case 'paint-undo':
+        this.easel.remove(message.id);
+        break;
+      case 'paint-page':
+        this.easel.reset(message.page, message.lv);
         break;
       case 'bye':
         this.leave('The host closed the visit.');
@@ -596,6 +647,13 @@ export class TownSession {
   }
 
   /** Host: to every guest except `except`. */
+  /** Sends a newcomer the picture on the easel. */
+  private sendEasel(to: string) {
+    const { page, lv, actions } = this.easel.getPicture();
+    this.send({ type: 'paint-page', page, lv }, to);
+    for (const a of paintBatches(actions)) this.send({ type: 'paint', a }, to);
+  }
+
   private sendToGuests(message: GameMessage, except?: string) {
     for (const p of this.roster) if (p.id !== HOST_ID && p.id !== except) this.send(message, p.id);
   }

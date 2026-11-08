@@ -4,6 +4,8 @@ import { Pressable, StyleSheet, View, type ViewStyle } from 'react-native';
 import { Text } from '@/components/AppText';
 import { Rumble, Spin, Swing } from '@/components/Motion';
 import { Chalkboard } from '@/components/community/Chalkboard';
+import { PaintingView } from '@/components/PaintingView';
+import { useEaselPicture } from '@/services/easel';
 import { BAKERY, FARM, FLOOR, LIBRARY, nestX, PARK, SCHOOL, SHOP, type Shelves } from '@/utils/multiplayer/placeProps';
 import { SWING_COUNT, SWING_PIVOT, SWING_SEAT_Y, swingName, swingX } from '@/utils/park';
 import type { TownPlace } from '@/utils/multiplayer/protocol';
@@ -39,6 +41,8 @@ interface Props {
   onExit: () => void;
   /** School: fingers started or stopped drawing on the chalkboard. */
   onDrawing?: (drawing: boolean) => void;
+  /** School: the easel was tapped, to paint on it. */
+  onEasel?: () => void;
 }
 
 /**
@@ -46,7 +50,7 @@ interface Props {
  * wall, floor, furniture and things to tap. The things you can pick up, and
  * the people, are drawn on top by the room.
  */
-export function Interior({ place, width: w, viewWidth, height: h, switches, onSwitch, riding = [], onDoor, onExit, onDrawing }: Props) {
+export function Interior({ place, width: w, viewWidth, height: h, switches, onSwitch, riding = [], onDoor, onExit, onDrawing, onEasel }: Props) {
   const floorY = h * FLOOR;
   const tones: Record<TownPlace, { wall: string; floor: string }> = {
     street: { wall: '#9BD4F5', floor: '#B0BEC5' },
@@ -74,7 +78,7 @@ export function Interior({ place, width: w, viewWidth, height: h, switches, onSw
       ) : null}
 
       {place === 'street' ? <Street w={w} h={h} floorY={floorY} screenW={viewWidth} onDoor={onDoor} /> : null}
-      {place === 'school' ? <School {...part} onDrawing={onDrawing} /> : null}
+      {place === 'school' ? <School {...part} onDrawing={onDrawing} onEasel={onEasel} /> : null}
       {place === 'shop' ? <Shop {...part} /> : null}
       {place === 'bakery' ? <Bakery {...part} /> : null}
       {place === 'library' ? <Library {...part} /> : null}
@@ -179,12 +183,14 @@ function Street({ w, h, floorY, screenW, onDoor }: { w: number; h: number; floor
   );
 }
 
-function School({ w, h, on, tap, onDrawing }: Part & { onDrawing?: (drawing: boolean) => void }) {
+function School({ w, h, on, tap, onDrawing, onEasel }: Part & { onDrawing?: (drawing: boolean) => void; onEasel?: () => void }) {
   const b = SCHOOL.board;
   const t = SCHOOL.teacher;
   const c = SCHOOL.color;
   const bell = !!on.bell;
-  const easel = !!on.easel;
+  const picture = useEaselPicture();
+  const easelX0 = c.x0 + 0.005;
+  const easelX1 = c.x0 + 0.06;
   return (
     <>
       <Sign w={w} h={h} x={0.45} y={0.06} text="🏫 School" />
@@ -224,7 +230,7 @@ function School({ w, h, on, tap, onDrawing }: Part & { onDrawing?: (drawing: boo
         </Fragment>
       ))}
 
-      {/* Color corner: a placeholder for coloring games */}
+      {/* Color corner: the easel and a crayon table */}
       <View style={[styles.colorRug, rect(w, h, c.x0 + 0.01, c.x1 - 0.01, 0.7, 0.82)]} />
       <Sign w={w} h={h} x={c.x0 + 0.005} y={0.08} text="🎨 Color corner" />
       <View style={[rect(w, h, c.x0 + 0.01, c.x1 - 0.01, 0.2, 0.3), styles.artWall]}>
@@ -234,17 +240,21 @@ function School({ w, h, on, tap, onDrawing }: Part & { onDrawing?: (drawing: boo
           </View>
         ))}
       </View>
-      {/* Easel: tap it to see what is coming */}
+      {/* Easel: tap it to paint (it shows what is on it now) */}
       <Pressable
-        onPress={() => tap('easel')}
+        onPress={onEasel}
         accessibilityRole="button"
-        accessibilityLabel="Easel. Coloring games are coming soon."
-        style={rect(w, h, c.x0 + 0.005, c.x0 + 0.06, 0.32, FLOOR + 0.04)}
+        accessibilityLabel="Easel. Tap to paint and color."
+        style={rect(w, h, easelX0, easelX1, 0.32, FLOOR + 0.04)}
       >
         <View style={[styles.easelLeg, { left: '15%', transform: [{ rotate: '8deg' }] }]} />
         <View style={[styles.easelLeg, { right: '15%', transform: [{ rotate: '-8deg' }] }]} />
         <View style={[edge, styles.easelPaper]}>
-          <Text style={styles.easelText}>{easel ? 'Coloring games coming soon!' : '🖍️'}</Text>
+          {picture.actions.length || picture.page !== 'blank' ? (
+            <PaintingView picture={picture} width={Math.max(8, Math.min((easelX1 - easelX0) * w - 14, ((FLOOR + 0.04 - 0.32) * h * 0.55 - 14) * 0.75))} />
+          ) : (
+            <Text style={styles.easelText}>🎨 Tap to paint!</Text>
+          )}
         </View>
       </Pressable>
       <View style={[edge, rect(w, h, SCHOOL.crayonTable.x0, SCHOOL.crayonTable.x1, SCHOOL.crayonTable.top, SCHOOL.crayonTable.top + 0.025), { backgroundColor: '#EC407A', borderRadius: 4 }]} />

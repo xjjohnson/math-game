@@ -1,9 +1,11 @@
 import { memo, useRef, useState } from 'react';
 import { Pressable, StyleSheet, View, type GestureResponderEvent } from 'react-native';
+import Svg, { Path } from 'react-native-svg';
 
 import { Text } from '@/components/AppText';
 import { newStrokeId, useChalkStrokes } from '@/services/chalkboard';
 import { townSession } from '@/services/townSession';
+import { smoothPath } from '@/utils/easel';
 import { CHALK_COLORS, CHALK_SCALE, MAX_CHALK_POINTS, type ChalkStroke } from '@/utils/multiplayer/protocol';
 
 interface Props {
@@ -122,9 +124,7 @@ export function Chalkboard({ left, top, width, height, onDrawing }: Props) {
       <View style={[styles.surface, { height: boardH }]} {...handlers} accessibilityLabel="Chalkboard. Draw on it with your finger.">
         <View style={StyleSheet.absoluteFill} pointerEvents="none">
           {strokes.length === 0 ? <Text style={styles.hint}>Draw here with your finger ✍️</Text> : null}
-          {strokes.map((s) => (
-            <Line key={s.id} stroke={s} w={width} h={boardH} />
-          ))}
+          <Lines strokes={strokes} w={width} h={boardH} />
         </View>
       </View>
       <View style={[styles.tray, { height: tray }]}>
@@ -148,41 +148,36 @@ export function Chalkboard({ left, top, width, height, onDrawing }: Props) {
   );
 }
 
-/** One chalk line, drawn as short rounded bars from point to point. */
+/**
+ * The chalk lines, drawn as one smooth SVG path each (not a row of little
+ * pieces), so a full board stays quick to draw.
+ */
+const Lines = memo(function Lines({ strokes, w, h }: { strokes: ChalkStroke[]; w: number; h: number }) {
+  return (
+    <Svg width={w} height={h} style={StyleSheet.absoluteFill}>
+      {strokes.map((s) => (
+        <Line key={s.id} stroke={s} w={w} h={h} />
+      ))}
+    </Svg>
+  );
+});
+
+/** One chalk line, as a single rounded path through its points. */
 const Line = memo(function Line({ stroke, w, h }: { stroke: ChalkStroke; w: number; h: number }) {
   const eraser = stroke.c === ERASER;
   const t = Math.max(4, Math.round(h * (eraser ? 0.09 : 0.022)));
   const color = CHALK_COLORS[stroke.c] ?? CHALK_COLORS[1];
-  const p = stroke.p;
-  const at = (i: number) => ({ x: (p[i] / CHALK_SCALE) * w, y: (p[i + 1] / CHALK_SCALE) * h });
-  const bars = [];
-  if (p.length === 2) {
-    const a = at(0);
-    bars.push(<View key={0} style={{ position: 'absolute', left: a.x - t / 2, top: a.y - t / 2, width: t, height: t, borderRadius: t / 2, backgroundColor: color }} />);
-  }
-  for (let i = 0; i + 3 < p.length; i += 2) {
-    const a = at(i);
-    const b = at(i + 2);
-    const len = Math.hypot(b.x - a.x, b.y - a.y) + t;
-    const angle = Math.atan2(b.y - a.y, b.x - a.x);
-    bars.push(
-      <View
-        key={i}
-        style={{
-          position: 'absolute',
-          left: (a.x + b.x) / 2 - len / 2,
-          top: (a.y + b.y) / 2 - t / 2,
-          width: len,
-          height: t,
-          borderRadius: t / 2,
-          backgroundColor: color,
-          opacity: eraser ? 1 : 0.92,
-          transform: [{ rotate: `${angle}rad` }],
-        }}
-      />,
-    );
-  }
-  return <>{bars}</>;
+  return (
+    <Path
+      d={smoothPath(stroke.p, w / CHALK_SCALE, h / CHALK_SCALE)}
+      stroke={color}
+      strokeWidth={t}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      strokeOpacity={eraser ? 1 : 0.92}
+      fill="none"
+    />
+  );
 });
 
 const styles = StyleSheet.create({

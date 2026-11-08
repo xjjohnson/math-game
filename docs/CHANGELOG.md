@@ -1,5 +1,15 @@
 # Change log
 
+## 2026-11-08 (paint easel)
+
+- **The easel in the School's Color corner works.** Tap it and it opens full screen. Paint with your finger on blank paper: 13 paint colors, thin, medium and thick brushes, **Rub out**, a **paint bucket** (Fill), **Undo** (takes back your own last line or fill) and **New** paper.
+- **8 coloring pages:** house, flower, rocket, fish, cat, turkey, pumpkin and butterfly. Tap an area with the paint bucket to fill it, or paint over it; the black outlines always stay on top.
+- **Color by number:** pick any page with Easy (3 + 4), Medium (12 − 5) or Hard (21 ÷ 3) sums (it starts at the level for the player's grade). Each area shows a sum; the answer is the number on the paint to use. **Check** says how many are left and makes the wrong ones flash red; get them all and "You did it!".
+- **My pictures:** **Save** keeps a picture (up to 12 each). Open one again to keep painting, throw it away, or **Hang** it: it goes up as a framed picture on the wall of your buddy's home (drag it where you like; tap it and your buddy loves it).
+- **Paint together:** on a Community visit everyone paints on the same paper and sees it live, and a friend who joins later sees the picture so far. The easel in the room shows what is on it.
+- **Smoother, faster chalkboard:** each chalk line is now drawn as one smooth line instead of lots of little pieces, so a full board doesn't slow down.
+- **Needs the new APK** (it adds a drawing library). Protocol v10, but older phones can still visit; they just paint on their own.
+
 ## 2026-11-08 (safer saving, steadier Nearby)
 
 - **Saved players can't be wiped by an update.** Before an update changes the saved players, a copy is kept (the last 3). If the saved players ever fail to open, the app stops saving instead of saving an empty list over them, Home says to ask a grown-up, and the Parent area has a **Saved players** card with **Restore copy from (date)** (tap twice). The card only shows when there is a copy or a problem.

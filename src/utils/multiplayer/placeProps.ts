@@ -78,7 +78,7 @@ export const SCHOOL = {
     [0.735, 0.785],
   ] as [number, number][],
   deskTop: 0.5,
-  /** The color corner: an easel and a little crayon table, ready for coloring games. */
+  /** The color corner: the easel (tap it to paint) and a little crayon table. */
   color: { x0: 0.82, x1: 0.98 },
   crayonTable: { x0: 0.885, x1: 0.975, top: 0.5 },
 };

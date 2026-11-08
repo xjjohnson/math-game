@@ -13,6 +13,7 @@ import {
 import { Text } from '@/components/AppText';
 import { BuddyFigure } from '@/components/BuddyFigure';
 import { BookReader } from '@/components/community/BookReader';
+import { Easel } from '@/components/community/Easel';
 import { FLOOR, Interior } from '@/components/community/Interiors';
 import { Bob, Lively, Swing, Wallow } from '@/components/Motion';
 import { ACCESSORIES, GLASSES } from '@/components/VisitPanel';
@@ -160,6 +161,7 @@ export function CommunityRoom({ place, onDoor, onExit }: Props) {
   const [drawing, setDrawing] = useState(false);
   /** The library book open on this phone (only this phone: friends read their own). */
   const [reading, setReading] = useState<{ book: number; cover: string } | null>(null);
+  const [painting, setPainting] = useState(false);
   /** Farm: what an animal just said ("Moo!", "Yum!") and when, shown over its head on this phone. */
   const [said, setSaid] = useState<Record<string, { text: string; at: number }>>({});
   const scroller = useRef<ScrollViewInstance>(null);
@@ -513,7 +515,7 @@ export function CommunityRoom({ place, onDoor, onExit }: Props) {
           showsHorizontalScrollIndicator={false}
           contentContainerStyle={{ width: roomW, height: h }}
         >
-          <Interior place={place} width={roomW} viewWidth={w} height={h} switches={switches} onSwitch={flip} riding={riding} onDoor={onDoor} onExit={onExit} onDrawing={setDrawing} />
+          <Interior place={place} width={roomW} viewWidth={w} height={h} switches={switches} onSwitch={flip} riding={riding} onDoor={onDoor} onExit={onExit} onDrawing={setDrawing} onEasel={() => setPainting(true)} />
           <View style={[styles.layer, { width: roomW, height: h }]} pointerEvents="box-none" {...touch.handlers}>
             {pieces.map((piece) => {
               const held = touch.dragAt[piece.key];
@@ -554,6 +556,7 @@ export function CommunityRoom({ place, onDoor, onExit }: Props) {
           </View>
         </ScrollView>
       ) : null}
+      <Easel visible={painting} onClose={() => setPainting(false)} />
       <BookReader book={reading ? bookAt(reading.book) : null} cover={reading?.cover} onClose={() => setReading(null)} />
     </View>
   );

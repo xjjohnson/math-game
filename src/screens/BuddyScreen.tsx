@@ -1,5 +1,5 @@
 import { router, Stack } from 'expo-router';
-import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { PanResponder, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -22,6 +22,8 @@ import {
   inSeason,
   MAX_ROOM_THINGS,
   MONTH_NAMES,
+  PICTURE_ITEM,
+  PICTURE_KEY,
   ROOM_ITEM_GROUPS,
   ROOM_ITEMS,
   seasonOf,
@@ -44,7 +46,9 @@ import {
   type WearSlot,
 } from '@/constants/wardrobe';
 import { colors, fontSizes, radius, spacing } from '@/constants/theme';
+import { usePictures } from '@/store/paintings';
 import { useActiveProfile, useProfiles } from '@/store/profiles';
+import type { Picture } from '@/utils/easel';
 import { useSettings } from '@/store/settings';
 import type { Operation, Problem, Profile, RoomThing } from '@/types';
 import {
@@ -111,6 +115,12 @@ interface Game {
  */
 export function BuddyScreen() {
   const profile = useActiveProfile();
+  const savedPictures = usePictures(profile?.id);
+  const hungPictures = useMemo(() => {
+    const out: Record<string, Picture> = {};
+    for (const p of savedPictures) out[PICTURE_KEY + p.id] = p;
+    return out;
+  }, [savedPictures]);
   const { careForBuddy, equip, buyRoomItem, buyHomeRoom, moveInRoom, moveHomeRoom, setPlaced, paintRoom, setBuddyHome, wear, undress, setLook, takeOff, moveWearable } =
     useProfiles();
   const insets = useSafeAreaInsets();
@@ -261,6 +271,7 @@ export function BuddyScreen() {
     else if (item.light) say(`Click! ${stickerText(item.emoji)}`);
     else if (item.says) say(`${holder ?? name} ${item.says}! ${item.fx ?? ''}`);
     else if (holder) say(`${holder} holds the ${what} tight.`);
+    else if (item.id === PICTURE_ITEM) say(`${name} loves your picture! 🎨`);
     else say(`${name} likes the ${what}! ${stickerText(item.emoji)}`);
   };
 
@@ -329,6 +340,7 @@ export function BuddyScreen() {
           }}
           onTapThing={tapThing}
           onTapBuddy={tapBuddy}
+          pictures={hungPictures}
           onToggle={(what, open) => {
             if (!open) return;
             if (what === 'fridge' || what === 'freezer') say(`Brrr, the ${what} is cold! Drag food onto the shelves.`);
@@ -901,7 +913,7 @@ interface ShopDrawerProps {
 
 function ShopDrawer({ coins, month, areaId, full, onBuy }: ShopDrawerProps) {
   // Shop shelves with something on sale this month; the shelf starts on the room in view.
-  const groups = ROOM_ITEM_GROUPS.filter((g) => ROOM_ITEMS.some((i) => i.group === g.id && inSeason(i, month)));
+  const groups = ROOM_ITEM_GROUPS.filter((g) => ROOM_ITEMS.some((i) => i.group === g.id && !i.hidden && inSeason(i, month)));
   const [picked, setShelf] = useState<RoomItemGroup | null>(null);
   const holiday = groups.find((g) => ROOM_ITEMS.some((i) => i.group === g.id && i.month === month));
   const here = areaId;
@@ -923,7 +935,7 @@ function ShopDrawer({ coins, month, areaId, full, onBuy }: ShopDrawerProps) {
         ))}
       </ScrollView>
       <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chips}>
-        {ROOM_ITEMS.filter((item) => item.group === shelf && inSeason(item, month)).map((item) => (
+        {ROOM_ITEMS.filter((item) => item.group === shelf && !item.hidden && inSeason(item, month)).map((item) => (
           <Pressable
             key={item.id}
             onPress={() => onBuy(item.id)}

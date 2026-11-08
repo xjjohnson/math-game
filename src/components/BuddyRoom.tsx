@@ -17,6 +17,7 @@ import { Candle } from '@/components/Candle';
 import { BuddyFigure, type Dressed } from '@/components/BuddyFigure';
 import { PersonFigure, type PersonDressed } from '@/components/PersonFigure';
 import { Furniture } from '@/components/Furniture';
+import { FramedPicture } from '@/components/PaintingView';
 import { Lamp } from '@/components/Lamp';
 import { Bob, Drifting, Flicker, FloatUp, Lively, Rumble, Spin, type BounceKind } from '@/components/Motion';
 import { PopIn } from '@/components/PopIn';
@@ -38,6 +39,7 @@ import {
   type FixtureSpot,
   type Gadget,
   type Season,
+  PICTURE_ITEM,
 } from '@/constants/room';
 import type { PersonLook } from '@/constants/wardrobe';
 import type { BuddySpot, Room } from '@/types';
@@ -55,6 +57,7 @@ import {
   type HomeSize,
   type Piece,
 } from '@/utils/home';
+import type { Picture } from '@/utils/easel';
 import { AREA_COUNT, BUDDY_KEY, paintOf, type Placement } from '@/utils/room';
 
 export interface HomeBuddy {
@@ -106,6 +109,8 @@ interface Props {
   coins?: number;
   /** The Buy button of a for-sale room was confirmed. */
   onBuyRoom?: (areaId: AreaId) => void;
+  /** Pictures from the School easel hanging in the home, by thing key. A friend's home leaves them out (empty frames show). */
+  pictures?: Record<string, Picture>;
 }
 
 const TRIM = '#A86B45';
@@ -739,6 +744,8 @@ export function BuddyRoom(props: Props) {
                             wave={b?.kind === 'hop' ? b.n : undefined}
                           />
                         )
+                      ) : piece.item?.id === PICTURE_ITEM ? (
+                        <FramedPicture picture={props.pictures?.[piece.key]} width={piece.width} height={piece.height} />
                       ) : piece.item?.draw ? (
                         <Furniture shape={piece.item.draw} width={piece.width} height={piece.height} />
                       ) : piece.item?.lamp ? (
