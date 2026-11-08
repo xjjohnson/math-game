@@ -12,7 +12,7 @@ import {
   MAX_PLAYERS,
   ownerOf,
   PROTOCOL_VERSION,
-  SCHOOL_VERSION,
+  FARM_VERSION,
   TOWN_MARK,
   type ChalkStroke,
   type GameMessage,
@@ -422,8 +422,8 @@ export class TownSession {
     switch (message.type) {
       case 'hello':
         this.send({ type: 'welcome', version: PROTOCOL_VERSION, you: id }, id);
-        if (message.version < SCHOOL_VERSION) {
-          // An older phone can play matches but doesn't know this community (it still has the corner shop).
+        if (message.version < FARM_VERSION) {
+          // An older phone can play matches but doesn't know this community (it has no farm yet).
           this.send({ type: 'bye' }, id);
           this.set({ notice: `${message.name}'s phone needs the newest Math Game to visit the community.` });
           return;

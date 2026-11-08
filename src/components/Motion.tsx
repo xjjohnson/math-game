@@ -364,6 +364,24 @@ export function Rumble({ children, active, style }: { children: ReactNode; activ
   return <Animated.View style={[style, look]}>{children}</Animated.View>;
 }
 
+/** Rocks from side to side on its feet while `active`, like a pig rolling about in the mud. Still when motion is off. */
+export function Wallow({ children, active, style }: { children: ReactNode; active: boolean; style?: StyleProp<ViewStyle> }) {
+  const { animate } = useMotion();
+  const t = useSharedValue(0);
+  useEffect(() => {
+    if (!animate || !active) {
+      cancelAnimation(t);
+      t.value = withTiming(0, { duration: 200 });
+      return;
+    }
+    const ease = Easing.inOut(Easing.sin);
+    t.value = withRepeat(withSequence(withTiming(1, { duration: 450, easing: ease }), withTiming(-1, { duration: 900, easing: ease }), withTiming(0, { duration: 450, easing: ease })), -1);
+    return () => cancelAnimation(t);
+  }, [animate, active, t]);
+  const look = useAnimatedStyle(() => ({ transform: [{ rotate: `${t.value * 14}deg` }] }));
+  return <Animated.View style={[{ transformOrigin: 'bottom' }, style, look]}>{children}</Animated.View>;
+}
+
 /** Swings to and fro from its top edge while `active`, like a playground swing. Still when motion is off. */
 export function Swing({ children, active, style }: { children: ReactNode; active: boolean; style?: StyleProp<ViewStyle> }) {
   const { animate } = useMotion();
