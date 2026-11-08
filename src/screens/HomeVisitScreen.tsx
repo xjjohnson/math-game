@@ -1,5 +1,5 @@
 import { router, Stack } from 'expo-router';
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -11,25 +11,32 @@ import { colors, radius, spacing } from '@/constants/theme';
 import { townSession, useTownState } from '@/services/townSession';
 import { useActiveProfile } from '@/store/profiles';
 import type { Profile, Room } from '@/types';
+import { GUEST_ME, guestsOf } from '@/utils/homeVisit';
 import { areasOf, BUDDY_KEY, moveInRoom } from '@/utils/room';
 
 /**
  * A friend's buddy home, sent over Nearby while visiting in the community.
- * You can look around and move things to play, but it's their home: nothing
- * you do here is saved, on your phone or theirs.
+ * You come along, with the buddies you picked in Bring, dressed as they are at
+ * home. You can look around and move things (and yourselves) to play, but it's
+ * their home: nothing you do here is saved, on your phone or theirs.
  */
 export function HomeVisitScreen() {
   const me = useActiveProfile();
-  const { home } = useTownState();
+  const { home, look } = useTownState();
   const insets = useSafeAreaInsets();
   const [room, setRoom] = useState<Room | null>(null);
   const [area, setArea] = useState(0);
   const [line, setLine] = useState('');
 
+  // You and the buddies you brought.
+  const guests = useMemo(() => (me ? guestsOf(me, look.buddies, look.chosen) : []), [me, look.buddies, look.chosen]);
+  const pals = guests.length - 1;
+
   useEffect(() => {
     if (home?.status === 'ready' && home.snap) {
       setRoom(home.snap.room);
-      setLine(`Welcome to ${home.name}'s home! Move things around to play. It all goes back when you leave.`);
+      const came = pals === 0 ? 'You came over' : pals === 1 ? 'You and your buddy came over' : `You and ${pals} buddies came over`;
+      setLine(`Welcome to ${home.name}'s home! ${came}. Move things around to play. It all goes back when you leave.`);
     }
   }, [home?.status, home?.snap, home?.name]);
 
@@ -63,7 +70,7 @@ export function HomeVisitScreen() {
     const a = areas[i];
     return !!a && (a.price === undefined || snap.homeRooms.includes(a.id));
   };
-  const buddies = snap.buddies.map((b) => ({ ...b, spot: room.buddies[b.id] ?? b.spot }));
+  const buddies = [...snap.buddies, ...guests].map((b) => ({ ...b, spot: room.buddies[b.id] ?? b.spot }));
 
   return (
     <View style={styles.full}>
@@ -81,7 +88,8 @@ export function HomeVisitScreen() {
         onPlaceBuddy={(id, place) => setRoom(moveInRoom(pretend, BUDDY_KEY + id, place).room)}
         onTapThing={() => undefined}
         onTapBuddy={(id) => {
-          const b = snap.buddies.find((x) => x.id === id);
+          if (id === GUEST_ME) return setLine(`That's you, visiting ${snap.name}! Drag yourself anywhere, even onto a seat.`);
+          const b = buddies.find((x) => x.id === id);
           if (b) setLine(`${b.name} says hi! 👋`);
         }}
       />
