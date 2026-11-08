@@ -1,4 +1,5 @@
 import { ingredientIndex, MADE_SLOTS } from '@/utils/bakery';
+import { SHELF_BOOKS } from '@/utils/libraryBooks';
 import type { TownPlace } from '@/utils/multiplayer/protocol';
 import type { Spot } from '@/utils/multiplayer/scene';
 
@@ -43,6 +44,8 @@ export interface PropDef {
   bowl?: boolean;
   /** Bakery: one of the spare places a finished treat appears (only drawn while its switch says there is one). */
   made?: number;
+  /** Library: which book this is (see libraryBooks.ts); tap it to read it. */
+  book?: number;
 }
 
 /** A row of shelves inside one cabinet: the cabinet runs from x0 to x1, with a shelf at each height in rows. */
@@ -94,7 +97,7 @@ export const LIBRARY = {
 
 // --- Park ---
 export const PARK = {
-  swings: { x0: 0.08, x1: 0.2, top: 0.3 },
+  swings: { x0: 0.07, x1: 0.21, top: 0.12 },
   slide: { x0: 0.24, x1: 0.37, top: 0.34 },
   sandbox: { x0: 0.41, x1: 0.55, y0: 0.66, y1: 0.78 },
   pond: { x0: 0.59, x1: 0.75, y0: 0.66, y1: 0.82 },
@@ -138,6 +141,9 @@ export const SURFACES: Record<InsidePlace, Surface[]> = {
 const row = (emojis: string[], x0: number, x1: number, y: number, tag: string): PropDef[] =>
   emojis.map((emoji, i) => ({ id: `${tag}${i}`, emoji, y, x: x0 + ((i + 0.5) * (x1 - x0)) / emojis.length }));
 
+/** The open book on the reading rug is the library guide. */
+export const GUIDE_BOOK = SHELF_BOOKS;
+
 const BOOKS = ['📕', '📗', '📘', '📙', '📔', '📓', '📒'];
 const books = (caseIndex: number): PropDef[] => {
   const c = LIBRARY.cases[caseIndex];
@@ -148,7 +154,7 @@ const books = (caseIndex: number): PropDef[] => {
       c.x1 - 0.01,
       y,
       `k${caseIndex}${r}`,
-    ),
+    ).map((b, i) => ({ ...b, book: caseIndex * 9 + r * 3 + i })),
   );
 };
 
@@ -198,7 +204,7 @@ export const PLACE_PROPS: Record<InsidePlace, PropDef[]> = {
     { id: 'phones', emoji: '🎧', x: 0.85, y: LIBRARY.desk.top },
     { id: 'pencil', emoji: '✏️', x: 0.96, y: LIBRARY.desk.top },
     { id: 'teddy', emoji: '🧸', x: 0.63, y: 0.78 },
-    { id: 'open', emoji: '📖', x: 0.68, y: 0.84 },
+    { id: 'open', emoji: '📖', x: 0.68, y: 0.84, book: GUIDE_BOOK },
   ],
   park: [
     { id: 'bucket', emoji: '🪣', x: 0.44, y: 0.73 },

@@ -9,6 +9,19 @@
 - **The shop's customers moved to the Bakery counter:** the bakery job now mixes one-item customers with two-item customers you add up first, then give change with dollar bills, just like the shop did.
 - **Needs the new APK on every phone** (protocol v8). A phone that hasn't updated is asked to update before it can visit the Community.
 
+## 2026-11-08 (park playground)
+
+- **Play on the park things.** In the Park, drag yourself (or one of your buddies) onto a **swing** and you sit on it and swing. Drop yourself at the **slide** and you climb the ladder and slide down ("Wheee!"). Lift yourself into the **tree** to sit on a branch, or drop into the **pond** to swim. Drag yourself off to stop. Only one person fits on each swing.
+- Works on a Nearby visit too: friends see you swinging, climbing and sliding. No new APK needed.
+
+## 2026-11-08 (library books)
+
+- **Read the library books.** Tap any book on the library shelves to open it. One big page at a time with large words and a picture, ◀ ▶ buttons to turn pages, and **🔊 Read to me** to hear the page. Dragging a book still moves it.
+- **18 easy stories** for young readers (The Big Red Bus, Pip the Pup, Frog Can Hop, Ducks at the Pond, Ten Red Apples, My Rocket, Turtle Wins the Race and more), some with counting in them.
+- **9 books hide secret bakery recipes.** They start like a story, then a "Shh!" page leads to a **Secret recipe** page that shows exactly what to put in the bakery bowl, then mix and bake. All 15 bakery recipes are hidden somewhere, three books in each bookcase.
+- The open book on the reading rug is a short guide to the library.
+- Reading is just on your own phone, so no store or protocol change and no new APK needed.
+
 ## 2026-11-08 (don't chase older phones)
 
 - A host no longer gives way to a phone that hasn't updated yet. Older phones start over every 20-30 seconds and then join a host they find, so the updated phone stays the host and lets them come, instead of the two chasing each other.
