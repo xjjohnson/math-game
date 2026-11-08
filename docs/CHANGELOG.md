@@ -1,5 +1,13 @@
 # Change log
 
+## 2026-11-08 (library books)
+
+- **Read the library books.** Tap any book on the library shelves to open it. One big page at a time with large words and a picture, ◀ ▶ buttons to turn pages, and **🔊 Read to me** to hear the page. Dragging a book still moves it.
+- **18 easy stories** for young readers (The Big Red Bus, Pip the Pup, Frog Can Hop, Ducks at the Pond, Ten Red Apples, My Rocket, Turtle Wins the Race and more), some with counting in them.
+- **9 books hide secret bakery recipes.** They start like a story, then a "Shh!" page leads to a **Secret recipe** page that shows exactly what to put in the bakery bowl, then mix and bake. All 15 bakery recipes are hidden somewhere, three books in each bookcase.
+- The open book on the reading rug is a short guide to the library.
+- Reading is just on your own phone, so no store or protocol change and no new APK needed.
+
 ## 2026-11-08 (don't chase older phones)
 
 - A host no longer gives way to a phone that hasn't updated yet. Older phones start over every 20-30 seconds and then join a host they find, so the updated phone stays the host and lets them come, instead of the two chasing each other.

@@ -3,6 +3,7 @@ import { PanResponder, ScrollView, StyleSheet, View, type ScrollViewInstance } f
 
 import { Text } from '@/components/AppText';
 import { BuddyFigure } from '@/components/BuddyFigure';
+import { BookReader } from '@/components/community/BookReader';
 import { FLOOR, Interior } from '@/components/community/Interiors';
 import { ACCESSORIES, GLASSES } from '@/components/VisitPanel';
 import { townSession, useTownState, WAVE_MS } from '@/services/townSession';
@@ -39,6 +40,7 @@ import {
 } from '@/utils/multiplayer/placeProps';
 import { buddyPieceId, type TownPerson, type TownPlace } from '@/utils/multiplayer/protocol';
 import type { Spot } from '@/utils/multiplayer/scene';
+import { bookAt } from '@/utils/libraryBooks';
 import type { BuildingId } from '@/utils/town';
 
 const FURS = ['#F2B880', '#E57373', '#81C784', '#64B5F6', '#BA68C8', '#FFD54F', '#4DB6AC', '#F06292'];
@@ -111,6 +113,8 @@ export function CommunityRoom({ place, onDoor, onExit }: Props) {
   const [soloSpots, setSoloSpots] = useState<Record<string, Spot>>(() => ({ ...soloMemory }));
   const [soloWave, setSoloWave] = useState(0);
   const [dragging, setDragging] = useState(false);
+  /** The library book open on this phone (only this phone: friends read their own). */
+  const [reading, setReading] = useState<{ book: number; cover: string } | null>(null);
   const scroller = useRef<ScrollViewInstance>(null);
 
   const visiting = status !== 'off';
@@ -294,6 +298,7 @@ export function CommunityRoom({ place, onDoor, onExit }: Props) {
   const tapProp = (prop: PropDef): (() => void) | undefined => {
     if (prop.bowl) return () => (onMixer(latest.current.bowlSpot) ? flip('mixer') : move(bowlSwitch, 0, 0));
     if (prop.made !== undefined) return () => move(switchPieceId('bakery', madeSwitch(prop.made as number)), 0, 0);
+    if (prop.book !== undefined) return () => setReading({ book: prop.book as number, cover: prop.emoji });
     return undefined;
   };
 
@@ -380,6 +385,7 @@ export function CommunityRoom({ place, onDoor, onExit }: Props) {
           )}
         </ScrollView>
       ) : null}
+      <BookReader book={reading ? bookAt(reading.book) : null} cover={reading?.cover} onClose={() => setReading(null)} />
     </View>
   );
 }
@@ -549,7 +555,13 @@ interface PropProps {
 function Prop({ prop, shown, badge, caption, batter, spot, w, h, size, onMove, onTap, land, onDrop, onDragging }: PropProps) {
   const { handlers, at, lifted } = useDrag({ spot, w, h, enabled: true, onMove, onTap, onDragging, fit: inRoom, land, onDrop });
   const box = size * 1.25;
-  const label = prop.bowl ? 'Mixing bowl. Drop food on it, then put it in the oven. Tap to tip it out.' : caption ? `${caption}. Tap to eat.` : `${shown}. Drag to move.`;
+  const label = prop.bowl
+    ? 'Mixing bowl. Drop food on it, then put it in the oven. Tap to tip it out.'
+    : caption
+      ? `${caption}. Tap to eat.`
+      : prop.book !== undefined
+        ? `${bookAt(prop.book).title}. Tap to read, or drag to move.`
+        : `${shown}. Drag to move.`;
   return (
     <View
       {...handlers}
