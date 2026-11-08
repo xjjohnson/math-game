@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Modal, Pressable, StyleSheet, useWindowDimensions, View } from 'react-native';
+import { Image, Modal, Pressable, ScrollView, StyleSheet, useWindowDimensions, View } from 'react-native';
 
 import { Text } from '@/components/AppText';
 import { colors, radius, spacing, TAP_TARGET } from '@/constants/theme';
@@ -14,14 +14,17 @@ interface Props {
   onClose: () => void;
 }
 
+/** Where each book was left, so a long chapter book opens where you stopped (until the app closes). */
+const bookmarks = new Map<Book, number>();
+
 /** An open library book: one big page at a time, with arrows to turn, and a button that reads it aloud. */
 export function BookReader({ book, cover, onClose }: Props) {
   const [page, setPage] = useState(0);
   const { width, height } = useWindowDimensions();
 
-  // A new book opens at its first page.
+  // A book opens where it was left, or at its first page.
   useEffect(() => {
-    setPage(0);
+    setPage(book ? (bookmarks.get(book) ?? 0) : 0);
     return stopSpeaking;
   }, [book]);
 
@@ -34,32 +37,46 @@ export function BookReader({ book, cover, onClose }: Props) {
 
   const turn = (by: number) => {
     stopSpeaking();
-    setPage(Math.max(0, Math.min(pages.length - 1, at + by)));
+    const next = Math.max(0, Math.min(pages.length - 1, at + by));
+    bookmarks.set(book, next);
+    setPage(next);
   };
   const close = () => {
     stopSpeaking();
     onClose();
   };
+  const finish = () => {
+    // Read to the end: next time it starts over.
+    bookmarks.delete(book);
+    close();
+  };
+  const words = pageWords(pages[at]);
 
   return (
     <Modal visible transparent animationType="fade" onRequestClose={close} supportedOrientations={['landscape', 'portrait']}>
       <View style={styles.backdrop}>
-        <View style={[styles.book, { width: Math.min(width - 24, 760), height: Math.min(height - 24, 620) }]}>
+        <View style={[styles.book, { width: Math.min(width - 16, 1180), height: Math.min(height - 16, 900) }]}>
           <View style={styles.header}>
             <Text style={styles.title} numberOfLines={1}>
               {cover ? `${cover} ` : ''}
               {book.title}
+              {book.grade ? <Text style={styles.grade}>{`  ${book.grade}`}</Text> : null}
+            </Text>
+            {words ? (
+              <Pressable onPress={() => speakText(words, true)} accessibilityRole="button" accessibilityLabel="Read this page to me" style={styles.read}>
+                <Text style={styles.readText}>🔊 Read to me</Text>
+              </Pressable>
+            ) : null}
+            <Text style={styles.count}>
+              {at + 1} / {pages.length}
             </Text>
             <Pressable onPress={close} accessibilityRole="button" accessibilityLabel="Close the book" style={styles.close}>
               <Text style={styles.closeText}>✖</Text>
             </Pressable>
           </View>
 
-          <View style={styles.page}>
-            <PageView page={pages[at]} big={big} />
-          </View>
-
-          <View style={styles.footer}>
+          {/* The arrows sit beside the page, so the page gets all the height a phone held sideways has. */}
+          <View style={styles.body}>
             <Pressable
               onPress={() => turn(-1)}
               disabled={at === 0}
@@ -69,21 +86,11 @@ export function BookReader({ book, cover, onClose }: Props) {
             >
               <Text style={styles.arrowText}>◀</Text>
             </Pressable>
-            <View style={styles.middle}>
-              <Pressable
-                onPress={() => speakText(pageWords(pages[at]), true)}
-                accessibilityRole="button"
-                accessibilityLabel="Read this page to me"
-                style={styles.read}
-              >
-                <Text style={styles.readText}>🔊 Read to me</Text>
-              </Pressable>
-              <Text style={styles.count}>
-                {at + 1} / {pages.length}
-              </Text>
+            <View style={pages[at].kind === 'picture' || pages[at].kind === 'chapter' ? styles.fullPage : styles.page}>
+              <PageView key={at} page={pages[at]} big={big} />
             </View>
             {last ? (
-              <Pressable onPress={close} accessibilityRole="button" accessibilityLabel="The end. Close the book" style={[styles.arrow, styles.end]}>
+              <Pressable onPress={finish} accessibilityRole="button" accessibilityLabel="The end. Close the book" style={[styles.arrow, styles.end]}>
                 <Text style={styles.endText}>The end</Text>
               </Pressable>
             ) : (
@@ -99,6 +106,33 @@ export function BookReader({ book, cover, onClose }: Props) {
 }
 
 function PageView({ page, big }: { page: Page; big: number }) {
+  if (page.kind === 'picture') {
+    return <Image source={page.image} style={styles.spread} resizeMode="contain" accessibilityLabel={page.text || 'A picture'} />;
+  }
+  if (page.kind === 'chapter') {
+    // A picture page with a short caption shows the picture big; a page of words shows a smaller picture above them.
+    const caption = page.text.length < 140 && !page.heading;
+    const size = Math.max(16, Math.round(big * 0.72));
+    if (caption && page.image) {
+      return (
+        <View style={styles.captionPage}>
+          <Image source={page.image} style={styles.bigPicture} resizeMode="contain" />
+          {page.text ? <Text style={[styles.caption, { fontSize: size, lineHeight: size * 1.45 }]}>{page.text}</Text> : null}
+        </View>
+      );
+    }
+    return (
+      <ScrollView style={styles.chapterScroll} contentContainerStyle={styles.chapter}>
+        {page.image ? <Image source={page.image} style={styles.smallPicture} resizeMode="contain" /> : null}
+        {page.heading ? <Text style={[styles.heading, { fontSize: size * 1.3, lineHeight: size * 1.6 }]}>{page.heading}</Text> : null}
+        {page.text.split('\n\n').map((para, i) => (
+          <Text key={i} style={[styles.para, { fontSize: size, lineHeight: size * 1.45 }]}>
+            {para}
+          </Text>
+        ))}
+      </ScrollView>
+    );
+  }
   if (page.kind === 'text') {
     return (
       <>
@@ -139,25 +173,35 @@ const LINE = '#5B3A24';
 
 const styles = StyleSheet.create({
   backdrop: { flex: 1, backgroundColor: 'rgba(30,20,10,0.55)', alignItems: 'center', justifyContent: 'center' },
-  book: { backgroundColor: PAPER, borderRadius: radius.lg, borderWidth: 4, borderColor: LINE, padding: spacing.md, gap: spacing.sm },
+  book: { backgroundColor: PAPER, borderRadius: radius.lg, borderWidth: 4, borderColor: LINE, padding: spacing.sm, gap: spacing.sm },
+  body: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
   header: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
-  title: { flex: 1, fontSize: 24, fontWeight: '900', color: colors.text },
-  close: { width: 56, height: 56, borderRadius: 28, alignItems: 'center', justifyContent: 'center', backgroundColor: '#EFE3CF' },
+  title: { flex: 1, fontSize: 22, fontWeight: '900', color: colors.text },
+  close: { width: 48, height: 48, borderRadius: 24, alignItems: 'center', justifyContent: 'center', backgroundColor: '#EFE3CF' },
   closeText: { fontSize: 24, fontWeight: '900', color: LINE },
-  page: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: spacing.sm, paddingHorizontal: spacing.md },
+  page: { flex: 1, alignSelf: 'stretch', alignItems: 'center', justifyContent: 'center', gap: spacing.sm, paddingHorizontal: spacing.md },
+  fullPage: { flex: 1, alignSelf: 'stretch' },
+  spread: { flex: 1, width: '100%' },
+  chapterScroll: { flex: 1 },
+  chapter: { gap: spacing.sm, paddingHorizontal: spacing.sm, paddingBottom: spacing.md },
+  captionPage: { flex: 1, gap: spacing.sm, paddingBottom: spacing.sm },
+  bigPicture: { flex: 1, width: '100%' },
+  smallPicture: { width: '100%', height: 170 },
+  heading: { fontWeight: '900', color: colors.text, textAlign: 'center' },
+  para: { color: colors.text, fontWeight: '500' },
+  caption: { color: colors.textMuted, fontWeight: '700', textAlign: 'center', fontStyle: 'italic' },
+  grade: { fontSize: 16, fontWeight: '700', color: colors.textMuted },
   words: { fontWeight: '800', color: colors.text, textAlign: 'center' },
   secret: { fontWeight: '900', color: '#C2185B', textAlign: 'center' },
   step: { fontWeight: '800', color: colors.textMuted, textAlign: 'center' },
   chips: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', gap: spacing.sm },
   chip: { backgroundColor: '#FFE9B8', borderRadius: radius.md, borderWidth: 2, borderColor: LINE, paddingHorizontal: 12, paddingVertical: 6 },
-  footer: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.sm },
-  arrow: { minWidth: TAP_TARGET * 1.3, height: TAP_TARGET, borderRadius: radius.lg, backgroundColor: colors.primary, alignItems: 'center', justifyContent: 'center', paddingHorizontal: spacing.md },
+  arrow: { width: TAP_TARGET * 1.1, height: TAP_TARGET * 1.6, borderRadius: radius.lg, backgroundColor: colors.primary, alignItems: 'center', justifyContent: 'center' },
   arrowText: { fontSize: 32, color: colors.primaryText, fontWeight: '900' },
   off: { backgroundColor: colors.disabled },
   end: { backgroundColor: colors.correct },
-  endText: { fontSize: 22, color: colors.primaryText, fontWeight: '900' },
-  middle: { flex: 1, alignItems: 'center', gap: 2 },
+  endText: { fontSize: 18, color: colors.primaryText, fontWeight: '900', textAlign: 'center' },
   read: { paddingHorizontal: spacing.md, paddingVertical: spacing.sm, borderRadius: radius.lg, backgroundColor: '#EFE3CF', borderWidth: 2, borderColor: LINE },
-  readText: { fontSize: 20, fontWeight: '800', color: LINE },
+  readText: { fontSize: 18, fontWeight: '800', color: LINE },
   count: { fontSize: 16, fontWeight: '700', color: colors.textMuted },
 });

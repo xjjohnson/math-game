@@ -1,5 +1,13 @@
 # Change log
 
+## 2026-11-08 (real school books in the library)
+
+- **The library's stories are now real books from Texas schools.** The 18 made-up stories on the library shelves are replaced with stories from the Texas Bluebonnet Learning readers (the state's K-5 reading program), with their real pictures: Kit, Kit's Cats, Sal's Fish Shop, Sam and the Duck and Max in the Mud (kindergarten); Where Is King?, Splash Dogs, The Fox and the Grapes, The Fox and the Crane, Big Cats, The Frog Jumping Contest and A Rainforest Ride (1st grade); The Hare and the Hedgehog, The Pancake and The Math Contest (2nd grade); and three chapter books: Alice's Adventures in Wonderland (3rd), Treasure Island (4th) and The Badlands Sleuth (5th).
+- Picture books show the printed pages as an open book. Chapter books show the words as big text with the book's pictures. Read to me reads every page. A long book opens where you left off.
+- The book shows its grade next to its title, and the last page credits the Texas Education Agency (the readers are free to share under Creative Commons BY-NC-SA 4.0).
+- The secret bakery recipe books are still on the shelves, in the same places.
+- No new APK needed; works with the in-app Update now (a bigger download than usual, about 17 MB of pictures).
+
 ## 2026-11-08 (buddy hangs off the mixer)
 
 - **Put a buddy on the bakery mixer.** Drag one of your buddies up onto the stand mixer and it grabs the end of the mixer's arm and hangs there, swaying, with "I'll mix!". Put food in the bowl and it pulls the bowl under itself and runs the mixer, swinging back and forth while it whirrs ("Mixing! 🥄", then "All mixed! 👍"). Standing a buddy by the mixer still works too.
