@@ -12,7 +12,7 @@ import { usePlace } from '@/hooks/usePlace';
 import { useActiveProfile, useProfiles } from '@/store/profiles';
 import { dateKey } from '@/utils/dates';
 import { createRng, randomSeed } from '@/utils/seededRandom';
-import { BUILDINGS, changeCoins, shiftDone, shiftPay, shiftQuestions, SHIFT_QUESTIONS, type BuildingId, type ShiftPay } from '@/utils/town';
+import { BUILDINGS, changeBills, shiftDone, shiftPay, shiftQuestions, SHIFT_QUESTIONS, type BuildingId, type ShiftPay } from '@/utils/town';
 
 /** One job at a community building: five questions, then pay (once a day). */
 export function ShiftScreen() {
@@ -29,20 +29,21 @@ export function ShiftScreen() {
   const [selected, setSelected] = useState<number | null>(null);
   const [correct, setCorrect] = useState(0);
   const [paid, setPaid] = useState<ShiftPay | null>(null);
+  // Worked here already today when the job was opened: this play is a replay.
+  const [replay] = useState(() => (building && profile ? shiftDone(profile, building.id, dateKey()) : false));
   usePlace(building ? building.id : null);
 
   if (!building || !profile) return <Screen title="Community"><Text style={styles.text}>Nothing here.</Text></Screen>;
-  const alreadyDone = shiftDone(profile, building.id, dateKey()) && !paid;
 
   if (index >= SHIFT_QUESTIONS) {
-    const pay = paid ?? shiftPay(profile, building.id, correct);
+    const pay = paid ?? shiftPay(profile, building.id, correct, !replay);
     return (
       <Screen title={`${building.emoji} ${building.name}`}>
         <Text style={styles.big}>Shift over!</Text>
         <Text style={styles.text}>You got {correct} out of {SHIFT_QUESTIONS}.</Text>
-        <Text style={styles.big}>
-          {alreadyDone ? 'Today’s pay was already given. Come back tomorrow!' : pay.hearts > 0 ? `❤️ +${pay.hearts} for your buddy` : `🪙 +${pay.coins}`}
-        </Text>
+        <Text style={styles.big}>{pay.hearts > 0 ? `❤️ +${pay.hearts} for your buddy` : `🪙 +${pay.coins}`}</Text>
+        {pay.bonus > 0 ? <Text style={styles.text}>That includes a first-time-today bonus of {pay.bonus}!</Text> : null}
+        {replay ? <Text style={styles.text}>You worked here already today, so this was a smaller practice pay. Come back tomorrow for the full pay and a bonus!</Text> : null}
         <BigButton label="Back to the community" onPress={() => router.back()} />
       </Screen>
     );
@@ -52,8 +53,8 @@ export function ShiftScreen() {
   const answered = selected !== null;
   return (
     <Screen title={`${building.emoji} ${building.name}`}>
-      {alreadyDone && index === 0 ? (
-        <Text style={styles.text}>You already worked here today, so this is just practice (no pay).</Text>
+      {replay && index === 0 ? (
+        <Text style={styles.text}>You already worked here today, so this is practice: 1 coin for each right answer.</Text>
       ) : null}
       <Text style={styles.text}>Question {index + 1} of {SHIFT_QUESTIONS}</Text>
       {q.change ? null : <Text style={styles.prompt}>{q.prompt}</Text>}
@@ -64,7 +65,7 @@ export function ShiftScreen() {
           price={q.change.price}
           paid={q.change.paid}
           grade={profile.grade}
-          coins={changeCoins(profile.grade)}
+          coins={changeBills(profile.grade)}
           onDone={(rightFirstTry) => {
             setSelected(q.answer);
             if (rightFirstTry) setCorrect((n) => n + 1);
@@ -87,7 +88,7 @@ export function ShiftScreen() {
           color={colors.correct}
           onPress={() => {
             const last = index + 1 >= SHIFT_QUESTIONS;
-            if (last && !alreadyDone) setPaid(finishShift(profile.id, building.id, correct));
+            if (last) setPaid(finishShift(profile.id, building.id, correct));
             setSelected(null);
             setIndex(index + 1);
           }}

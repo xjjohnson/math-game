@@ -1,14 +1,16 @@
-import { type ReactNode } from 'react';
+import { useState, type ReactNode } from 'react';
 import { Pressable, StyleSheet, View, type ViewStyle } from 'react-native';
 
 import { Text } from '@/components/AppText';
-import { BUILDINGS, type BuildingId } from '@/utils/town';
+import { Rumble, Spin, Swing } from '@/components/Motion';
+import { BAKERY, FLOOR, LIBRARY, PARK, SHOP, type Shelves } from '@/utils/multiplayer/placeProps';
 import type { TownPlace } from '@/utils/multiplayer/protocol';
+import { BUILDINGS, type BuildingId } from '@/utils/town';
 
-/** Where the wall meets the floor, as a share of a room's height (people stand on the floor below it). */
-export const FLOOR = 0.6;
+export { FLOOR };
 
 const LINE = '#5B3A24';
+const WOOD = '#A86B45';
 const edge = { borderWidth: 3, borderColor: LINE } as const;
 
 /** A box placed by shares of the room's width and height. */
@@ -20,9 +22,13 @@ interface Props {
   place: TownPlace;
   /** The whole room, which scrolls. */
   width: number;
-  /** One screen's width: furniture is sized by this and placed in the middle of the room. */
+  /** One screen's width. */
   viewWidth: number;
   height: number;
+  /** Things switched on in this place (an oven, a swing), shared with friends on a visit. */
+  switches: Record<string, boolean>;
+  /** Tap something that turns on and off. */
+  onSwitch: (name: string) => void;
   /** Tap a building's door on the street. */
   onDoor: (id: BuildingId) => void;
   /** Tap the way out, inside a building. */
@@ -31,11 +37,10 @@ interface Props {
 
 /**
  * The drawn side-view backdrop for one place, in the buddy home's flat style:
- * wall, floor, and a few built-in things. People are drawn on top by the room.
+ * wall, floor, furniture and things to tap. The things you can pick up, and
+ * the people, are drawn on top by the room.
  */
-export function Interior({ place, width: roomW, viewWidth, height: h, onDoor, onExit }: Props) {
-  const w = place === 'street' ? roomW : viewWidth;
-  const offset = place === 'street' ? 0 : (roomW - viewWidth) / 2;
+export function Interior({ place, width: w, viewWidth, height: h, switches, onSwitch, onDoor, onExit }: Props) {
   const floorY = h * FLOOR;
   const tones: Record<TownPlace, { wall: string; floor: string }> = {
     street: { wall: '#9BD4F5', floor: '#B0BEC5' },
@@ -45,36 +50,33 @@ export function Interior({ place, width: roomW, viewWidth, height: h, onDoor, on
     park: { wall: '#A5E3F7', floor: '#7CC36B' },
   };
   const t = tones[place];
+  const part = { w, h, floorY, on: switches, tap: onSwitch };
   return (
     <View style={StyleSheet.absoluteFill} pointerEvents="box-none">
       <View style={[StyleSheet.absoluteFill, { backgroundColor: t.wall }]} />
       <View style={{ position: 'absolute', left: 0, right: 0, top: floorY, bottom: 0, backgroundColor: t.floor }} />
       {place !== 'street' && place !== 'park' ? (
-        <View style={{ position: 'absolute', left: 0, right: 0, top: floorY - 8, height: 10, backgroundColor: '#A86B45' }} />
+        <>
+          {/* Floor boards and a skirting board, so the room reads as a room. */}
+          {Array.from({ length: 5 }, (_, i) => (
+            <View key={i} style={{ position: 'absolute', left: 0, right: 0, top: floorY + (i + 1) * h * 0.075, height: 2, backgroundColor: 'rgba(0,0,0,0.07)' }} />
+          ))}
+          <View style={{ position: 'absolute', left: 0, right: 0, top: floorY - 8, height: 10, backgroundColor: WOOD }} />
+        </>
       ) : null}
 
       {place === 'street' ? <Street w={w} h={h} floorY={floorY} screenW={viewWidth} onDoor={onDoor} /> : null}
-      {place !== 'street' ? (
-        <View style={{ position: 'absolute', left: offset, top: 0, width: viewWidth, height: h }} pointerEvents="box-none">
-          {place === 'bakery' ? <Bakery w={w} h={h} floorY={floorY} /> : null}
-          {place === 'shop' ? <Shop w={w} h={h} floorY={floorY} /> : null}
-          {place === 'library' ? <Library w={w} h={h} floorY={floorY} /> : null}
-          {place === 'park' ? <Park w={w} h={h} floorY={floorY} /> : null}
-        </View>
-      ) : null}
-      {place !== 'street' ? (
-        <>
-          <Text style={[styles.plant, { left: offset * 0.4, top: floorY - 56 }]}>🪴</Text>
-          <Text style={[styles.plant, { right: offset * 0.4, top: floorY - 56 }]}>🪴</Text>
-        </>
-      ) : null}
+      {place === 'shop' ? <Shop {...part} /> : null}
+      {place === 'bakery' ? <Bakery {...part} /> : null}
+      {place === 'library' ? <Library {...part} /> : null}
+      {place === 'park' ? <Park {...part} /> : null}
 
       {place !== 'street' ? (
         <Pressable
           onPress={onExit}
           accessibilityRole="button"
           accessibilityLabel="Go back out to the street"
-          style={[edge, styles.exit, { left: 10, top: floorY - h * 0.3, width: w * 0.16, height: h * 0.3 }]}
+          style={[edge, styles.exit, { left: 10, top: floorY - h * 0.3, width: Math.min(90, viewWidth * 0.16), height: h * 0.3 }]}
         >
           <Text style={styles.exitText}>🚪 Street</Text>
         </Pressable>
@@ -87,9 +89,46 @@ interface Part {
   w: number;
   h: number;
   floorY: number;
+  on: Record<string, boolean>;
+  tap: (name: string) => void;
 }
 
-function Street({ w, h, floorY, screenW, onDoor }: Part & { screenW: number; onDoor: (id: BuildingId) => void }) {
+/** A rectangle from shares of the room: x0 to x1 across, top to bottom down. */
+const rect = (w: number, h: number, x0: number, x1: number, top: number, bottom: number): ViewStyle => ({
+  position: 'absolute',
+  left: x0 * w,
+  width: (x1 - x0) * w,
+  top: top * h,
+  height: (bottom - top) * h,
+});
+
+function Sign({ w, h, x, y, text }: { w: number; h: number; x: number; y: number; text: string }) {
+  return (
+    <Box w={w} h={h} x={x} y={y}>
+      <View style={[edge, styles.sign]}><Text style={styles.signText}>{text}</Text></View>
+    </Box>
+  );
+}
+
+/** A plank to put things on, its top at height y. */
+function Plank({ w, h, x0, x1, y }: { w: number; h: number; x0: number; x1: number; y: number }) {
+  return <View style={[edge, styles.plank, { left: x0 * w, width: (x1 - x0) * w, top: y * h }]} />;
+}
+
+/** A wooden cabinet with shelves in it. */
+function Cabinet({ w, h, s, color = '#D7A77A' }: { w: number; h: number; s: Shelves; color?: string }) {
+  return (
+    <>
+      <View style={[edge, rect(w, h, s.x0, s.x1, s.top, FLOOR), { backgroundColor: color, borderRadius: 6 }]} />
+      <Plank w={w} h={h} x0={s.x0 - 0.004} x1={s.x1 + 0.004} y={s.top} />
+      {s.rows.map((y) => (
+        <Plank key={y} w={w} h={h} x0={s.x0} x1={s.x1} y={y} />
+      ))}
+    </>
+  );
+}
+
+function Street({ w, h, floorY, screenW, onDoor }: { w: number; h: number; floorY: number; screenW: number; onDoor: (id: BuildingId) => void }) {
   const gap = w / (BUILDINGS.length + 0.5);
   return (
     <>
@@ -130,107 +169,284 @@ function Street({ w, h, floorY, screenW, onDoor }: Part & { screenW: number; onD
   );
 }
 
-function Bakery({ w, h, floorY }: Part) {
+function Shop({ w, h, on, tap }: Part) {
+  const f = SHOP.fridge;
+  const fridgeOpen = !!on.fridge;
+  const till = !!on.till;
   return (
     <>
-      {/* Sign and window */}
-      <Box w={w} h={h} x={0.3} y={0.11}>
-        <View style={[edge, styles.sign]}><Text style={styles.signText}>🥐 Bakery</Text></View>
-      </Box>
-      <View style={[edge, styles.bigWindow, { left: w * 0.62, top: h * 0.12, width: w * 0.3, height: h * 0.26 }]}><Text style={styles.sun}>☀️</Text></View>
-      {/* Display case with pastries */}
-      <View style={[edge, styles.glass, { left: w * 0.24, top: floorY - h * 0.22, width: w * 0.3, height: h * 0.22 }]}>
-        <Text style={styles.pastry}>🥐 🍪 🧁 🍩</Text>
-      </View>
-      <View style={[edge, styles.counter, { left: w * 0.22, top: floorY - h * 0.02, width: w * 0.34, height: h * 0.08 }]} />
-      {/* Oven */}
-      <View style={[edge, styles.oven, { left: w * 0.72, top: floorY - h * 0.3, width: w * 0.22, height: h * 0.3 }]}>
-        <View style={styles.ovenWindow}><Text style={styles.pastry}>🥖</Text></View>
-        <View style={styles.dials}><View style={styles.dial} /><View style={styles.dial} /></View>
-      </View>
-      {/* Bread shelf */}
-      <View style={[edge, styles.shelf, { left: w * 0.24, top: h * 0.3, width: w * 0.3 }]} />
-      <Text style={[styles.pastry, { position: 'absolute', left: w * 0.27, top: h * 0.24 }]}>🍞 🥖 🥐</Text>
-    </>
-  );
-}
+      <Sign w={w} h={h} x={0.49} y={0.09} text="🏪 Corner shop" />
+      <Cabinet w={w} h={h} s={SHOP.shelvesA} />
 
-function Shop({ w, h, floorY }: Part) {
-  const colorsOf = ['#EF5350', '#FFCA28', '#66BB6A', '#42A5F5', '#AB47BC'];
-  return (
-    <>
-      <Box w={w} h={h} x={0.3} y={0.11}>
-        <View style={[edge, styles.sign]}><Text style={styles.signText}>🏪 Corner shop</Text></View>
-      </Box>
-      {[0.2, 0.34].map((top, row) => (
-        <View key={row} style={[edge, styles.shelf, { left: w * 0.24, top: floorY - h * (0.34 - row * 0.15), width: w * 0.36 }]}>
-          <View style={styles.goods}>
-            {colorsOf.map((c, i) => (
-              <View key={i} style={{ width: w * 0.05, height: h * 0.07, backgroundColor: colorsOf[(i + row * 2) % 5], borderWidth: 2, borderColor: LINE, borderRadius: 4 }} />
-            ))}
-          </View>
-        </View>
+      {/* Fridge: tap to open the door */}
+      <Pressable
+        onPress={() => tap('fridge')}
+        accessibilityRole="button"
+        accessibilityLabel={fridgeOpen ? 'Close the fridge' : 'Open the fridge'}
+        style={[edge, rect(w, h, f.x0, f.x1, f.top, FLOOR), styles.fridge]}
+      />
+      {f.rows.map((y) => (
+        <View key={y} pointerEvents="none" style={[rect(w, h, f.x0 + 0.004, f.x1 - 0.004, y, y + 0.01), { backgroundColor: '#90A4AE' }]} />
       ))}
-      <View style={[edge, styles.oven, { left: w * 0.68, top: floorY - h * 0.34, width: w * 0.12, height: h * 0.34, backgroundColor: '#E3F2FD' }]}>
-        <Text style={styles.pastry}>🥛🧃</Text>
+      <View
+        pointerEvents="none"
+        style={[
+          edge,
+          fridgeOpen ? rect(w, h, f.x1, f.x1 + 0.025, f.top, FLOOR) : rect(w, h, f.x0, f.x1, f.top, FLOOR),
+          { backgroundColor: fridgeOpen ? '#CFE8F7' : 'rgba(207,232,247,0.35)', borderRadius: 8 },
+        ]}
+      >
+        <View style={[styles.handle, fridgeOpen ? { right: 4 } : { left: 6 }]} />
       </View>
-      <View style={[edge, styles.counter, { left: w * 0.8, top: floorY - h * 0.12, width: w * 0.18, height: h * 0.12 }]}>
-        <Text style={styles.pastry}>🧾</Text>
-      </View>
-    </>
-  );
-}
+      {fridgeOpen ? <Text pointerEvents="none" style={[styles.puff, { left: (f.x0 + 0.02) * w, top: f.top * h - 30 }]}>❄️ ❄️</Text> : null}
 
-function Library({ w, h, floorY }: Part) {
-  const spines = ['#EF5350', '#42A5F5', '#FFCA28', '#66BB6A', '#AB47BC', '#FF7043', '#26C6DA', '#EC407A'];
-  const shelf = (x: number) => (
-    <View style={[edge, { position: 'absolute', left: w * x, top: floorY - h * 0.5, width: w * 0.22, height: h * 0.5, backgroundColor: '#8D6E63', padding: 4, justifyContent: 'space-around' }]}>
-      {[0, 1, 2].map((row) => (
-        <View key={row} style={{ flexDirection: 'row', alignItems: 'flex-end', gap: 2, borderBottomWidth: 4, borderBottomColor: LINE }}>
-          {spines.map((c, i) => (
-            <View key={i} style={{ flex: 1, height: h * (0.08 + ((i + row) % 3) * 0.015), backgroundColor: spines[(i + row * 3) % 8] }} />
-          ))}
-        </View>
+      {SHOP.shelvesB.rows.map((y) => (
+        <Plank key={y} w={w} h={h} x0={SHOP.shelvesB.x0} x1={SHOP.shelvesB.x1} y={y} />
       ))}
-    </View>
-  );
-  return (
-    <>
-      <Box w={w} h={h} x={0.3} y={0.11}>
-        <View style={[edge, styles.sign]}><Text style={styles.signText}>📚 Library</Text></View>
-      </Box>
-      {shelf(0.24)}
-      {shelf(0.5)}
-      <View style={[edge, styles.rug, { left: w * 0.3, top: floorY + h * 0.13, width: w * 0.4, height: h * 0.1 }]} />
-      <View style={[edge, styles.counter, { left: w * 0.76, top: floorY - h * 0.12, width: w * 0.2, height: h * 0.12 }]}><Text style={styles.pastry}>🪔</Text></View>
+
+      {/* Fruit stand */}
+      <View style={[edge, rect(w, h, SHOP.stand.x0, SHOP.stand.x1, SHOP.stand.top, FLOOR), { backgroundColor: '#C68B5E', borderRadius: 4 }]}>
+        {[0, 1, 2].map((i) => <View key={i} style={styles.slat} />)}
+      </View>
+      <Text style={[styles.label, { left: SHOP.stand.x0 * w, top: (SHOP.stand.top + 0.03) * h }]}>Fresh fruit</Text>
+
+      {/* Counter and till: tap the till to open it */}
+      <View style={[edge, rect(w, h, SHOP.counter.x0, SHOP.counter.x1, SHOP.counter.top, FLOOR), { backgroundColor: WOOD, borderRadius: 6 }]} />
+      <Pressable
+        onPress={() => tap('till')}
+        accessibilityRole="button"
+        accessibilityLabel="Ring the till"
+        style={[edge, styles.till, rect(w, h, 0.9, 0.96, SHOP.counter.top - 0.08, SHOP.counter.top)]}
+      >
+        <Text style={styles.tillText}>{till ? '💵 Ka-ching!' : '🧾'}</Text>
+      </Pressable>
+      {till ? <View pointerEvents="none" style={[edge, styles.drawer, rect(w, h, 0.9, 0.97, SHOP.counter.top + 0.005, SHOP.counter.top + 0.04)]} /> : null}
     </>
   );
 }
 
-function Park({ w, h, floorY }: Part) {
+function Bakery({ w, h, on, tap }: Part) {
+  const o = BAKERY.oven;
+  const hot = !!on.oven;
+  const mixing = !!on.mixer;
+  const m = BAKERY.mixer;
+  const mid = (m.x0 + m.x1) / 2;
   return (
     <>
-      <Box w={w} h={h} x={0.08} y={0.06}><Text style={styles.sun}>☀️</Text></Box>
-      <Box w={w} h={h} x={0.55} y={0.08}><Text style={styles.cloud}>☁️</Text></Box>
-      <View style={{ position: 'absolute', left: -w * 0.1, top: floorY - h * 0.16, width: w * 0.7, height: h * 0.4, borderRadius: w, backgroundColor: '#8BD17C' }} />
-      {/* Tree */}
-      <View style={[edge, { position: 'absolute', left: w * 0.74, top: floorY - h * 0.2, width: w * 0.04, height: h * 0.22, backgroundColor: '#8D6E63' }]} />
-      <View style={[edge, { position: 'absolute', left: w * 0.66, top: floorY - h * 0.46, width: w * 0.2, height: h * 0.3, borderRadius: w, backgroundColor: '#43A047' }]} />
-      {/* Pond */}
-      <View style={[edge, { position: 'absolute', left: w * 0.34, top: floorY + h * 0.12, width: w * 0.3, height: h * 0.1, borderRadius: w, backgroundColor: '#4FC3F7' }]}>
-        <Text style={styles.pastry}> 🦆</Text>
+      <Sign w={w} h={h} x={0.22} y={0.1} text="🥐 Bakery" />
+      <View style={[edge, styles.bigWindow, rect(w, h, 0.63, 0.77, 0.1, 0.21)]}><Text style={styles.sun}>☀️</Text></View>
+
+      {/* Back counter with tiles above */}
+      <View style={[rect(w, h, BAKERY.counter.x0, BAKERY.counter.x1, BAKERY.counter.top - 0.12, BAKERY.counter.top), styles.tiles]} />
+      <View style={[edge, rect(w, h, BAKERY.counter.x0, BAKERY.counter.x1, BAKERY.counter.top, FLOOR), { backgroundColor: WOOD, borderRadius: 6, flexDirection: 'row' }]}>
+        {[0, 1, 2, 3].map((i) => <View key={i} style={styles.cupboard} />)}
       </View>
-      {/* Bench */}
-      <View style={[edge, styles.shelf, { left: w * 0.24, top: floorY - h * 0.06, width: w * 0.24, height: 12 }]} />
-      <View style={[edge, { position: 'absolute', left: w * 0.25, top: floorY - h * 0.02, width: 6, height: h * 0.07, backgroundColor: LINE }]} />
-      <View style={[edge, { position: 'absolute', left: w * 0.45, top: floorY - h * 0.02, width: 6, height: h * 0.07, backgroundColor: LINE }]} />
+      <Plank w={w} h={h} x0={BAKERY.wallShelf.x0} x1={BAKERY.wallShelf.x1} y={BAKERY.wallShelf.y} />
+
+      {/* Stand mixer: tap to mix */}
+      <Pressable
+        onPress={() => tap('mixer')}
+        accessibilityRole="button"
+        accessibilityLabel={mixing ? 'Stop the mixer' : 'Start the mixer'}
+        style={rect(w, h, m.x0, m.x1, BAKERY.counter.top - 0.17, BAKERY.counter.top)}
+      >
+        <Rumble active={mixing} style={StyleSheet.absoluteFill}>
+          <View style={[edge, styles.mixerBase, { left: '10%', right: '10%', bottom: 0, height: '12%' }]} />
+          <View style={[edge, styles.mixerBase, { left: '10%', width: '18%', bottom: '10%', height: '70%' }]} />
+          <View style={[edge, styles.mixerBase, { left: '10%', right: '6%', top: '6%', height: '22%', borderRadius: 14 }]} />
+          <View style={[edge, styles.bowl, { left: '32%', right: '14%', bottom: '10%', height: '30%' }]} />
+          <Spin active={mixing} style={[styles.whisk, { left: '44%', top: '30%' }]}>
+            <Text style={styles.whiskText}>✳️</Text>
+          </Spin>
+        </Rumble>
+      </Pressable>
+      <Text pointerEvents="none" style={[styles.label, { left: (mid - 0.03) * w, top: (BAKERY.counter.top + 0.02) * h, color: '#fff' }]}>
+        {mixing ? 'Whirr!' : 'Mixer'}
+      </Text>
+
+      {/* Oven: tap to turn on; things inside bake */}
+      <Pressable
+        onPress={() => tap('oven')}
+        accessibilityRole="button"
+        accessibilityLabel={hot ? 'Turn the oven off' : 'Turn the oven on'}
+        style={[edge, rect(w, h, o.x0, o.x1, o.top, FLOOR), styles.oven]}
+      >
+        <View style={[styles.ovenWindow, { backgroundColor: hot ? '#FF9800' : '#455A64' }]} />
+        <View style={styles.dials}>
+          <View style={[styles.dial, hot && { backgroundColor: '#FF5722' }]} />
+          <View style={[styles.dial, hot && { backgroundColor: '#FF5722' }]} />
+          <Text style={styles.ovenText}>{hot ? '🔥 Baking' : 'Tap to bake'}</Text>
+        </View>
+      </Pressable>
+      <View pointerEvents="none" style={[rect(w, h, o.x0 + 0.012, o.x1 - 0.012, o.rack, o.rack + 0.008), { backgroundColor: '#B0BEC5' }]} />
+
+      {/* Glass display case */}
+      <View style={[edge, styles.glass, rect(w, h, BAKERY.caseBox.x0, BAKERY.caseBox.x1, BAKERY.caseBox.top, FLOOR)]} />
+      <Plank w={w} h={h} x0={BAKERY.caseBox.x0 - 0.004} x1={BAKERY.caseBox.x1 + 0.004} y={BAKERY.caseBox.top} />
+      {BAKERY.caseBox.rows.map((y) => (
+        <View key={y} style={[rect(w, h, BAKERY.caseBox.x0 + 0.003, BAKERY.caseBox.x1 - 0.003, y, y + 0.008), { backgroundColor: '#90CAF9' }]} />
+      ))}
+
+      {/* Bread rack */}
+      <Cabinet w={w} h={h} s={BAKERY.rack} color="#C69C6D" />
+    </>
+  );
+}
+
+const QUIZ_OPS = ['+', '−', '×'] as const;
+
+/** A library computer: tap for a quick question, tap again for the answer. */
+function Computer({ w, h, x, seed }: { w: number; h: number; x: number; seed: number }) {
+  const [n, setN] = useState(seed);
+  const [shown, setShown] = useState(false);
+  const a = 2 + ((n * 7) % 9);
+  const b = 1 + ((n * 5) % 8);
+  const op = QUIZ_OPS[n % 3];
+  const answer = op === '+' ? a + b : op === '−' ? a - Math.min(a, b) : a * b;
+  const second = op === '−' ? Math.min(a, b) : b;
+  const top = LIBRARY.desk.top;
+  return (
+    <>
+      <Pressable
+        onPress={() => {
+          if (shown) {
+            setN((v) => v + 1);
+            setShown(false);
+          } else setShown(true);
+        }}
+        accessibilityRole="button"
+        accessibilityLabel={shown ? `${a} ${op} ${second} is ${answer}. Tap for another.` : `Computer: what is ${a} ${op} ${second}? Tap to see.`}
+        style={[edge, styles.monitor, rect(w, h, x - 0.04, x + 0.04, top - 0.15, top - 0.03)]}
+      >
+        <Text style={styles.screenText} numberOfLines={2}>
+          {`${a} ${op} ${second}\n= ${shown ? answer : '?'}`}
+        </Text>
+      </Pressable>
+      <View style={[rect(w, h, x - 0.006, x + 0.006, top - 0.03, top), { backgroundColor: '#455A64' }]} />
+      <View style={[edge, rect(w, h, x - 0.03, x + 0.03, top - 0.012, top), { backgroundColor: '#CFD8DC', borderRadius: 3, borderWidth: 2 }]} />
+      {/* Chair */}
+      <View style={[edge, rect(w, h, x - 0.025, x + 0.025, top + 0.12, top + 0.15), { backgroundColor: '#5C6BC0', borderRadius: 6 }]} />
+      <View style={[rect(w, h, x - 0.003, x + 0.003, top + 0.15, top + 0.22), { backgroundColor: LINE }]} />
+    </>
+  );
+}
+
+function Library({ w, h, on, tap }: Part) {
+  const lamp = !!on.lamp;
+  const n = LIBRARY.nook;
+  return (
+    <>
+      <Sign w={w} h={h} x={0.585} y={0.13} text="📚 Library" />
+      {LIBRARY.cases.map((c) => (
+        <Cabinet key={c.x0} w={w} h={h} s={c} color="#8D6E63" />
+      ))}
+
+      {/* Reading corner: rug, armchair and a lamp to tap */}
+      <View style={[edge, styles.rug, rect(w, h, n.x0, n.x1, 0.74, 0.88)]} />
+      <View style={[edge, rect(w, h, n.x0 + 0.01, n.x0 + 0.07, 0.5, 0.66), { backgroundColor: '#E57373', borderRadius: 16 }]} />
+      <View style={[edge, rect(w, h, n.x0, n.x0 + 0.08, 0.6, 0.7), { backgroundColor: '#EF5350', borderRadius: 10 }]} />
+      {lamp ? <View pointerEvents="none" style={[styles.glow, rect(w, h, n.x1 - 0.06, n.x1 + 0.02, 0.24, 0.48)]} /> : null}
+      <Pressable
+        onPress={() => tap('lamp')}
+        accessibilityRole="button"
+        accessibilityLabel={lamp ? 'Turn the lamp off' : 'Turn the lamp on'}
+        style={rect(w, h, n.x1 - 0.04, n.x1, 0.3, FLOOR + 0.02)}
+      >
+        <View style={[edge, styles.shade, { backgroundColor: lamp ? '#FFF59D' : '#FFE0B2' }]} />
+        <View style={styles.pole} />
+        <View style={[edge, styles.lampFoot]} />
+      </Pressable>
+
+      {/* Computer corner */}
+      <Sign w={w} h={h} x={0.79} y={0.12} text="💻 Computers" />
+      <View style={[edge, rect(w, h, LIBRARY.desk.x0, LIBRARY.desk.x1, LIBRARY.desk.top, LIBRARY.desk.top + 0.03), { backgroundColor: WOOD, borderRadius: 4 }]} />
+      {[LIBRARY.desk.x0 + 0.01, LIBRARY.desk.x1 - 0.015].map((x) => (
+        <View key={x} style={[rect(w, h, x, x + 0.006, LIBRARY.desk.top + 0.03, FLOOR + 0.06), { backgroundColor: LINE }]} />
+      ))}
+      {LIBRARY.computers.map((x, i) => (
+        <Computer key={x} w={w} h={h} x={x} seed={i * 4 + 1} />
+      ))}
+    </>
+  );
+}
+
+function Park({ w, h, floorY, on, tap }: Part) {
+  const s = PARK.swings;
+  const sl = PARK.slide;
+  const swingLen = (FLOOR - 0.05 - s.top) * h;
+  // The slide runs from the top of its ladder down to the grass.
+  const run = (sl.x1 - sl.x0 - 0.05) * w;
+  const drop = (FLOOR - sl.top) * h;
+  const len = Math.hypot(run, drop);
+  const angle = (Math.atan2(drop, run) * 180) / Math.PI;
+  return (
+    <>
+      <Box w={w} h={h} x={0.02} y={0.07}><Text style={styles.sun}>☀️</Text></Box>
+      {[0.2, 0.47, 0.7, 0.9].map((x, i) => (
+        <Box key={x} w={w} h={h} x={x} y={0.08 + (i % 2) * 0.06}><Text style={styles.cloud}>☁️</Text></Box>
+      ))}
+      <View style={{ position: 'absolute', left: -w * 0.05, top: floorY - h * 0.14, width: w * 0.4, height: h * 0.4, borderRadius: w, backgroundColor: '#8BD17C' }} />
+      <View style={{ position: 'absolute', left: w * 0.5, top: floorY - h * 0.1, width: w * 0.45, height: h * 0.4, borderRadius: w, backgroundColor: '#8BD17C' }} />
+      <Sign w={w} h={h} x={0.36} y={0.1} text="🌳 Park" />
+
+      {/* Swings: tap a seat to swing it */}
+      <View style={[edge, rect(w, h, s.x0, s.x1, s.top, s.top + 0.015), { backgroundColor: '#E53935' }]} />
+      {[s.x0, s.x1 - 0.008].map((x) => (
+        <View key={x} style={[edge, rect(w, h, x, x + 0.008, s.top, FLOOR + 0.03), { backgroundColor: '#E53935' }]} />
+      ))}
+      {[0, 1].map((i) => {
+        const x = s.x0 + (s.x1 - s.x0) * (i ? 0.68 : 0.32);
+        const name = `swing${i}`;
+        return (
+          <Swing key={i} active={!!on[name]} style={{ position: 'absolute', left: x * w - 30, top: (s.top + 0.015) * h, width: 60, height: swingLen + 18 }}>
+            <Pressable onPress={() => tap(name)} accessibilityRole="button" accessibilityLabel={on[name] ? 'Stop the swing' : 'Push the swing'} style={styles.swingHit}>
+              <View style={[styles.rope, { left: 8, height: swingLen }]} />
+              <View style={[styles.rope, { right: 8, height: swingLen }]} />
+              <View style={[edge, styles.seat]} />
+            </Pressable>
+          </Swing>
+        );
+      })}
+
+      {/* Slide */}
+      <View style={[edge, rect(w, h, sl.x0, sl.x0 + 0.05, sl.top, sl.top + 0.02), { backgroundColor: '#1E88E5' }]} />
+      {[sl.x0, sl.x0 + 0.045].map((x) => (
+        <View key={x} style={[rect(w, h, x, x + 0.006, sl.top, FLOOR + 0.04), { backgroundColor: '#90A4AE' }]} />
+      ))}
+      {Array.from({ length: 5 }, (_, i) => (
+        <View key={i} style={[rect(w, h, sl.x0, sl.x0 + 0.05, sl.top + 0.04 + i * 0.05, sl.top + 0.047 + i * 0.05), { backgroundColor: '#90A4AE' }]} />
+      ))}
+      <View
+        style={[
+          edge,
+          styles.slide,
+          {
+            width: len,
+            left: (sl.x0 + 0.05) * w + run / 2 - len / 2,
+            top: sl.top * h + drop / 2 - 9,
+            transform: [{ rotate: `${angle}deg` }],
+          },
+        ]}
+      />
+
+      {/* Sandbox, pond, tree and picnic blanket */}
+      <View style={[edge, rect(w, h, PARK.sandbox.x0, PARK.sandbox.x1, PARK.sandbox.y0, PARK.sandbox.y1), { backgroundColor: '#F6D58E', borderColor: WOOD, borderWidth: 6 }]} />
+      <View style={[edge, rect(w, h, PARK.pond.x0, PARK.pond.x1, PARK.pond.y0, PARK.pond.y1), { backgroundColor: '#4FC3F7', borderRadius: w }]} />
+      <View style={[rect(w, h, PARK.pond.x0 + 0.1, PARK.pond.x0 + 0.13, PARK.pond.y0 + 0.03, PARK.pond.y0 + 0.06), { backgroundColor: '#66BB6A', borderRadius: 40 }]} />
+      <View style={[edge, rect(w, h, PARK.tree.x - 0.012, PARK.tree.x + 0.012, PARK.tree.branches[1], FLOOR + 0.04), { backgroundColor: '#8D6E63' }]} />
+      <View style={[edge, rect(w, h, PARK.tree.x - 0.07, PARK.tree.x + 0.07, PARK.tree.top, PARK.tree.branches[1] + 0.06), { backgroundColor: '#43A047', borderRadius: w }]} />
+      {PARK.tree.branches.map((y, i) => (
+        <View key={y} style={[rect(w, h, PARK.tree.x - 0.055 + i * 0.01, PARK.tree.x + 0.055 - i * 0.01, y, y + 0.012), { backgroundColor: '#6D4C41', borderRadius: 6 }]} />
+      ))}
+      <View style={[edge, rect(w, h, PARK.blanket.x0, PARK.blanket.x1, PARK.blanket.y0, PARK.blanket.y1), styles.blanket]}>
+        {Array.from({ length: 6 }, (_, i) => <View key={i} style={styles.check} />)}
+      </View>
     </>
   );
 }
 
 const styles = StyleSheet.create({
   sun: { fontSize: 44 },
-  plant: { position: 'absolute', fontSize: 44 },
   tree: { position: 'absolute', fontSize: 40 },
   cloud: { fontSize: 44, opacity: 0.9 },
   exit: { position: 'absolute', backgroundColor: '#C68B5E', borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
@@ -240,18 +456,42 @@ const styles = StyleSheet.create({
   streetName: { fontSize: 13, fontWeight: '900', color: '#fff', textAlign: 'center', paddingHorizontal: 2 },
   signText: { fontSize: 20, fontWeight: '900', color: '#3B2B25', textAlign: 'center' },
   sign: { backgroundColor: '#FFF3D6', paddingHorizontal: 14, paddingVertical: 4, borderRadius: 12 },
+  label: { position: 'absolute', fontSize: 13, fontWeight: '900', color: '#3B2B25' },
   window: { backgroundColor: '#BBDEFB', marginTop: 6, borderRadius: 6 },
   door: { position: 'absolute', bottom: 0, backgroundColor: '#8D6E63', borderTopLeftRadius: 10, borderTopRightRadius: 10, justifyContent: 'center', alignItems: 'flex-end', paddingRight: 6 },
   knob: { width: 10, height: 10, borderRadius: 5, backgroundColor: '#FFCA28' },
-  bigWindow: { position: 'absolute', backgroundColor: '#BBDEFB', borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
-  glass: { position: 'absolute', backgroundColor: 'rgba(200,235,255,0.7)', borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
-  pastry: { fontSize: 24 },
-  counter: { position: 'absolute', backgroundColor: '#A86B45', borderRadius: 6, alignItems: 'center', justifyContent: 'center' },
-  oven: { position: 'absolute', backgroundColor: '#37474F', borderRadius: 10, padding: 8, gap: 8, alignItems: 'center', justifyContent: 'center' },
-  ovenWindow: { flex: 1, alignSelf: 'stretch', backgroundColor: '#FF9800', borderRadius: 8, alignItems: 'center', justifyContent: 'center' },
-  dials: { flexDirection: 'row', gap: 10 },
-  dial: { width: 12, height: 12, borderRadius: 6, backgroundColor: '#ECEFF1' },
-  shelf: { position: 'absolute', height: 14, backgroundColor: '#A86B45', borderRadius: 4 },
-  goods: { position: 'absolute', bottom: 12, left: 6, right: 6, flexDirection: 'row', justifyContent: 'space-around' },
-  rug: { position: 'absolute', backgroundColor: '#E57373', borderRadius: 40 },
+  plank: { position: 'absolute', height: 12, backgroundColor: WOOD, borderRadius: 3, borderWidth: 2 },
+  fridge: { backgroundColor: '#E3F2FD', borderRadius: 8 },
+  handle: { position: 'absolute', top: '40%', width: 6, height: 40, borderRadius: 3, backgroundColor: '#78909C' },
+  puff: { position: 'absolute', fontSize: 22 },
+  slat: { height: 3, backgroundColor: 'rgba(0,0,0,0.18)', marginTop: 14 },
+  till: { backgroundColor: '#90A4AE', borderRadius: 6, alignItems: 'center', justifyContent: 'center' },
+  tillText: { fontSize: 14, fontWeight: '900', color: '#fff', textAlign: 'center' },
+  drawer: { backgroundColor: '#B0BEC5', borderRadius: 4 },
+  bigWindow: { backgroundColor: '#BBDEFB', borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
+  tiles: { backgroundColor: '#FFFFFF', opacity: 0.55, borderRadius: 4 },
+  cupboard: { flex: 1, margin: 6, borderWidth: 2, borderColor: 'rgba(0,0,0,0.25)', borderRadius: 4 },
+  mixerBase: { position: 'absolute', backgroundColor: '#EC407A', borderRadius: 8 },
+  bowl: { position: 'absolute', backgroundColor: '#CFD8DC', borderBottomLeftRadius: 30, borderBottomRightRadius: 30 },
+  whisk: { position: 'absolute' },
+  whiskText: { fontSize: 22 },
+  oven: { backgroundColor: '#37474F', borderRadius: 10, padding: 8, gap: 6 },
+  ovenWindow: { flex: 1, borderRadius: 8, borderWidth: 3, borderColor: '#263238' },
+  ovenText: { fontSize: 13, fontWeight: '900', color: '#fff' },
+  dials: { flexDirection: 'row', gap: 8, alignItems: 'center', justifyContent: 'center' },
+  dial: { width: 14, height: 14, borderRadius: 7, backgroundColor: '#ECEFF1' },
+  glass: { backgroundColor: 'rgba(200,235,255,0.55)', borderRadius: 10 },
+  rug: { backgroundColor: '#7E57C2', borderRadius: 60 },
+  glow: { backgroundColor: 'rgba(255,241,118,0.45)', borderRadius: 200 },
+  shade: { height: 34, borderTopLeftRadius: 16, borderTopRightRadius: 16, borderRadius: 4 },
+  pole: { alignSelf: 'center', flex: 1, width: 5, backgroundColor: LINE },
+  lampFoot: { height: 10, borderRadius: 5, backgroundColor: '#6D4C41' },
+  monitor: { backgroundColor: '#263238', borderRadius: 6, alignItems: 'center', justifyContent: 'center', padding: 2 },
+  screenText: { fontSize: 15, fontWeight: '900', color: '#A5D6A7', textAlign: 'center' },
+  swingHit: { flex: 1 },
+  rope: { position: 'absolute', top: 0, width: 3, backgroundColor: '#5D4037' },
+  seat: { position: 'absolute', bottom: 0, left: 2, right: 2, height: 16, borderRadius: 4, backgroundColor: '#FFCA28' },
+  slide: { position: 'absolute', height: 18, borderRadius: 9, backgroundColor: '#FFB300' },
+  blanket: { backgroundColor: '#EF5350', borderRadius: 6, flexDirection: 'row', flexWrap: 'wrap', overflow: 'hidden' },
+  check: { width: '33.3%', height: '50%', backgroundColor: 'rgba(255,255,255,0.35)', opacity: 0.6 },
 });

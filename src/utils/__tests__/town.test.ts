@@ -1,6 +1,6 @@
 import { makeProfile } from '@/test/fixtures';
 import { createRng } from '@/utils/seededRandom';
-import { BUILDINGS, changeCoins, changeHint, finishShift, handedBack, shiftDone, shiftQuestions, SHIFT_QUESTIONS } from '@/utils/town';
+import { BUILDINGS, changeBills, paymentBills, changeHint, FIRST_BONUS_COINS, FIRST_BONUS_HEARTS, finishShift, handedBack, REPLAY_COINS_PER_RIGHT, shiftDone, shiftQuestions, SHIFT_QUESTIONS } from '@/utils/town';
 
 const today = '2026-11-07';
 const withPup = makeProfile({ unlocks: ['buddy-pup'], equipped: { background: 'bg-cream', cardStyle: 'card-classic', companion: 'buddy-pup' } });
@@ -23,7 +23,7 @@ describe('community shifts', () => {
         qs.forEach((q) => {
           expect(q.change).toBeDefined();
           expect(q.answer).toBeGreaterThan(0);
-          expect(changeCoins(grade)).toContain(1); // any amount can be made
+          expect(changeBills(grade)).toContain(1); // any amount can be made
         });
       }
     }
@@ -49,18 +49,34 @@ describe('community shifts', () => {
     }
   });
 
-  it('pays coins once a day', () => {
+  it('pays full rate plus a bonus on the first play, and a little on replays', () => {
     const first = finishShift(makeProfile(), 'shop', 4, today);
-    expect(first.pay.coins).toBe(8);
+    expect(first.pay).toEqual({ coins: 8 + FIRST_BONUS_COINS, hearts: 0, bonus: FIRST_BONUS_COINS });
+    expect(first.profile.coins - makeProfile().coins).toBe(8 + FIRST_BONUS_COINS);
     expect(shiftDone(first.profile, 'shop', today)).toBe(true);
-    expect(finishShift(first.profile, 'shop', 5, today).pay).toEqual({ coins: 0, hearts: 0 });
+    const again = finishShift(first.profile, 'shop', 5, today);
+    expect(again.pay).toEqual({ coins: 5 * REPLAY_COINS_PER_RIGHT, hearts: 0, bonus: 0 });
+    expect(again.profile.coins - first.profile.coins).toBe(5);
     expect(shiftDone(first.profile, 'shop', '2026-11-08')).toBe(false);
+    // no bonus when nothing was right, and nothing paid on a replay with nothing right
+    expect(finishShift(makeProfile(), 'shop', 0, today).pay.coins).toBe(0);
+  });
+
+  it('uses US bills with no 2, and pays with a few bills', () => {
+    for (const g of [0, 1, 2, 3, 4, 6] as const) {
+      expect(changeBills(g)).not.toContain(2);
+      expect(changeBills(g)[0]).toBe(1);
+    }
+    expect(changeBills(0)).toEqual([1, 5, 10]);
+    expect(changeBills(6)).toContain(100);
+    expect(paymentBills(22, [1, 5, 10, 20])).toEqual([20, 1, 1]);
+    expect(paymentBills(500, [1, 5, 10])).toEqual([]);
   });
 
   it('pays hearts to the buddy, or coins without one', () => {
     const hearts = finishShift(withPup, 'park', 3, today);
-    expect(hearts.pay).toEqual({ coins: 0, hearts: 3 });
-    expect(hearts.profile.buddyHearts['buddy-pup']).toBe(3);
-    expect(finishShift(makeProfile(), 'park', 3, today).pay).toEqual({ coins: 6, hearts: 0 });
+    expect(hearts.pay).toEqual({ coins: 0, hearts: 3 + FIRST_BONUS_HEARTS, bonus: FIRST_BONUS_HEARTS });
+    expect(hearts.profile.buddyHearts['buddy-pup']).toBe(3 + FIRST_BONUS_HEARTS);
+    expect(finishShift(makeProfile(), 'park', 3, today).pay).toEqual({ coins: 6 + FIRST_BONUS_COINS, hearts: 0, bonus: FIRST_BONUS_COINS });
   });
 });

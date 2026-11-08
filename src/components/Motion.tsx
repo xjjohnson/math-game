@@ -364,7 +364,25 @@ export function Rumble({ children, active, style }: { children: ReactNode; activ
   return <Animated.View style={[style, look]}>{children}</Animated.View>;
 }
 
-const CONFETTI_COLORS = ['#FF6B6B', '#FFD93D', '#6BCB77', '#4D96FF', '#C77DFF', '#FF9F45'];
+/** Swings to and fro from its top edge while `active`, like a playground swing. Still when motion is off. */
+export function Swing({ children, active, style }: { children: ReactNode; active: boolean; style?: StyleProp<ViewStyle> }) {
+  const { animate } = useMotion();
+  const t = useSharedValue(0);
+  useEffect(() => {
+    if (!animate || !active) {
+      cancelAnimation(t);
+      t.value = withTiming(0, { duration: 500 });
+      return;
+    }
+    const ease = Easing.inOut(Easing.sin);
+    t.value = withRepeat(withSequence(withTiming(1, { duration: 650, easing: ease }), withTiming(-1, { duration: 1300, easing: ease }), withTiming(0, { duration: 650, easing: ease })), -1);
+    return () => cancelAnimation(t);
+  }, [animate, active, t]);
+  const look = useAnimatedStyle(() => ({ transform: [{ rotate: `${t.value * 30}deg` }] }));
+  return <Animated.View style={[{ transformOrigin: 'top' }, style, look]}>{children}</Animated.View>;
+}
+
+const CONFETTI_COLORS =['#FF6B6B', '#FFD93D', '#6BCB77', '#4D96FF', '#C77DFF', '#FF9F45'];
 
 interface ConfettiProps {
   /** Change this number to throw another handful; 0 throws none. */

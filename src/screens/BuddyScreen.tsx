@@ -5,8 +5,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Text } from '@/components/AppText';
 import { BigButton } from '@/components/BigButton';
-import type { Dressed } from '@/components/BuddyFigure';
-import { BuddyRoom, type HomeBuddy } from '@/components/BuddyRoom';
+import { BuddyRoom } from '@/components/BuddyRoom';
 import { ChoiceButtons } from '@/components/ChoiceButtons';
 import { Furniture } from '@/components/Furniture';
 import { Confetti } from '@/components/Motion';
@@ -33,8 +32,6 @@ import {
 } from '@/constants/room';
 import { itemsIn, type ShopItem } from '@/constants/shop';
 import {
-  BODY_COLORS,
-  DEFAULT_BODY,
   findWearable,
   type Wearable,
   HAIR_COLOR_NAMES,
@@ -66,11 +63,12 @@ import {
   type CareAction,
 } from '@/utils/buddy';
 import { dateKey } from '@/utils/dates';
+import { homeBuddiesOf } from '@/utils/homeVisit';
 import { generate } from '@/utils/mathEngine';
 import { BUDDY_KEY, buddiesHome, FIXTURE_KEY, ownsArea } from '@/utils/room';
 import { createRng, pick, randomSeed } from '@/utils/seededRandom';
 import { owns } from '@/utils/shop';
-import { canWear, clothOf, lookOf, outfitOf } from '@/utils/wardrobe';
+import { canWear, lookOf, outfitOf } from '@/utils/wardrobe';
 import { playSound } from '@/utils/soundEffects';
 
 /** The tabs along the bottom; each opens a drawer over the home. */
@@ -187,24 +185,7 @@ export function BuddyScreen() {
 
   const say = (text: string) => setLine(text);
   const home = buddiesHome(profile);
-  const homeBuddies: HomeBuddy[] = home.flatMap(({ id, spot }) => {
-    const item = owned.find((o) => o.id === id);
-    if (!item || item.category !== 'companion') return [];
-    const gift = giftForLevel(buddyLevel(buddyHearts(profile, id)));
-    const body = BODY_COLORS[id] ?? DEFAULT_BODY;
-    return [
-      {
-        id,
-        emoji: item.companion.emoji,
-        gift,
-        name: item.name,
-        spot,
-        ...body,
-        dressed: dressedOf(profile, id),
-        person: personOf(profile, id),
-      },
-    ];
-  });
+  const homeBuddies = homeBuddiesOf(profile);
 
   /** Makes another buddy the one you're with. The one before stays home where it stood. */
   const switchTo = (id: string) => {
@@ -683,37 +664,6 @@ function CareDrawer({ profile, name, treat, hasBuddy, onPet, onTreat, onFetch }:
       </View>
     </>
   );
-}
-
-/** A buddy's outfit as things to draw. */
-function dressedOf(profile: Profile, buddyId: string): Dressed {
-  const outfit = outfitOf(profile, buddyId);
-  const emoji = (id?: string) => (id ? findWearable(id)?.emoji : undefined);
-  return {
-    hat: emoji(outfit.hat),
-    face: emoji(outfit.face),
-    neck: emoji(outfit.neck),
-    feet: emoji(outfit.feet),
-    shirt: outfit.shirt ? findWearable(outfit.shirt)?.color : undefined,
-  };
-}
-
-/** A person buddy's looks and clothes, ready to draw; null for animals. */
-function personOf(profile: Profile, buddyId: string): HomeBuddy['person'] {
-  const look = lookOf(profile, buddyId);
-  if (!look) return undefined;
-  const outfit = outfitOf(profile, buddyId);
-  return {
-    look,
-    dressed: {
-      hat: outfit.hat,
-      face: outfit.face,
-      neck: outfit.neck,
-      feet: outfit.feet,
-      top: clothOf(outfit.shirt),
-      legs: clothOf(outfit.legs),
-    },
-  };
 }
 
 /** Dress up tabs: clothes spots, plus hair, beard and skin for people. */
