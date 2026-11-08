@@ -3,6 +3,7 @@ import { ScrollView, StyleSheet } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Text } from '@/components/AppText';
+import { TabBar, type TabId } from '@/components/TabBar';
 import { BackgroundDecor } from '@/components/BackgroundDecor';
 import { colors, fontSizes, spacing } from '@/constants/theme';
 import { useActiveProfile } from '@/store/profiles';
@@ -15,23 +16,30 @@ interface Props {
   compact?: boolean;
   /** For screens without a header bar, which then need the top safe area too. */
   noHeader?: boolean;
+  /** Shows the bottom tab bar with this tab highlighted. */
+  tab?: TabId;
 }
 
 /** Standard page wrapper: safe area, scrolling, centered column for tablets and PC. */
-export function Screen({ title, children, compact = false, noHeader = false }: Props) {
+export function Screen({ title, children, compact = false, noHeader = false, tab }: Props) {
   const profile = useActiveProfile();
   const background = backgroundColor(profile);
   return (
     <SafeAreaView
       style={[styles.safe, { backgroundColor: background }]}
       // The header bar already sits below the status bar, so only header-less screens pad the top.
-      edges={noHeader ? ['top', 'bottom', 'left', 'right'] : ['bottom', 'left', 'right']}
+      edges={
+        noHeader
+          ? ['top', ...(tab ? [] : ['bottom' as const]), 'left', 'right']
+          : [...(tab ? [] : ['bottom' as const]), 'left', 'right']
+      }
     >
       <BackgroundDecor decor={backgroundDecor(profile)} />
       <ScrollView contentContainerStyle={[styles.content, compact && styles.compact]}>
         {title ? <Text style={styles.title} accessibilityRole="header">{title}</Text> : null}
         {children}
       </ScrollView>
+      {tab ? <TabBar active={tab} /> : null}
     </SafeAreaView>
   );
 }

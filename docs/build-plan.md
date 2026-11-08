@@ -2,7 +2,7 @@
 
 **Platform:** Android phones/tablets (Google Play) + optional PC via web build
 **Use:** Personal, sideloaded APK (no store release, no accounts, no analytics, no ads)
-**Status:** Planning only. Nothing has been built or run.
+**Status:** Phases 1-8 built, plus buddy home, community and kid-test features. The APK rebuilds on each merge to main.
 
 ---
 
@@ -114,6 +114,9 @@ Cross-platform interactive math learning game for kids (ages 5-15), React Native
 - Worksheet mode: all 10 questions on one page, answered in any order with a short pad, marked together at the end (untimed; same coins, stars and high scores, kept separately)
 
 ## Motivation
+
+- **Coins are spending money** (per right answer by operation, level and grade; also Community jobs). **Stars are progress:** each round earns stars, and star levels unlock free rewards. Points are gone from play.
+- **Navigation:** Home is "Buddy Street" (character + buddy scene, big Play) with a bottom tab bar: Home, Buddy, Town, Shop, Me.
 
 - Daily challenge with bonus reward
 - Daily streak calendar (separate from in-session streak)

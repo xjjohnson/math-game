@@ -21,7 +21,7 @@ export function ShopScreen() {
 
   if (!profile) {
     return (
-      <Screen title="Shop">
+      <Screen title="Shop" tab="shop">
         <Text style={styles.message}>Pick a player first.</Text>
       </Screen>
     );
@@ -50,7 +50,7 @@ export function ShopScreen() {
   };
 
   return (
-    <Screen title="Shop">
+    <Screen title="Shop" tab="shop">
       <Text style={styles.balance}>🪙 {profile.coins} coins</Text>
       <OptionGroup label="Shop for" value={category} onChange={setCategory} options={SHOP_CATEGORIES} />
       {message ? (
