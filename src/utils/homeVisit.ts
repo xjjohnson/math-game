@@ -68,6 +68,8 @@ export interface HomeSnapshot {
   buddies: HomeBuddy[];
   /** Extra rooms bought, so the friend sees the same rooms open. */
   homeRooms: string[];
+  /** The order the rooms are in, left to right. */
+  homeOrder?: string[];
 }
 
 /** Nearby sends at most 32 KB in one go; stay well under it. */
@@ -85,6 +87,7 @@ export function homeSnapshot(profile: Profile): HomeSnapshot | null {
     room: { ...profile.room, things },
     buddies: homeBuddiesOf(profile),
     homeRooms: profile.homeRooms,
+    homeOrder: profile.homeOrder,
   };
   return JSON.stringify(snap).length <= MAX_HOME_BYTES ? snap : null;
 }
@@ -113,6 +116,7 @@ export function parseHomeSnapshot(v: unknown): HomeSnapshot | null {
   const { name, room, buddies, homeRooms } = v;
   if (!isStr(name, 40) || !isObj(room) || !Array.isArray(buddies) || !Array.isArray(homeRooms)) return null;
   if (!homeRooms.every((r) => isStr(r))) return null;
+  if (v.homeOrder !== undefined && !(Array.isArray(v.homeOrder) && v.homeOrder.every((r) => isStr(r)))) return null;
   const { paint, things } = room;
   if (!Array.isArray(paint) || !paint.every((p) => isObj(p) && isNum(p.wall) && isNum(p.floor))) return null;
   if (!isObj(room.buddies) || !Object.values(room.buddies).every(isSpot)) return null;

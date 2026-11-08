@@ -1,4 +1,4 @@
-import { findRoomItem, FLOOR_COLORS, HOME_AREAS, inSeason, MAX_ROOM_THINGS, ROOM_SPAN, WALL_COLORS } from '@/constants/room';
+import { findRoomItem, FLOOR_COLORS, type HomeArea, HOME_AREAS, inSeason, MAX_ROOM_THINGS, ROOM_SPAN, WALL_COLORS } from '@/constants/room';
 import type { AreaPaint, BuddySpot, Profile, Room, RoomSpot, RoomThing } from '@/types';
 
 /** Where the floor starts, as a share of the room's height. */
@@ -93,9 +93,51 @@ export function addExtraRooms(room: Room, from = AREAS_BEFORE_EXTRA_ROOMS): Room
   };
 }
 
+/**
+ * The rooms left to right in the order the player chose. Unknown ids are dropped and any
+ * room missing from `order` goes on the end, so a bad or old list still gives every room.
+ */
+export function areasOf(order?: string[]): HomeArea[] {
+  const list: HomeArea[] = [];
+  for (const id of order ?? []) {
+    const a = HOME_AREAS.find((h) => h.id === id);
+    if (a && !list.includes(a)) list.push(a);
+  }
+  for (const a of HOME_AREAS) if (!list.includes(a)) list.push(a);
+  return list;
+}
+
+/**
+ * Swaps the room in `slot` with its neighbor (-1 is left, 1 is right). The rooms' paint and
+ * everything standing or sitting in them swap too, so the rooms move whole. Things inside
+ * cupboards go along with their cupboard.
+ */
+export function moveRoom(profile: Profile, slot: number, dir: -1 | 1): Profile {
+  const other = slot + dir;
+  if (slot < 0 || slot >= AREA_COUNT || other < 0 || other >= AREA_COUNT) return profile;
+  const order = areasOf(profile.homeOrder).map((a) => a.id);
+  [order[slot], order[other]] = [order[other], order[slot]];
+  const shift = (x: number) => {
+    const at = areaAt(x);
+    if (at === slot) return x + (other - slot) / AREA_COUNT;
+    if (at === other) return x + (slot - other) / AREA_COUNT;
+    return x;
+  };
+  const room = profile.room;
+  const paint = HOME_AREAS.map((_, i) => paintOf(room, i));
+  [paint[slot], paint[other]] = [paint[other], paint[slot]];
+  const buddies: Room['buddies'] = {};
+  for (const [id, spot] of Object.entries(room.buddies)) buddies[id] = { ...spot, x: shift(spot.x) };
+  return {
+    ...profile,
+    homeOrder: order,
+    room: { paint, buddies, things: room.things.map((t) => (t.in ? t : { ...t, x: shift(t.x) })) },
+  };
+}
+
 /** Rooms the profile can use: the ones everyone has plus the extra ones bought. */
 export function ownsArea(profile: Profile, area: number): boolean {
-  const a = HOME_AREAS[area];
+  const a = areasOf(profile.homeOrder)[area];
   return !!a && (a.price === undefined || profile.homeRooms.includes(a.id));
 }
 

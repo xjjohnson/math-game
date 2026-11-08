@@ -4,6 +4,8 @@ import { makeProfile } from '@/test/fixtures';
 import {
   addExtraRooms,
   areaAt,
+  areasOf,
+  moveRoom,
   buyRoom,
   ownsArea,
   BUDDY_KEY,
@@ -161,5 +163,60 @@ describe('buddy home', () => {
       expect(home.things[0].x).toBeCloseTo((0.5 * 5) / HOME_AREAS.length);
       expect(areaAt(home.things[0].x)).toBe(2);
     });
+  });
+});
+
+describe('moving rooms', () => {
+  const ids = (order?: string[]) => areasOf(order).map((a) => a.id);
+
+  it('starts in the usual order and repairs a bad list', () => {
+    expect(ids()).toEqual(HOME_AREAS.map((a) => a.id));
+    expect(ids(['kitchen', 'nope', 'kitchen'])).toEqual(['kitchen', ...HOME_AREAS.map((a) => a.id).filter((i) => i !== 'kitchen')]);
+  });
+
+  it('swaps a room with its neighbor, carrying paint, things and buddies', () => {
+    const n = HOME_AREAS.length;
+    const base = makeProfile();
+    const painted = setPaint(base, 'wall', 4, 1);
+    const profile = {
+      ...painted,
+      room: {
+        ...painted.room,
+        buddies: { b1: { x: 1.5 / n, y: 0.8 } },
+        things: [
+          { key: 't0', itemId: 'bed', placed: true, x: 0.5 / n, y: 0.8 },
+          { key: 't1', itemId: 'bed', placed: true, x: 1.25 / n, y: 0.8 },
+          { key: 't3', itemId: 'bed', placed: true, x: 3.5 / n, y: 0.8 },
+        ],
+      },
+    };
+    const moved = moveRoom(profile, 1, -1);
+    expect(moved.homeOrder?.slice(0, 2)).toEqual(['kitchen', 'living']);
+    expect(moved.room.paint[0].wall).toBe(4);
+    const x = (k: string) => moved.room.things.find((t) => t.key === k)!.x;
+    expect(x('t0')).toBeCloseTo(1.5 / n);
+    expect(x('t1')).toBeCloseTo(0.25 / n);
+    expect(x('t3')).toBeCloseTo(3.5 / n);
+    expect(moved.room.buddies.b1.x).toBeCloseTo(0.5 / n);
+    // Moving it back puts everything where it was.
+    const back = moveRoom(moved, 0, 1);
+    expect(back.homeOrder).toEqual(HOME_AREAS.map((a) => a.id));
+    expect(back.room.things.map((t) => t.x)).toEqual(profile.room.things.map((t) => t.x).map((v) => expect.closeTo(v, 6)));
+    expect(back.room.paint).toEqual(profile.room.paint);
+  });
+
+  it('does nothing at either end and keeps things in cupboards put', () => {
+    const profile = makeProfile();
+    expect(moveRoom(profile, 0, -1)).toBe(profile);
+    expect(moveRoom(profile, HOME_AREAS.length - 1, 1)).toBe(profile);
+    const withIn = { ...profile, room: { ...profile.room, things: [{ key: 'c', itemId: 'bed', placed: true, x: 0.3, y: 0.5, in: 'fridge' }] } };
+    expect(moveRoom(withIn, 0, 1).room.things[0].x).toBe(0.3);
+  });
+
+  it('knows which room is bought by where it now sits', () => {
+    const moved = moveRoom(makeProfile({ homeOrder: undefined }), 4, 1);
+    const backyardSlot = ids(moved.homeOrder).indexOf('backyard');
+    expect(ownsArea(moved, backyardSlot)).toBe(false);
+    expect(ownsArea(moved, ids(moved.homeOrder).indexOf('playroom'))).toBe(true);
   });
 });

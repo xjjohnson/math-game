@@ -11,6 +11,7 @@ import { applyRound, type RoundOutcome, type RoundResult } from '@/utils/progres
 import { careForBuddy as applyCare, heartForRound, type CareAction, type CareResult } from '@/utils/buddy';
 import {
   addExtraRooms,
+  moveRoom,
   AREAS_BEFORE_EXTRA_ROOMS,
   buyRoom,
   buyRoomItem,
@@ -104,6 +105,8 @@ interface ProfilesState {
   buyRoomItem: (id: string, itemId: string, area: number, at?: number) => RoomBuyResult;
   /** Buys an extra room (an area id) for the buddies' home with coins. */
   buyHomeRoom: (id: string, areaId: string) => HomeRoomBuyResult;
+  /** Swaps the room in `slot` with the one to its left (-1) or right (1). */
+  moveHomeRoom: (id: string, slot: number, dir: -1 | 1) => void;
   /** Moves a thing in the home, or a buddy when `key` is BUDDY_KEY plus its id. */
   moveInRoom: (id: string, key: string, place: Placement) => void;
   setPlaced: (id: string, key: string, placed: boolean, area: number, at?: number) => void;
@@ -209,6 +212,8 @@ export const useProfiles = create<ProfilesState>()(
         }
         return result;
       },
+      moveHomeRoom: (id, slot, dir) =>
+        set((s) => ({ profiles: s.profiles.map((p) => (p.id === id ? moveRoom(p, slot, dir) : p)) })),
       moveInRoom: (id, key, spot) =>
         set((s) => ({
           profiles: s.profiles.map((p) => (p.id === id ? moveInRoom(p, key, spot) : p)),
