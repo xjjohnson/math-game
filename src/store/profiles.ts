@@ -25,6 +25,7 @@ import {
   type HomeRoomBuyResult,
   type RoomBuyResult,
 } from '@/utils/room';
+import { grantStarRewards } from '@/utils/starLevels';
 import { finishShift, type BuildingId, type ShiftPay } from '@/utils/town';
 import { buyItem, equipItem, freeAvatars, type BuyResult } from '@/utils/shop';
 import { moveWearable, setLook, takeOff, undress, wear, type MoveResult, type WearResult } from '@/utils/wardrobe';
@@ -173,7 +174,11 @@ export const useProfiles = create<ProfilesState>()(
         set((s) => ({
           profiles: s.profiles.map((p) =>
             p.id === id
-              ? { ...p, coins: Math.max(0, p.coins + coins), stars: Math.max(0, p.stars + stars) }
+              ? grantStarRewards({
+                  ...p,
+                  coins: Math.max(0, p.coins + coins),
+                  stars: Math.max(0, p.stars + stars),
+                }).profile
               : p,
           ),
         })),

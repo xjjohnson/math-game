@@ -6,6 +6,7 @@ import { Text } from '@/components/AppText';
 import { BigButton } from '@/components/BigButton';
 import { Confetti } from '@/components/Motion';
 import { PopIn } from '@/components/PopIn';
+import { findItem } from '@/constants/shop';
 import { Screen } from '@/components/Screen';
 import { findBadge } from '@/constants/badges';
 import { colors, fontSizes, radius, spacing } from '@/constants/theme';
@@ -25,6 +26,7 @@ export function isNotable(outcome: RoundOutcome): boolean {
     outcome.dailyBonusCoins > 0 ||
     outcome.weeklyBonusCoins > 0 ||
     outcome.newBadges.length > 0 ||
+    outcome.newStarLevels.length > 0 ||
     outcome.newHighScore ||
     outcome.stars === 3
   );
@@ -85,6 +87,14 @@ export function RoundResults({
           {outcome.weeklyBonusCoins > 0 ? (
             <Text style={styles.bonus}>🏆 All weekly goals done! +{outcome.weeklyBonusCoins} bonus</Text>
           ) : null}
+          {outcome.newStarLevels.map((level) => {
+            const item = level.reward ? findItem(level.reward) : undefined;
+            return (
+              <Text key={level.stars} style={styles.badge}>
+                ⭐ Star level up: {level.title}!{item ? ` Unlocked ${item.name}.` : ''}
+              </Text>
+            );
+          })}
           {outcome.newHighScore ? <Text style={styles.highScore}>🏆 New high score!</Text> : null}
           {outcome.newBadges.map((id) => {
             const badge = findBadge(id);
@@ -97,7 +107,6 @@ export function RoundResults({
         </View>
       ) : null}
       <View style={styles.summary}>
-        <Stat label="Points" value={String(summary.score)} />
         <Stat label="Right" value={`${right} / ${total}`} />
         <Stat label="Best streak" value={String(summary.bestStreak)} />
       </View>
