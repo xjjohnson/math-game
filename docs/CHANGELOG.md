@@ -9,6 +9,14 @@
 - **One plan for animation:** docs/animation.md lists the moves every screen uses and what's next.
 - No new APK needed; works with the in-app Update now. Animations stop when Animations is off in Settings.
 
+## 2026-11-08 (closes after 30 minutes in the background)
+
+- **The app closes itself after 30 minutes in the background** on Android. If you switch away (or the screen turns off) and don't come back within 30 minutes, it hangs up any Nearby connection, leaves the Recents list and stops, so it can't keep the radio, sounds or timers going and drain the battery. Coming back within 30 minutes carries on where you left off.
+- Players, coins and homes are saved as they change, so nothing is lost; only a round that was left half-way through starts over.
+- If the phone is fully asleep it closes within a minute or so of waking up.
+- PC/web is unchanged.
+- **Needs the new APK** (small native change). No protocol or store version change; older phones still connect.
+
 ## 2026-11-08 (paint easel)
 
 - **The easel in the School's Color corner works.** Tap it and it opens full screen. Paint with your finger on blank paper: 13 paint colors, thin, medium and thick brushes, **Rub out**, a **paint bucket** (Fill), **Undo** (takes back your own last line or fill) and **New** paper.
