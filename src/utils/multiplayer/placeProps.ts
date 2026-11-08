@@ -1,3 +1,4 @@
+import { ingredientIndex, MADE_SLOTS } from '@/utils/bakery';
 import type { TownPlace } from '@/utils/multiplayer/protocol';
 import type { Spot } from '@/utils/multiplayer/scene';
 
@@ -36,6 +37,12 @@ export interface PropDef {
   bakeTo?: string;
   /** Drawn bigger (a shopping cart, a picnic basket). */
   big?: boolean;
+  /** Bakery: which ingredient this is (a bit number); dropped on the mixing bowl it goes in and the thing springs back. */
+  ingredient?: number;
+  /** Bakery: the mixing bowl itself. */
+  bowl?: boolean;
+  /** Bakery: one of the spare places a finished treat appears (only drawn while its switch says there is one). */
+  made?: number;
 }
 
 /** A row of shelves inside one cabinet: the cabinet runs from x0 to x1, with a shelf at each height in rows. */
@@ -59,7 +66,7 @@ export const SHOP = {
 export const BAKERY = {
   counter: { x0: 0.08, x1: 0.4, top: 0.45 },
   mixer: { x0: 0.1, x1: 0.19 },
-  wallShelf: { x0: 0.22, x1: 0.39, y: 0.27 },
+  wallShelf: { x0: 0.09, x1: 0.39, y: 0.27 },
   oven: { x0: 0.44, x1: 0.56, top: 0.22, rack: 0.47 },
   caseBox: { x0: 0.6, x1: 0.8, top: 0.3, rows: [0.43, 0.56] } as Shelves,
   rack: { x0: 0.84, x1: 0.97, top: 0.16, rows: [0.27, 0.41] } as Shelves,
@@ -138,6 +145,15 @@ const books = (caseIndex: number): PropDef[] => {
   );
 };
 
+/** The bakery's mixing bowl: drop ingredients in, then slide it into the hot oven. */
+export const BOWL: PropDef = { id: 'bowl', emoji: '🥣', x: 0.225, y: BAKERY.counter.top, big: true, bowl: true };
+/** The switch that keeps what is in the bowl (x is the contents as a number between 0 and 1). */
+export const BOWL_SWITCH = 'bowl';
+/** A switch that says a finished treat is waiting in this slot (y says which treat). */
+export const madeSwitch = (slot: number): string => `made-${slot}`;
+
+const asIngredient = (keys: string[]) => (p: PropDef, i: number): PropDef => ({ ...p, ingredient: ingredientIndex(keys[i]) });
+
 export const PLACE_PROPS: Record<InsidePlace, PropDef[]> = {
   shop: [
     ...row(['🥫', '🥫', '🧂', '🍯'], SHOP.shelvesA.x0, SHOP.shelvesA.x1, SHOP.shelvesA.rows[0], 'a'),
@@ -156,10 +172,11 @@ export const PLACE_PROPS: Record<InsidePlace, PropDef[]> = {
     { id: 'basket', emoji: '🧺', x: 0.2, y: 0.8 },
   ],
   bakery: [
-    { id: 'batter1', emoji: '🥣', x: 0.22, y: BAKERY.counter.top, bakeTo: '🎂' },
-    { id: 'batter2', emoji: '🥣', x: 0.26, y: BAKERY.counter.top, bakeTo: '🧁' },
-    ...row(['🥚', '🥛', '🧈', '🍓'], 0.29, 0.4, BAKERY.counter.top, 'i'),
-    ...row(['🍯', '🧂', '🫙', '🍫'], BAKERY.wallShelf.x0, BAKERY.wallShelf.x1, BAKERY.wallShelf.y, 'j'),
+    BOWL,
+    ...row(['🥚', '🥛', '🧈', '🍓'], 0.29, 0.4, BAKERY.counter.top, 'i').map(asIngredient(['egg', 'milk', 'butter', 'berry'])),
+    ...row(['🍯', '🧂', '🫙', '🍫', '🌾', '🍬', '🍌', '🍎'], BAKERY.wallShelf.x0, BAKERY.wallShelf.x1, BAKERY.wallShelf.y, 'j').map(
+      asIngredient(['honey', 'salt', 'jam', 'choc', 'flour', 'sugar', 'banana', 'apple']),
+    ),
     { id: 'dough1', emoji: '🫓', x: 0.475, y: BAKERY.oven.top, bakeTo: '🥖' },
     { id: 'dough2', emoji: '🫓', x: 0.525, y: BAKERY.oven.top, bakeTo: '🍞' },
     ...row(['🧁', '🍰', '🥧'], BAKERY.caseBox.x0, BAKERY.caseBox.x1, BAKERY.caseBox.top, 't'),
@@ -168,6 +185,7 @@ export const PLACE_PROPS: Record<InsidePlace, PropDef[]> = {
     ...row(['🍞', '🥖'], BAKERY.rack.x0, BAKERY.rack.x1, BAKERY.rack.rows[0], 'r'),
     ...row(['🥯', '🥐'], BAKERY.rack.x0, BAKERY.rack.x1, BAKERY.rack.rows[1], 's'),
     { id: 'tray', emoji: '🍽️', x: 0.66, y: 0.8 },
+    ...Array.from({ length: MADE_SLOTS }, (_, i): PropDef => ({ id: `made${i}`, emoji: '🍰', x: BOWL.x, y: BAKERY.counter.top, made: i })),
   ],
   library: [
     ...books(0),
@@ -229,6 +247,11 @@ export function settle(place: InsidePlace, prop: Pick<PropDef, 'float'>, x: numb
     .filter((s) => cx >= s.x0 && cx <= s.x1 && s.y >= y - 0.015)
     .sort((a, b) => a.y - b.y)[0];
   return { x: cx, y: below ? below.y : FLOOR + 0.04 };
+}
+
+/** Whether a thing let go at this spot lands in the mixing bowl (bowl is where the bowl is now). */
+export function onBowl(s: Spot, bowl: Spot): boolean {
+  return Math.abs(s.x - bowl.x) <= 0.04 && s.y >= bowl.y - 0.2 && s.y <= bowl.y + 0.04;
 }
 
 /** Whether a spot is inside the bakery oven, where things bake while it's on. */
