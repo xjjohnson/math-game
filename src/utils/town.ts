@@ -39,7 +39,7 @@ export interface TownQuestion {
   answer: number;
   choices: number[];
   /** Money jobs: the player hands back change with coins and bills instead of picking an answer. */
-  change?: { price: number; paid: number; item: string };
+  change?: { price: number; paid: number; item: string; bills: number[] };
 }
 
 /** The US bills offered for giving change: $1, $5, $10, $20, and bigger ones where the amounts need them. */
@@ -63,6 +63,46 @@ export function paymentBills(amount: number, bills: number[]): number[] {
   return left === 0 && out.length <= 6 ? out : [];
 }
 
+/** Most bills a customer will hand over at once. */
+const MOST_BILLS = 6;
+
+/**
+ * Every sensible way to pay `price`: more than the price (never exactly it, or
+ * there's no change to give), and no bill could be left out and still cover it.
+ * So $10 + $5 for $12 is fine, but $10 + $5 + $1 isn't. Fewest bills first.
+ */
+export function sensiblePayments(price: number, bills: number[]): number[][] {
+  const kinds = [...bills].sort((a, b) => b - a);
+  const out: number[][] = [];
+  const walk = (from: number, hand: number[], sum: number) => {
+    if (sum > price) {
+      // Over the price: keep it only if the smallest bill was needed.
+      if (sum - hand[hand.length - 1] < price) out.push(hand);
+      return;
+    }
+    if (hand.length >= MOST_BILLS) return;
+    for (let i = from; i < kinds.length; i++) walk(i, [...hand, kinds[i]], sum + kinds[i]);
+  };
+  walk(0, [], 0);
+  return out.sort((a, b) => a.length - b.length || handedBack(a) - handedBack(b));
+}
+
+/**
+ * How a customer pays, like a real one would: often one bill that's bigger than
+ * the price, otherwise a few bills that just cover it. Empty if there's no sensible way.
+ */
+export function customerPays(price: number, bills: number[], rng: Rng): number[] {
+  const all = sensiblePayments(price, bills);
+  if (!all.length) return [];
+  const fewest = all[0].length;
+  const singles = all.filter((h) => h.length === 1);
+  // Half the time: the smallest single bill that covers it, like a $20 for $12.
+  if (singles.length && rng() < 0.5) return singles[0];
+  // Otherwise the fewest bills that cover it; never a bigger bill than needed, like $20 for $8.
+  const near = all.filter((h) => (h.length > 1 ? h.length === fewest : h === singles[0]));
+  return pick(rng, near);
+}
+
 /** Adds up what was handed back. */
 export const handedBack = (hand: number[]): number => hand.reduce((a, b) => a + b, 0);
 
@@ -72,8 +112,9 @@ export function changeHint(price: number, paid: number, given: number, grade: Gr
   return `${given > paid - price ? 'That is a bit too much.' : 'Not quite enough yet.'} ${how}`;
 }
 
-function changeQuestion(prompt: string, price: number, paid: number, item: string): TownQuestion {
-  return { prompt, answer: paid - price, choices: [], change: { price, paid, item } };
+function changeQuestion(prompt: string, price: number, bills: number[], item: string): TownQuestion {
+  const paid = handedBack(bills);
+  return { prompt: `${prompt} They pay $${paid}. Give them their change.`, answer: paid - price, choices: [], change: { price, paid, item, bills } };
 }
 
 /** The biggest numbers used at a grade: kindergarten stays within 10, then it grows. */
@@ -105,29 +146,36 @@ export function shiftQuestions(building: BuildingId, grade: Grade, rng: Rng): To
       case 'shop': {
         const [e1, n1] = pick(rng, SHOP_ITEMS);
         const [e2, n2] = pick(rng, SHOP_ITEMS);
-        const a = randInt(rng, 1, Math.max(1, Math.floor(max / 2)));
-        const b = randInt(rng, 1, Math.max(1, Math.floor(max / 2)));
+        let a = randInt(rng, 1, Math.max(1, Math.floor(max / 2)));
+        let b = randInt(rng, 1, Math.max(1, Math.floor(max / 2)));
         if (grade === 0) {
           out.push(question(`A customer buys a ${e1} ${n1} for ${a} and a ${e2} ${n2} for ${b}. How many coins is that?`, a + b, rng));
         } else {
           // Grown-ups' shop: add it up, take the money, give the change.
-          const paid = a + b + randInt(rng, 1, Math.max(1, Math.floor(max / 4)));
-          out.push(
-            changeQuestion(`A customer buys a ${e1} ${n1} for ${a} and a ${e2} ${n2} for ${b}. They pay ${paid}. Give them their change.`, a + b, paid, `${e1}${e2}`),
-          );
+          let hand = customerPays(a + b, changeBills(grade), rng);
+          for (let tries = 0; !hand.length && tries < 20; tries++) {
+            a = randInt(rng, 1, Math.max(1, Math.floor(max / 2)));
+            b = randInt(rng, 1, Math.max(1, Math.floor(max / 2)));
+            hand = customerPays(a + b, changeBills(grade), rng);
+          }
+          out.push(changeQuestion(`A customer buys a ${e1} ${n1} for $${a} and a ${e2} ${n2} for $${b}.`, a + b, hand, `${e1}${e2}`));
         }
         break;
       }
       case 'bakery': {
         // Kindergarten has not met subtraction, so the bakery counts up instead.
-        const price = randInt(rng, 1, Math.max(2, Math.floor(max / 2)));
+        let price = randInt(rng, 1, Math.max(2, Math.floor(max / 2)));
         const [bakeEmoji, label] = pick(rng, BAKES).split(' ');
         if (grade === 0) {
           const second = randInt(rng, 1, Math.max(1, max - price));
           out.push(question(`One ${label} costs ${price} and another costs ${second}. How much for both?`, price + second, rng));
         } else {
-          const paid = Math.min(max, price + randInt(rng, 1, Math.max(1, Math.floor(max / 2))));
-          out.push(changeQuestion(`A ${label} costs ${price}. The customer pays ${paid}. Give them their change.`, price, paid, bakeEmoji));
+          let hand = customerPays(price, changeBills(grade), rng);
+          for (let tries = 0; !hand.length && tries < 20; tries++) {
+            price = randInt(rng, 1, Math.max(2, Math.floor(max / 2)));
+            hand = customerPays(price, changeBills(grade), rng);
+          }
+          out.push(changeQuestion(`A ${label} costs $${price}.`, price, hand, bakeEmoji));
         }
         break;
       }
