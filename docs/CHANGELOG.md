@@ -1,5 +1,10 @@
 # Change log
 
+## 2026-11-08 (buddy hangs off the mixer)
+
+- **Put a buddy on the bakery mixer.** Drag one of your buddies up onto the stand mixer and it grabs the end of the mixer's arm and hangs there, swaying, with "I'll mix!". Put food in the bowl and it pulls the bowl under itself and runs the mixer, swinging back and forth while it whirrs ("Mixing! 🥄", then "All mixed! 👍"). Standing a buddy by the mixer still works too.
+- No new APK needed; works with the in-app Update now.
+
 ## 2026-11-08 (people and buddies come alive in Community)
 
 - **Same bodies as at home.** In Community your buddies look just like they do in the buddy home: Bluey is blue, the pup wears its crown, and people buddies (Mom, Dad, sisters...) and people avatars are whole drawn people instead of a face on a cartoon body. A friend's buddies come in their own colors and starting clothes.

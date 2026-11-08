@@ -257,6 +257,7 @@ Phases 1-6 deliver a complete single-player game before any native Bluetooth wor
 - [x] While one finger holds a person or thing, a second finger on the background slides the home along, and what's held stays under its finger
 - [x] Animations, batch 1: buddies and people breathe in place (slower while napping on a bed, with a drifting 💤), people blink, tapping a buddy makes it hop and wave, tapped things wiggle, dropped things land with a squash, tap pictures float up and fade, things added to the home pop in, a level-up throws confetti; in a round the buddy hops for right answers and shakes its head after misses, the feedback line pops in, and a notable round end throws confetti. All of it stops when Animations is off in Settings (or the device's reduce motion is on)
 - [x] Animations, batch 2 (one approach for the whole app, written up in docs/animation.md): in Community the people and buddies breathe, blink, walk to where they're put instead of jumping (friends' moves too), hop and wave when waving, and squash a little when put down; things slide to where they land; bodies match the buddy home (each buddy in its own colors and clothes, people buddies and people avatars drawn as whole people); a buddy standing by the bakery mixer runs it for you (pulls the bowl over, mixes, rocks while it works, "Mixing! 🥄"); on Home your character and buddy breathe, and tapping your character makes it hop
+- [x] A buddy dragged onto the bakery mixer hangs off the end of its arm and swings while it mixes the bowl for you
 
 ---
 
