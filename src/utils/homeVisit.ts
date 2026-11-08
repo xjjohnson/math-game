@@ -4,7 +4,8 @@ import { BODY_COLORS, DEFAULT_BODY, findWearable } from '@/constants/wardrobe';
 import { itemsIn } from '@/constants/shop';
 import type { Profile, Room, RoomThing } from '@/types';
 import { buddyHearts, buddyLevel, giftForLevel } from '@/utils/buddy';
-import { buddiesHome } from '@/utils/room';
+import { ROOM_SPAN } from '@/constants/room';
+import { AREA_COUNT, buddiesHome } from '@/utils/room';
 import { owns } from '@/utils/shop';
 import { clothOf, lookOf, outfitOf } from '@/utils/wardrobe';
 
@@ -59,6 +60,45 @@ export function homeBuddiesOf(profile: Profile): HomeBuddy[] {
       },
     ];
   });
+}
+
+/** Pieces that came along on a visit start with this, so they never mix up with the friend's own buddies. */
+export const GUEST_PREFIX = 'guest~';
+/** The visitor themselves, in a friend's home. */
+export const GUEST_ME = GUEST_PREFIX + 'me';
+
+/**
+ * Who comes along to a friend's home: you, plus the buddies you picked in Bring
+ * (or the buddy you use, if you never picked), drawn just as they look at home:
+ * same body colors, same clothes. They stand in a row just inside the front
+ * door, in the first screen of the first room, so you see yourselves arrive.
+ */
+export function guestsOf(profile: Profile, brought: string[], chosen: boolean): HomeBuddy[] {
+  const owned = itemsIn('companion').filter((item) => owns(profile, item));
+  const items = chosen
+    ? brought.flatMap((v) => owned.filter((o) => o.category === 'companion' && o.companion.emoji === v).slice(0, 1))
+    : owned.filter((o) => o.id === profile.equipped.companion);
+  const avatarItem = owned.find((o) => o.category === 'companion' && o.companion.emoji === profile.avatar);
+  const meBody = (avatarItem && BODY_COLORS[avatarItem.id]) ?? DEFAULT_BODY;
+  const screen = 1 / (AREA_COUNT * ROOM_SPAN);
+  const spot = (n: number) => ({ x: (0.28 + 0.14 * n) * screen, y: 0.92 });
+  const me: HomeBuddy = { id: GUEST_ME, emoji: profile.avatar, gift: null, name: 'You', spot: spot(0), ...meBody, dressed: {} };
+  const pals = items.flatMap((item, i): HomeBuddy[] => {
+    if (item.category !== 'companion') return [];
+    return [
+      {
+        id: GUEST_PREFIX + item.id,
+        emoji: item.companion.emoji,
+        gift: giftForLevel(buddyLevel(buddyHearts(profile, item.id))),
+        name: `Your ${item.name}`,
+        spot: spot(i + 1),
+        ...(BODY_COLORS[item.id] ?? DEFAULT_BODY),
+        dressed: dressedOf(profile, item.id),
+        person: personOf(profile, item.id),
+      },
+    ];
+  });
+  return [me, ...pals];
 }
 
 /** Everything a friend's phone needs to show this player's buddy home. */

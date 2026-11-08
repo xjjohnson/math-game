@@ -1,5 +1,12 @@
 # Change log
 
+## 2026-11-08 (buddies come along on visits)
+
+- **You and your buddies come along when you visit a friend's home.** Walk into a friend's buddy home on a Community visit and you're standing just inside their front door, with the buddies you picked in **🐾 Bring** next to you. Never picked any? Your buddy comes along anyway.
+- Your buddies look just like they do at home: same body colors, same clothes, people buddies with their hair and outfits.
+- Drag yourself and your buddies anywhere in their home, even onto seats. Tap yourself and it says hi. Like everything else on a visit, it all goes back when you leave.
+- Only on your phone for now (your friend's phone doesn't show you in their home). No new APK needed and no protocol change.
+
 ## 2026-11-08 (closes after 30 minutes in the background)
 
 - **The app closes itself after 30 minutes in the background** on Android. If you switch away (or the screen turns off) and don't come back within 30 minutes, it hangs up any Nearby connection, leaves the Recents list and stops, so it can't keep the radio, sounds or timers going and drain the battery. Coming back within 30 minutes carries on where you left off.
