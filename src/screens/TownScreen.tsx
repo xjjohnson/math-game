@@ -54,6 +54,7 @@ export function TownScreen() {
   return (
     <CommunityView
       place="street"
+      tab="town"
       needsPermission={needsPermission}
       actions={
         <>

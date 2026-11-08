@@ -189,7 +189,8 @@ Phases 1-6 deliver a complete single-player game before any native Bluetooth wor
 - [ ] More co-op modes: Monster Battle and Relay on several phones, Team Up on one phone (protocol v3)
 - [x] Community: full-screen scrolling Toca-style street and building interiors (bakery, shop, library, park); opening it auto-joins a nearby visit or hosts one; everyone in a building stands in the room as their character with their buddies and an accessory, and each player moves only their own person and buddies, live (protocol v6; the host ignores moves for anyone else's pieces)
 - [x] Shop and Bakery jobs: customer scene, "Give back: ?", tap green US dollar bills ($1-$100, no $2) onto the counter, hint and a second try (grade 1 up)
-- [x] Realistic customer payments: one bigger bill or the fewest bills that cover the price, never exact, no unneeded bills; "That's $X" shown under the bills
+- [x] Realistic customer payments: the smallest single bill that covers the price or the fewest bills that cover the price, never exact, no unneeded bills; "That's $X" shown under the bills
+- [x] Community street shows the bottom tab bar, so there is always a way back
 - [x] Community jobs always pay: first play of the day full pay plus bonus (5 coins or 2 hearts), same-day replays 1 coin per right answer
 - [x] Community buildings 3 screens long (park 3.4) with 100+ movable things that land on shelves; shared over Nearby (ids starting "~"; anyone may move them)
 - [x] Tap-to-use things: shop fridge and till, bakery mixer and oven (bakes batter and dough), library lamp and math computers, park swings

@@ -98,8 +98,8 @@ export function customerPays(price: number, bills: number[], rng: Rng): number[]
   const singles = all.filter((h) => h.length === 1);
   // Half the time: the smallest single bill that covers it, like a $20 for $12.
   if (singles.length && rng() < 0.5) return singles[0];
-  // Otherwise the fewest bills that cover it, or the next bill up; never a huge bill for a small price.
-  const near = all.filter((h) => (h.length > 1 ? h.length === fewest : h === singles[0] || h === singles[1]));
+  // Otherwise the fewest bills that cover it; never a bigger bill than needed, like $20 for $8.
+  const near = all.filter((h) => (h.length > 1 ? h.length === fewest : h === singles[0]));
   return pick(rng, near);
 }
 

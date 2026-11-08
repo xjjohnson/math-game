@@ -89,6 +89,8 @@ describe('community shifts', () => {
       expect(paid).toBeGreaterThan(price); // never exactly the price
       // No bill could be left out and still cover the price.
       for (const b of hand) expect(paid - b).toBeLessThan(price);
+      // One bill: the smallest that covers it ($10 for $8, never $20).
+      if (hand.length === 1) expect(hand[0]).toBe(Math.min(...bills.filter((b) => b > price)));
     };
     for (let grade = 1; grade <= 6; grade++) {
       const bills = changeBills(grade as 1);

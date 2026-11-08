@@ -5,6 +5,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Text } from '@/components/AppText';
 import { BringPanel } from '@/components/BringPanel';
+import { TabBar, type TabId } from '@/components/TabBar';
 import { CommunityRoom } from '@/components/community/CommunityRoom';
 import { VisitPanel } from '@/components/VisitPanel';
 import { colors, radius, spacing, TAP_TARGET } from '@/constants/theme';
@@ -19,56 +20,62 @@ interface Props {
   /** Buttons along the bottom edge. */
   actions: ReactNode;
   needsPermission?: boolean;
+  /** Shows the bottom tab bar (on the street, which is a main place you reach from the tabs). */
+  tab?: TabId;
 }
 
 export const goInside = (id: BuildingId) => router.push({ pathname: '/place', params: { building: id } });
 
 /** The full-screen community: the room fills the screen, with the coin count, a Visit button and action buttons floating on it. */
-export function CommunityView({ place, actions, needsPermission = false }: Props) {
+export function CommunityView({ place, actions, needsPermission = false, tab }: Props) {
   const profile = useActiveProfile();
   const { status, people } = useTownState();
   const [open, setOpen] = useState<'friends' | 'bring' | null>(null);
   usePlace(place);
 
   return (
-    <SafeAreaView style={styles.safe} edges={['bottom', 'left', 'right']}>
-      <CommunityRoom place={place} onDoor={goInside} onExit={() => router.back()} />
-      <View style={styles.top} pointerEvents="box-none">
-        <Text style={styles.pill}>🪙 {profile?.coins ?? 0}</Text>
-        <View style={styles.pills}>
-          <Pressable
-            onPress={() => setOpen((o) => (o === 'bring' ? null : 'bring'))}
-            accessibilityRole="button"
-            accessibilityLabel="Choose your buddies and what you wear"
-            style={({ pressed }) => [styles.pill, styles.visit, pressed && { opacity: 0.8 }]}
-          >
-            <Text style={styles.visitText}>🐾 Bring</Text>
-          </Pressable>
-          <Pressable
-            onPress={() => setOpen((o) => (o === 'friends' ? null : 'friends'))}
-            accessibilityRole="button"
-            accessibilityLabel="Visit with friends"
-            style={({ pressed }) => [styles.pill, styles.visit, pressed && { opacity: 0.8 }]}
-          >
-            <Text style={styles.visitText}>{status === 'off' ? '👫 Friends' : `👫 ${people.length} here`}</Text>
-          </Pressable>
+    <SafeAreaView style={styles.safe} edges={tab ? ['left', 'right'] : ['bottom', 'left', 'right']}>
+      <View style={styles.fill}>
+        <CommunityRoom place={place} onDoor={goInside} onExit={() => router.back()} />
+        <View style={styles.top} pointerEvents="box-none">
+          <Text style={styles.pill}>🪙 {profile?.coins ?? 0}</Text>
+          <View style={styles.pills}>
+            <Pressable
+              onPress={() => setOpen((o) => (o === 'bring' ? null : 'bring'))}
+              accessibilityRole="button"
+              accessibilityLabel="Choose your buddies and what you wear"
+              style={({ pressed }) => [styles.pill, styles.visit, pressed && { opacity: 0.8 }]}
+            >
+              <Text style={styles.visitText}>🐾 Bring</Text>
+            </Pressable>
+            <Pressable
+              onPress={() => setOpen((o) => (o === 'friends' ? null : 'friends'))}
+              accessibilityRole="button"
+              accessibilityLabel="Visit with friends"
+              style={({ pressed }) => [styles.pill, styles.visit, pressed && { opacity: 0.8 }]}
+            >
+              <Text style={styles.visitText}>{status === 'off' ? '👫 Friends' : `👫 ${people.length} here`}</Text>
+            </Pressable>
+          </View>
         </View>
+        {open ? (
+          <View style={styles.panel}>
+            {open === 'bring' ? <BringPanel /> : <VisitPanel needsPermission={needsPermission} />}
+            <Pressable onPress={() => setOpen(null)} accessibilityRole="button" style={styles.close}>
+              <Text style={styles.visitText}>Close</Text>
+            </Pressable>
+          </View>
+        ) : null}
+        <View style={styles.bottom} pointerEvents="box-none">{actions}</View>
       </View>
-      {open ? (
-        <View style={styles.panel}>
-          {open === 'bring' ? <BringPanel /> : <VisitPanel needsPermission={needsPermission} />}
-          <Pressable onPress={() => setOpen(null)} accessibilityRole="button" style={styles.close}>
-            <Text style={styles.visitText}>Close</Text>
-          </Pressable>
-        </View>
-      ) : null}
-      <View style={styles.bottom} pointerEvents="box-none">{actions}</View>
+      {tab ? <TabBar active={tab} /> : null}
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: '#9BD4F5' },
+  fill: { flex: 1 },
   top: { position: 'absolute', top: spacing.sm, left: spacing.sm, right: spacing.sm, flexDirection: 'row', justifyContent: 'space-between' },
   pill: { fontSize: 20, fontWeight: '900', color: colors.text, backgroundColor: 'rgba(255,255,255,0.9)', paddingHorizontal: 14, paddingVertical: 6, borderRadius: radius.lg, overflow: 'hidden' },
   pills: { flexDirection: 'row', gap: spacing.sm },
