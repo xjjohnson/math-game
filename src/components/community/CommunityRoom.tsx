@@ -78,6 +78,18 @@ const inRoom = (s: Spot): Spot => ({ x: clamp(s.x, 0.01, 0.99), y: clamp(s.y, 0.
 /** How many screens wide each place is; the street and the buildings are long, so they scroll. */
 export const ROOM_SCREENS: Record<TownPlace, number> = { street: 3.4, ...INSIDE_SCREENS };
 
+/**
+ * The widest one screen's worth of room gets, compared with its height: about a phone held
+ * upright. A wide tablet then shows more of the place at once instead of stretching it sideways.
+ */
+const SCREEN_ASPECT = 0.6;
+
+/** The room's width in pixels: ROOM_SCREENS phone-shaped screens, and never narrower than the view. */
+export function roomWidth(viewW: number, viewH: number, place: TownPlace): number {
+  const screen = Math.min(viewW, viewH * SCREEN_ASPECT);
+  return Math.max(Math.round(viewW), Math.round(screen * ROOM_SCREENS[place]));
+}
+
 /** How long something sits in the hot oven before it's baked. */
 const BAKE_MS = 3000;
 /** How long the mixer whirrs before the bowl is mixed. */
@@ -151,7 +163,7 @@ export function CommunityRoom({ place, onDoor, onExit }: Props) {
   // Hosting or looking, the things in the rooms stay as this phone left them; a guest sees the host's.
   const spotsNow = visiting ? (status === 'joined' ? spots : { ...soloMemory, ...spots }) : soloSpots;
   const { w, h } = size;
-  const roomW = Math.round(w * ROOM_SCREENS[place]);
+  const roomW = roomWidth(w, h, place);
   const token = Math.max(96, Math.min(160, Math.round(h * 0.3)));
 
   // Someone sliding down the slide: the steps still to go, stopped if they're picked up again.

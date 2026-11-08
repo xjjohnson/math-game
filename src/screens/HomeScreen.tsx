@@ -1,6 +1,6 @@
 import { router } from 'expo-router';
 import { useEffect } from 'react';
-import { Pressable, StyleSheet, View } from 'react-native';
+import { Pressable, StyleSheet, useWindowDimensions, View } from 'react-native';
 
 import { Text } from '@/components/AppText';
 import { BigButton } from '@/components/BigButton';
@@ -47,42 +47,46 @@ export function HomeScreen() {
   const days = profile ? dayStreak(profile.playDates, today) : 0;
   const companion = companionFor(profile);
   const tricky = profile ? Object.keys(profile.missed).length : 0;
+  // A tablet on its side: the street on the left, the buttons beside it, all on one screen.
+  const { width, height } = useWindowDimensions();
+  const wide = width >= 760 && width > height;
 
-  return (
-    <Screen title="Math Game" noHeader tab="home">
-      <UpdateBanner />
-      <View style={styles.scene}>
-        <View style={styles.pills}>
-          <Pill text={`🪙 ${profile?.coins ?? 0}`} label={`${profile?.coins ?? 0} coins`} />
-          <Pill text={`🔥 ${days} ${days === 1 ? 'day' : 'days'}`} label={`${days} day streak`} />
-          <Pill text={`⭐ ${profile?.stars ?? 0}`} label={`${profile?.stars ?? 0} stars`} />
-        </View>
-        {profile ? (
-          <>
-            <View style={styles.bubble}>
-              <Text style={styles.bubbleText}>{greeting(profile.name, dailyDone, tricky)}</Text>
-            </View>
-            <View style={styles.cast}>
-              <Sticker value={profile.avatar} size={84} />
-              {companion ? (
-                <Pressable
-                  onPress={() => router.push('/buddy')}
-                  accessibilityRole="button"
-                  accessibilityLabel="Visit my buddy"
-                >
-                  <BuddyFace value={companion.emoji} size={56} gift={buddyGift(profile)} />
-                </Pressable>
-              ) : null}
-            </View>
-            <View style={styles.grass} />
-          </>
-        ) : (
-          <View style={styles.bubble}>
-            <Text style={styles.bubbleText}>Make a player to start playing!</Text>
-          </View>
-        )}
+  const scene = (
+    <View style={[styles.scene, wide && styles.sceneWide]}>
+      <View style={styles.pills}>
+        <Pill text={`🪙 ${profile?.coins ?? 0}`} label={`${profile?.coins ?? 0} coins`} />
+        <Pill text={`🔥 ${days} ${days === 1 ? 'day' : 'days'}`} label={`${days} day streak`} />
+        <Pill text={`⭐ ${profile?.stars ?? 0}`} label={`${profile?.stars ?? 0} stars`} />
       </View>
+      {profile ? (
+        <>
+          <View style={[styles.bubble, wide && styles.bubbleWide]}>
+            <Text style={styles.bubbleText}>{greeting(profile.name, dailyDone, tricky)}</Text>
+          </View>
+          <View style={[styles.cast, wide && styles.castWide]}>
+            <Sticker value={profile.avatar} size={wide ? 120 : 84} />
+            {companion ? (
+              <Pressable
+                onPress={() => router.push('/buddy')}
+                accessibilityRole="button"
+                accessibilityLabel="Visit my buddy"
+              >
+                <BuddyFace value={companion.emoji} size={wide ? 80 : 56} gift={buddyGift(profile)} />
+              </Pressable>
+            ) : null}
+          </View>
+          <View style={[styles.grass, wide && styles.grassWide]} />
+        </>
+      ) : (
+        <View style={styles.bubble}>
+          <Text style={styles.bubbleText}>Make a player to start playing!</Text>
+        </View>
+      )}
+    </View>
+  );
 
+  const buttons = (
+    <>
       {profile ? (
         <BigButton
           label="▶ Play"
@@ -134,6 +138,23 @@ export function HomeScreen() {
       ) : null}
 
       {profile ? <StarLevelCard stars={profile.stars} /> : null}
+    </>
+  );
+
+  return (
+    <Screen title={wide ? undefined : 'Math Game'} noHeader tab="home" wide={wide}>
+      <UpdateBanner />
+      {wide ? (
+        <View style={styles.row}>
+          <View style={styles.left}>{scene}</View>
+          <View style={styles.right}>{buttons}</View>
+        </View>
+      ) : (
+        <>
+          {scene}
+          {buttons}
+        </>
+      )}
     </Screen>
   );
 }
@@ -171,6 +192,16 @@ const styles = StyleSheet.create({
   bubbleText: { fontSize: 16, fontWeight: '700', color: colors.text, textAlign: 'center' },
   cast: { flexDirection: 'row', alignItems: 'flex-end', gap: spacing.md, marginTop: spacing.md, zIndex: 2 },
   grass: { position: 'absolute', left: 0, right: 0, bottom: 0, height: 70, backgroundColor: '#A6E39A' },
+  // Wide (tablet on its side): the scene on the left, the buttons on the right.
+  row: { flex: 1, flexDirection: 'row', gap: spacing.lg },
+  left: { flex: 1, justifyContent: 'center' },
+  right: { flex: 1, gap: spacing.md, justifyContent: 'center' },
+  // Square-ish, so a big tablet doesn't get a tall empty sky.
+  sceneWide: { width: '100%', aspectRatio: 1, maxHeight: '100%' },
+  // Pushes the greeting and the characters down to stand on the grass.
+  bubbleWide: { marginTop: 'auto' },
+  castWide: { marginBottom: 90 },
+  grassWide: { height: 140 },
   play: { paddingVertical: spacing.lg },
   pair: { flexDirection: 'row', gap: spacing.md },
   half: { flex: 1, paddingHorizontal: spacing.sm },

@@ -18,10 +18,12 @@ interface Props {
   noHeader?: boolean;
   /** Shows the bottom tab bar with this tab highlighted. */
   tab?: TabId;
+  /** Lets the page use more of a wide tablet (side-by-side layouts) and fill its height. */
+  wide?: boolean;
 }
 
 /** Standard page wrapper: safe area, scrolling, centered column for tablets and PC. */
-export function Screen({ title, children, compact = false, noHeader = false, tab }: Props) {
+export function Screen({ title, children, compact = false, noHeader = false, tab, wide = false }: Props) {
   const profile = useActiveProfile();
   const background = backgroundColor(profile);
   return (
@@ -35,7 +37,7 @@ export function Screen({ title, children, compact = false, noHeader = false, tab
       }
     >
       <BackgroundDecor decor={backgroundDecor(profile)} />
-      <ScrollView contentContainerStyle={[styles.content, compact && styles.compact]}>
+      <ScrollView contentContainerStyle={[styles.content, compact && styles.compact, wide && styles.wide]}>
         {title ? <Text style={styles.title} accessibilityRole="header">{title}</Text> : null}
         {children}
       </ScrollView>
@@ -54,6 +56,7 @@ const styles = StyleSheet.create({
     alignSelf: 'center',
   },
   compact: { paddingVertical: spacing.md, gap: spacing.sm },
+  wide: { maxWidth: 1100, flexGrow: 1 },
   title: {
     fontSize: fontSizes.title,
     fontWeight: '800',

@@ -1186,8 +1186,10 @@ const styles = StyleSheet.create({
     paddingTop: spacing.xs,
     paddingHorizontal: spacing.xs,
     gap: spacing.xs,
+    // On a wide tablet the tabs stay together in the middle.
+    justifyContent: 'center',
   },
-  tab: { flex: 1, minHeight: 60, borderRadius: radius.md, alignItems: 'center', justifyContent: 'center' },
+  tab: { flex: 1, maxWidth: 140, minHeight: 60, borderRadius: radius.md, alignItems: 'center', justifyContent: 'center' },
   tabOn: { backgroundColor: colors.primary },
   tabEmoji: { fontSize: 24 },
   tabName: { fontSize: 13, fontWeight: '800', color: colors.text },
