@@ -1,5 +1,12 @@
 # Change log
 
+## 2026-11-08 (buddies come along on visits)
+
+- **You and your buddies come along when you visit a friend's home.** Walk into a friend's buddy home on a Community visit and you're standing just inside their front door, with the buddies you picked in **🐾 Bring** next to you. Never picked any? Your buddy comes along anyway.
+- Your buddies look just like they do at home: same body colors, same clothes, people buddies with their hair and outfits.
+- Drag yourself and your buddies anywhere in their home, even onto seats. Tap yourself and it says hi. Like everything else on a visit, it all goes back when you leave.
+- Only on your phone for now (your friend's phone doesn't show you in their home). No new APK needed and no protocol change.
+
 ## 2026-11-08 (paint easel)
 
 - **The easel in the School's Color corner works.** Tap it and it opens full screen. Paint with your finger on blank paper: 13 paint colors, thin, medium and thick brushes, **Rub out**, a **paint bucket** (Fill), **Undo** (takes back your own last line or fill) and **New** paper.
