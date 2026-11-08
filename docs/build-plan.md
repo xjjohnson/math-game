@@ -187,7 +187,7 @@ Phases 1-6 deliver a complete single-player game before any native Bluetooth wor
 - [ ] LAN WebSocket fallback if WebRTC pairing is flaky (only if needed)
 - [ ] Keep MockTransport for solo testing of multiplayer logic
 - [ ] More co-op modes: Monster Battle and Relay on several phones, Team Up on one phone (protocol v3)
-- [x] Community: full-screen scrolling Toca-style street and building interiors (bakery, shop, library, park); opening it auto-joins a nearby visit or hosts one; everyone in a building stands in the room as their character with their buddies and an accessory, and each player moves only their own person and buddies, live (protocol v6; the host ignores moves for anyone else's pieces)
+- [x] Community: full-screen scrolling Toca-style street and building interiors (school, shop, bakery, library, park); opening it auto-joins a nearby visit or hosts one; everyone in a building stands in the room as their character with their buddies and an accessory, and each player moves only their own person and buddies, live (protocol v6; the host ignores moves for anyone else's pieces)
 - [x] Join or host for Community and Several phones: look once at start, join a host or host and stay; two lonely hosts merge (tag in the advertised name, smaller tag gives way; a host with friends never does)
 - [x] A host never gives way to an older phone with no tag (it starts over and joins by itself)
 - [x] Shop and Bakery jobs: customer scene, "Give back: ?", tap green US dollar bills ($1-$100, no $2) onto the counter, hint and a second try (grade 1 up)
@@ -197,9 +197,12 @@ Phases 1-6 deliver a complete single-player game before any native Bluetooth wor
 - [x] Community buildings 3 screens long (park 3.4) with 100+ movable things that land on shelves; shared over Nearby (ids starting "~"; anyone may move them)
 - [x] Bakery baking: 12 ingredients dropped on a mixing bowl go in it and spring back to their shelves (contents and finished treats kept as shared switches; no protocol change), wrong mixes give funny messes, bowl on the stand mixer and tap it to mix (unmixed food bakes into a lumpy mess), bowl into the hot oven for 3 s, and the recipe (cake, cookies, pie, bread, pancakes and more; src/utils/bakery.ts) comes out on the rack; tap it to eat
 - [x] Community rooms take several fingers at once like the buddy home (one finger carries, another scrolls; edge-scroll while holding)
-- [x] Tap-to-use things: shop fridge and till, bakery mixer and oven (bakes dough), library lamp and math computers, park swings
+- [x] Tap-to-use things: school bell and easel, shop fridge and till, bakery mixer and oven (bakes dough), library lamp and math computers, park swings
+- [x] Park playground: drop yourself or a buddy on a swing to sit and swing, at the slide to climb the ladder and slide down, in the tree to sit on a branch, or in the pond to swim; worked out from spots alone (src/utils/park.ts), so it shows on every phone with no protocol change
 - [x] Library books: tap any of the 27 shelf books to read it (big words, page arrows, Read to me); 18 easy stories, and 9 story books that hide all 15 bakery recipes as "secret recipe" pages built from src/utils/bakery.ts; the open book on the rug is a guide (src/utils/libraryBooks.ts; reading is on this phone only, no store or protocol change)
 - [x] Visit a friend's buddy home over Nearby (read-only copy, moves not saved; protocol v7 home-ask and home messages, relayed through the host)
+- [x] School, a fifth building next to the corner shop (protocol v8; place and building id "school"; street 3.4 screens long; phones older than v8 are asked to update before visiting): chalkboard you draw on with one or more fingers (5 chalk colors, eraser, Wipe), shared live with everyone on the visit (v8 "chalk" and "chalk-wipe" messages, relayed and kept by the host, sent to newcomers on join; lines up to 120 points, 250 lines kept); teacher's desk, 3 pupils' desks, number line; school job "Teacher asks" (K adds, 1st adds/subtracts, 2nd adds times, 3rd up all four); Learn how button inside
+- [ ] Color corner in the school: placeholder only (easel, crayon table, kids' art); coloring games to come
 
 ### Profiles
 - [ ] Multiple kid profiles on one device, each with its own coins and progress (Phase 1 store design)

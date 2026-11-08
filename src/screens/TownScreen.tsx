@@ -2,7 +2,7 @@ import { router, useFocusEffect } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
 
 import { BigButton } from '@/components/BigButton';
-import { CommunityView } from '@/components/community/CommunityView';
+import { CommunityView, goInside } from '@/components/community/CommunityView';
 import { colors } from '@/constants/theme';
 import { townSession } from '@/services/townSession';
 import { useActiveProfile, useProfiles } from '@/store/profiles';
@@ -58,7 +58,7 @@ export function TownScreen() {
       needsPermission={needsPermission}
       actions={
         <>
-          <BigButton style={{ flex: 1, paddingHorizontal: 8 }} label="🏫 School" color={colors.primary} onPress={() => router.push('/learn')} />
+          <BigButton style={{ flex: 1, paddingHorizontal: 8 }} label="🏫 School" color={colors.primary} onPress={() => goInside('school')} />
           <BigButton style={{ flex: 1, paddingHorizontal: 8 }} label="🐾 Buddy home" color={colors.operations.divide} onPress={() => router.push('/buddy')} />
         </>
       }

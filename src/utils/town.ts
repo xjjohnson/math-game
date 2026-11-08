@@ -2,10 +2,10 @@ import { generate, generateChoices } from '@/utils/mathEngine';
 import { randInt, pick } from '@/utils/seededRandom';
 import { toWordProblem } from '@/utils/wordProblems';
 import { buddyCompanion } from '@/utils/buddy';
-import type { Grade, Profile, Rng, TownVisits } from '@/types';
+import type { Grade, Operation, Profile, Rng, TownVisits } from '@/types';
 
 /** Places in the community the kids can visit. Each has one little job a day. */
-export type BuildingId = 'shop' | 'bakery' | 'library' | 'park';
+export type BuildingId = 'school' | 'shop' | 'bakery' | 'library' | 'park';
 
 export interface Building {
   id: BuildingId;
@@ -19,6 +19,7 @@ export interface Building {
 }
 
 export const BUILDINGS: Building[] = [
+  { id: 'school', name: 'School', emoji: '🏫', color: '#1E88E5', job: 'Answer the questions on the board.', reward: 'coins' },
   { id: 'shop', name: 'Corner shop', emoji: '🏪', color: '#E53935', job: 'Add up what the customers buy.', reward: 'coins' },
   { id: 'bakery', name: 'Bakery', emoji: '🥐', color: '#F9A825', job: 'Give the right change.', reward: 'coins' },
   { id: 'library', name: 'Library', emoji: '📚', color: '#5E35B1', job: 'Read number stories out loud.', reward: 'hearts' },
@@ -122,6 +123,14 @@ export function townMax(grade: Grade): number {
   return [10, 20, 50, 100, 200, 500, 1000][grade];
 }
 
+/** What the school board asks at each grade: adding first, then taking away, times and sharing. */
+function schoolOps(grade: Grade): Operation[] {
+  if (grade === 0) return ['add'];
+  if (grade === 1) return ['add', 'subtract'];
+  if (grade === 2) return ['add', 'subtract', 'multiply'];
+  return ['add', 'subtract', 'multiply', 'divide'];
+}
+
 const SHOP_ITEMS = [
   ['🍎', 'apple'],
   ['🥛', 'milk'],
@@ -143,6 +152,12 @@ export function shiftQuestions(building: BuildingId, grade: Grade, rng: Rng): To
   const out: TownQuestion[] = [];
   for (let i = 0; i < SHIFT_QUESTIONS; i++) {
     switch (building) {
+      case 'school': {
+        // The board at school: plain sums at the player's grade. Kindergarten only adds.
+        const p = generate(pick(rng, schoolOps(grade)), 'easy', rng, grade);
+        out.push({ prompt: `Teacher asks: ${p.prompt} = ?`, answer: p.answer, choices: p.choices });
+        break;
+      }
       case 'shop': {
         const [e1, n1] = pick(rng, SHOP_ITEMS);
         const [e2, n2] = pick(rng, SHOP_ITEMS);

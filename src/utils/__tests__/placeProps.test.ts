@@ -5,6 +5,7 @@ import { homeSnapshot, parseHomeSnapshot } from '@/utils/homeVisit';
 import {
   BAKERY,
   FLOOR,
+  LIBRARY,
   BOWL,
   BOWL_SWITCH,
   inOven,
@@ -15,7 +16,7 @@ import {
   PLACE_PROPS,
   propPieceId,
   settle,
-  SHOP,
+  SCHOOL,
   switchPieceId,
 } from '@/utils/multiplayer/placeProps';
 import { encodeMessage, type GameMessage, HOST_ID, MAX_SPOTS, parseMessage } from '@/utils/multiplayer/protocol';
@@ -53,15 +54,18 @@ describe('things in the community rooms', () => {
   });
 
   it('drops a thing onto the shelf under it, or the floor', () => {
-    const shelf = SHOP.shelvesA;
+    const shelf = LIBRARY.cases[0];
     // Let go just above the middle shelf: it lands on it.
-    expect(settle('shop', {}, 0.2, shelf.rows[1] - 0.03)).toEqual({ x: 0.2, y: shelf.rows[1] });
+    expect(settle('library', {}, 0.15, shelf.rows[1] - 0.03)).toEqual({ x: 0.15, y: shelf.rows[1] });
     // Let go between shelves: it falls to the next one down.
-    expect(settle('shop', {}, 0.2, shelf.rows[1] + 0.02).y).toBe(shelf.rows[2]);
+    expect(settle('library', {}, 0.15, shelf.rows[1] + 0.02).y).toBe(shelf.rows[2]);
+    // Over a school desk it lands on the desk.
+    const [x0, x1] = SCHOOL.desks[0];
+    expect(settle('school', {}, (x0 + x1) / 2, SCHOOL.deskTop - 0.1).y).toBe(SCHOOL.deskTop);
     // Nothing under it on the wall: it falls to the floor.
-    expect(settle('shop', {}, 0.45, 0.2).y).toBeCloseTo(FLOOR + 0.04);
+    expect(settle('school', {}, 0.8, 0.2).y).toBeCloseTo(FLOOR + 0.04);
     // On the floor it stays where it's put.
-    expect(settle('shop', {}, 0.5, 0.8)).toEqual({ x: 0.5, y: 0.8 });
+    expect(settle('school', {}, 0.5, 0.8)).toEqual({ x: 0.5, y: 0.8 });
     // A kite stays up in the sky.
     expect(settle('park', { float: true }, 0.3, 0.12)).toEqual({ x: 0.3, y: 0.12 });
   });
@@ -110,15 +114,15 @@ describe('things in the community rooms', () => {
     const sessions = net.map((t) => new TownSession(() => t));
     const [host, a, b] = sessions;
     await joinAll(sessions);
-    for (const s of sessions) s.setPlace('shop');
+    for (const s of sessions) s.setPlace('school');
     await tick();
-    const can = propPieceId('shop', 'a0');
+    const can = propPieceId('school', 't0');
     a.moveTo(can, 0.5, 0.45);
-    b.moveTo(switchPieceId('shop', 'fridge'), 1, 0);
+    b.moveTo(switchPieceId('school', 'bell'), 1, 0);
     await tick();
     for (const s of sessions) {
       expect(s.getState().spots[can]).toEqual({ x: 0.5, y: 0.45 });
-      expect(s.getState().spots[switchPieceId('shop', 'fridge')]).toEqual({ x: 1, y: 0 });
+      expect(s.getState().spots[switchPieceId('school', 'bell')]).toEqual({ x: 1, y: 0 });
     }
     host.moveTo(can, 0.6, 0.3);
     await tick();

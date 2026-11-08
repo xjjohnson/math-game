@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import {
   ScrollView,
   StyleSheet,
@@ -14,6 +14,7 @@ import { Text } from '@/components/AppText';
 import { BuddyFigure } from '@/components/BuddyFigure';
 import { BookReader } from '@/components/community/BookReader';
 import { FLOOR, Interior } from '@/components/community/Interiors';
+import { Bob, Swing } from '@/components/Motion';
 import { ACCESSORIES, GLASSES } from '@/components/VisitPanel';
 import { townSession, useTownState, WAVE_MS } from '@/services/townSession';
 import { useActiveProfile } from '@/store/profiles';
@@ -50,6 +51,7 @@ import {
 import { buddyPieceId, type TownPerson, type TownPlace } from '@/utils/multiplayer/protocol';
 import type { Spot } from '@/utils/multiplayer/scene';
 import { bookAt } from '@/utils/libraryBooks';
+import { carryInPark, offGround, parkLanding, rideAt, slidePath, SWING_PIVOT, type Ride } from '@/utils/park';
 import type { BuildingId } from '@/utils/town';
 
 const FURS = ['#F2B880', '#E57373', '#81C784', '#64B5F6', '#BA68C8', '#FFD54F', '#4DB6AC', '#F06292'];
@@ -66,11 +68,15 @@ const clamp = (v: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, v
 
 /** Keeps people on the floor and inside the room. */
 const onFloor = (s: Spot): Spot => ({ x: clamp(s.x, 0.02, 0.98), y: clamp(s.y, FLOOR + 0.04, 0.97) });
+/** Like onFloor, but someone on a swing, the slide or a branch in the park stays up there. */
+const keepSpot = (park: boolean, s: Spot): Spot => (park && offGround(s) ? s : onFloor(s));
+/** How long each step down the slide takes. */
+const SLIDE_STEP_MS = 60;
 /** Keeps a prop inside the room while it's carried. */
 const inRoom = (s: Spot): Spot => ({ x: clamp(s.x, 0.01, 0.99), y: clamp(s.y, 0.08, 0.95) });
 
 /** How many screens wide each place is; the street and the buildings are long, so they scroll. */
-export const ROOM_SCREENS: Record<TownPlace, number> = { street: 2.8, ...INSIDE_SCREENS };
+export const ROOM_SCREENS: Record<TownPlace, number> = { street: 3.4, ...INSIDE_SCREENS };
 
 /**
  * The widest one screen's worth of room gets, compared with its height: about a phone held
@@ -93,7 +99,7 @@ const KEEP_MY_CHANGES_MS = 10 * 60 * 1000;
 
 /**
  * Where things were put while playing alone, kept while the app is open so a
- * tidy shop is still tidy after doing the job. On a visit the host keeps them instead.
+ * tidy classroom is still tidy after doing the job. On a visit the host keeps them instead.
  */
 const soloMemory: Record<string, Spot> = {};
 /** When each remembered thing last changed, by this phone or a friend. */
@@ -104,8 +110,8 @@ function remember(id: string, spot: Spot) {
 }
 
 /** Where someone stands until they are moved: along the floor near the door, in order. */
-function standSpot(saved: Spot | undefined, index: number, inside: boolean, count: number): Spot {
-  if (saved) return onFloor(saved);
+function standSpot(saved: Spot | undefined, index: number, inside: boolean, count: number, park = false): Spot {
+  if (saved) return keepSpot(park, saved);
   if (inside) return { x: 0.1 + index * 0.05, y: index % 2 === 0 ? 0.72 : 0.82 };
   return { x: (index + 1) / (count + 1), y: index % 2 === 0 ? 0.68 : 0.78 };
 }
@@ -124,7 +130,7 @@ type Piece =
 /**
  * A full-screen, side-view place. Everyone who is here stands in it as their
  * character; you can move yourself, your buddies, and the things in the room
- * (cans on the shop shelves, books in the library). With a visit running,
+ * (pencils on the school desks, books in the library). With a visit running,
  * every phone follows live. Without one it's just you, in the same room.
  */
 export function CommunityRoom({ place, onDoor, onExit }: Props) {
@@ -133,6 +139,8 @@ export function CommunityRoom({ place, onDoor, onExit }: Props) {
   const [size, setSize] = useState({ w: 0, h: 0 });
   const [soloSpots, setSoloSpots] = useState<Record<string, Spot>>(() => ({ ...soloMemory }));
   const [soloWave, setSoloWave] = useState(0);
+  // School: while fingers are drawing on the chalkboard, the room holds still.
+  const [drawing, setDrawing] = useState(false);
   /** The library book open on this phone (only this phone: friends read their own). */
   const [reading, setReading] = useState<{ book: number; cover: string } | null>(null);
   const scroller = useRef<ScrollViewInstance>(null);
@@ -158,7 +166,19 @@ export function CommunityRoom({ place, onDoor, onExit }: Props) {
   const roomW = roomWidth(w, h, place);
   const token = Math.max(96, Math.min(160, Math.round(h * 0.3)));
 
+  // Someone sliding down the slide: the steps still to go, stopped if they're picked up again.
+  const rides = useRef<Record<string, ReturnType<typeof setInterval>>>({});
+  const stopRide = (id: string) => {
+    if (rides.current[id]) clearInterval(rides.current[id]);
+    delete rides.current[id];
+  };
+  useEffect(() => () => Object.values(rides.current).forEach(clearInterval), []);
+
   const move = (id: string, x: number, y: number) => {
+    stopRide(id);
+    put(id, x, y);
+  };
+  const put = (id: string, x: number, y: number) => {
     // People and buddies start fresh each time; things in the rooms stay where they were put,
     // even when the visit restarts (a phone left alone keeps looking again and again).
     if (id.startsWith('~')) remember(id, { x, y });
@@ -166,6 +186,19 @@ export function CommunityRoom({ place, onDoor, onExit }: Props) {
     else {
       setSoloSpots((s) => ({ ...s, [id]: { x, y } }));
     }
+  };
+  const putNow = useRef(put);
+  putNow.current = put;
+  /** Climb the ladder and slide down, one step at a time, so friends watch it happen too. */
+  const slideDown = (id: string) => {
+    stopRide(id);
+    const path = slidePath();
+    let step = 0;
+    rides.current[id] = setInterval(() => {
+      const s = path[step++];
+      putNow.current(id, s.x, s.y);
+      if (step >= path.length) stopRide(id);
+    }, SLIDE_STEP_MS);
   };
   const wave = () => {
     if (visiting) townSession().wave();
@@ -224,7 +257,8 @@ export function CommunityRoom({ place, onDoor, onExit }: Props) {
   };
 
   // Start the view on this player, and move it again when they walk into another place.
-  const mine = standSpot(spotsNow[self], Math.max(0, here.findIndex((p) => p.id === self)), inside, here.length);
+  const park = place === 'park';
+  const mine = standSpot(spotsNow[self], Math.max(0, here.findIndex((p) => p.id === self)), inside, here.length, park);
   useEffect(() => {
     if (w > 0) scroller.current?.scrollTo({ x: Math.max(0, mine.x * roomW - w / 2), animated: false });
     // Only when the place or screen size changes, not on every step.
@@ -328,18 +362,35 @@ export function CommunityRoom({ place, onDoor, onExit }: Props) {
   const pieces: Piece[] = [
     ...props,
     ...here.flatMap((p, i) => {
-      const spot = standSpot(spotsNow[p.id], i, inside, here.length);
+      const spot = standSpot(spotsNow[p.id], i, inside, here.length, park);
       const list: Piece[] = [{ key: p.id, kind: 'person', person: p, spot }];
       (p.buddies ?? []).forEach((b, n) => {
         const id = buddyPieceId(p.id, n);
         // Until a buddy is moved it stands next to its owner.
         const beside = onFloor({ x: spot.x + ((n + 1) * token * 0.55) / roomW, y: spot.y });
-        list.push({ key: id, kind: 'pal', person: p, value: b, spot: spotsNow[id] ? onFloor(spotsNow[id]) : beside });
+        list.push({ key: id, kind: 'pal', person: p, value: b, spot: spotsNow[id] ? keepSpot(park, spotsNow[id]) : beside });
       });
       return list;
     }),
   ];
   pieces.sort((a, b) => a.spot.y - b.spot.y);
+
+  // The park's playground: who is on which swing, and where someone dropped there ends up.
+  const rideOf = (piece: Piece): Ride | null => (park && piece.kind !== 'prop' ? rideAt(piece.spot) : null);
+  const seats = pieces.map((p) => ({ key: p.key, ride: rideOf(p) }));
+  const riding = seats.flatMap(({ ride }) => (ride?.kind === 'swing' ? [ride.seat] : []));
+  /** For a person or buddy: how it is carried and where it lands in the park (on the floor anywhere else). */
+  const playground = (key: string) =>
+    park
+      ? {
+          fit: carryInPark,
+          land: (s: Spot) => parkLanding(s, seats.flatMap(({ key: k, ride }) => (k !== key && ride?.kind === 'swing' ? [ride.seat] : []))).spot,
+          onDrop: (s: Spot) => {
+            // After the drop has put them at the foot of the ladder, up they go.
+            if (parkLanding(s).slide) setTimeout(() => slideDown(key), 0);
+          },
+        }
+      : {};
 
   // Everything that can be picked up, with where it is on screen, topmost first so a finger gets the front one.
   const grabs: Grab[] = pieces
@@ -354,6 +405,7 @@ export function CommunityRoom({ place, onDoor, onExit }: Props) {
           box: { left: x - token / 2, top: y - token - 44, width: token, height: token + 64 },
           fit: onFloor,
           onTap: wave,
+          ...playground(piece.key),
         };
       }
       if (piece.kind === 'pal') {
@@ -363,6 +415,7 @@ export function CommunityRoom({ place, onDoor, onExit }: Props) {
           spot: piece.spot,
           box: { left: x - palSize / 2, top: y - palSize - 6, width: palSize, height: palSize + 6 },
           fit: onFloor,
+          ...playground(piece.key),
         };
       }
       const size = piece.prop.big ? propSize * 1.4 : propSize;
@@ -399,13 +452,13 @@ export function CommunityRoom({ place, onDoor, onExit }: Props) {
         <ScrollView
           ref={scroller}
           horizontal
-          scrollEnabled={!touch.holding}
+          scrollEnabled={!touch.holding && !drawing}
           onScroll={touch.onScroll}
           scrollEventThrottle={16}
           showsHorizontalScrollIndicator={false}
           contentContainerStyle={{ width: roomW, height: h }}
         >
-          <Interior place={place} width={roomW} viewWidth={w} height={h} switches={switches} onSwitch={flip} onDoor={onDoor} onExit={onExit} />
+          <Interior place={place} width={roomW} viewWidth={w} height={h} switches={switches} onSwitch={flip} riding={riding} onDoor={onDoor} onExit={onExit} onDrawing={setDrawing} />
           <View style={[styles.layer, { width: roomW, height: h }]} pointerEvents="box-none" {...touch.handlers}>
             {pieces.map((piece) => {
               const held = touch.dragAt[piece.key];
@@ -418,12 +471,13 @@ export function CommunityRoom({ place, onDoor, onExit }: Props) {
                   waving={visiting ? Date.now() - (waves[piece.person.id] ?? 0) < WAVE_MS : piece.person.id === self && soloWave > 0}
                   spot={spot}
                   lifted={!!held}
+                  ride={held ? null : rideOf(piece)}
                   w={roomW}
                   h={h}
                   token={token}
                 />
               ) : piece.kind === 'pal' ? (
-                <Pal key={piece.key} value={piece.value} mine={piece.person.id === self} spot={spot} lifted={!!held} w={roomW} h={h} size={palSize} />
+                <Pal key={piece.key} value={piece.value} mine={piece.person.id === self} spot={spot} lifted={!!held} ride={held ? null : rideOf(piece)} w={roomW} h={h} size={palSize} />
               ) : (
                 <Prop
                   key={piece.key}
@@ -685,40 +739,49 @@ interface PersonProps {
   waving: boolean;
   spot: Spot;
   lifted: boolean;
+  /** What they are doing in the park right now (on a swing, down the slide...). */
+  ride: Ride | null;
   w: number;
   h: number;
   token: number;
 }
 
-function Person({ person, isMe, waving, spot: at, lifted, w, h, token }: PersonProps) {
+function Person({ person, isMe, waving, spot: at, lifted, ride, w, h, token }: PersonProps) {
   const i = colorIndex(person.id);
   const acc = person.acc && (ACCESSORIES as readonly string[]).includes(person.acc) ? person.acc : undefined;
+  const sliding = ride?.kind === 'slide';
   return (
-    <View
-      pointerEvents={isMe ? 'auto' : 'none'}
-      accessibilityLabel={isMe ? 'You. Drag to move.' : person.name}
-      style={[styles.person, { width: token, left: at.x * w - token / 2, top: at.y * h - token - 14 }, lifted && styles.lifted]}
+    <Riding
+      ride={ride}
+      at={at}
+      w={w}
+      h={h}
+      size={token}
+      above={30}
+      touchable={isMe}
+      lifted={lifted}
+      label={isMe ? 'You. Drag to move, or onto the swings, slide, tree or pond to play.' : person.name}
+      top={<Text style={[styles.wave, sliding && styles.wheee]}>{sliding ? 'Wheee!' : waving ? '👋' : ' '}</Text>}
+      bottom={
+        <Text style={[styles.name, isMe && styles.me]} numberOfLines={1}>
+          {isMe ? 'You' : person.name}
+        </Text>
+      }
     >
-      <Text style={styles.wave}>{waving ? '👋' : ' '}</Text>
       <View>
         <BuddyFigure value={person.avatar} size={token} fur={FURS[i]} belly={BELLIES[i]} dressed={{}} />
         {acc ? (
           <Text
             style={[
               styles.acc,
-              GLASSES.includes(acc)
-                ? { top: token * 0.2, fontSize: token * 0.34 }
-                : { top: -token * 0.12, fontSize: token * 0.36 },
+              GLASSES.includes(acc) ? { top: token * 0.2, fontSize: token * 0.34 } : { top: -token * 0.12, fontSize: token * 0.36 },
             ]}
           >
             {acc}
           </Text>
         ) : null}
       </View>
-      <Text style={[styles.name, isMe && styles.me]} numberOfLines={1}>
-        {isMe ? 'You' : person.name}
-      </Text>
-    </View>
+    </Riding>
   );
 }
 
@@ -727,23 +790,104 @@ interface PalProps {
   mine: boolean;
   spot: Spot;
   lifted: boolean;
+  ride: Ride | null;
   w: number;
   h: number;
   size: number;
 }
 
 /** One of a player's buddies; only its owner can move it. */
-function Pal({ value, mine, spot: at, lifted, w, h, size }: PalProps) {
+function Pal({ value, mine, spot: at, lifted, ride, w, h, size }: PalProps) {
   return (
-    <View
-      pointerEvents={mine ? 'auto' : 'none'}
-      accessibilityLabel={mine ? 'Your buddy. Drag to move.' : 'A buddy'}
-      style={[styles.person, { width: size, left: at.x * w - size / 2, top: at.y * h - size - 6 }, lifted && styles.lifted]}
+    <Riding
+      ride={ride}
+      at={at}
+      w={w}
+      h={h}
+      size={size}
+      above={0}
+      touchable={mine}
+      lifted={lifted}
+      label={mine ? 'Your buddy. Drag to move.' : 'A buddy'}
     >
       <BuddyFigure value={value} size={size} fur="#F2B880" belly="#FFE3C2" dressed={{}} />
+    </Riding>
+  );
+}
+
+interface RidingProps {
+  ride: Ride | null;
+  at: Spot;
+  w: number;
+  h: number;
+  /** The figure's size. */
+  size: number;
+  /** How tall the bit drawn over the figure (the wave) is. */
+  above: number;
+  touchable: boolean;
+  lifted: boolean;
+  label: string;
+  top?: ReactNode;
+  bottom?: ReactNode;
+  children: ReactNode;
+}
+
+/**
+ * Draws a person or buddy standing at their spot, or playing in the park: sitting on a swing
+ * (drawn with its ropes and seat, swinging together), splashing in the pond up to their middle,
+ * or anywhere else as they are (up the ladder, down the slide, on a branch).
+ */
+function Riding({ ride, at, w, h, size, above, touchable, lifted, label, top, bottom, children }: RidingProps) {
+  const x = at.x * w;
+  const y = at.y * h;
+  const common = { pointerEvents: touchable ? ('auto' as const) : ('none' as const), accessibilityLabel: label };
+  if (ride?.kind === 'swing') {
+    const pivot = SWING_PIVOT * h;
+    const seatW = Math.max(56, size * 0.62);
+    const ropeLeft = size / 2 - seatW / 2 + 6;
+    return (
+      <View {...common} style={[styles.person, { width: size, left: x - size / 2, top: pivot, height: y - pivot + 40 }]}>
+        <Swing active style={StyleSheet.absoluteFill}>
+          <View style={{ position: 'absolute', left: 0, right: 0, top: y - pivot - size * 0.78 - above, alignItems: 'center' }}>
+            {top}
+            {children}
+          </View>
+          <View style={[styles.rope, { left: ropeLeft, height: y - pivot }]} />
+          <View style={[styles.rope, { left: ropeLeft + seatW - 15, height: y - pivot }]} />
+          <View style={[styles.seat, { top: y - pivot, left: size / 2 - seatW / 2, width: seatW }]} />
+          <View style={{ position: 'absolute', left: -size * 0.3, right: -size * 0.3, top: y - pivot + 18, alignItems: 'center' }}>{bottom}</View>
+        </Swing>
+      </View>
+    );
+  }
+  if (ride?.kind === 'swim') {
+    // In up to their middle: the bottom is hidden under the water, and they bob.
+    const show = size * 0.6;
+    return (
+      <View {...common} style={[styles.person, { width: size, left: x - size / 2, top: y - show - above }]}>
+        {top}
+        <View style={{ width: size * 1.4, height: show, overflow: 'hidden', alignItems: 'center' }}>
+          <Bob seed={label} rise={size * 0.04} active={false} style={{ width: size, height: size }}>
+            {children}
+          </Bob>
+        </View>
+        <View style={[styles.ripple, { width: size * 1.1, height: Math.max(10, size * 0.12), marginTop: -size * 0.06 }]} />
+        {bottom}
+      </View>
+    );
+  }
+  return (
+    <View
+      {...common}
+      style={[styles.person, { width: size, left: x - size / 2, top: y - size - above + (above ? 16 : -6) }, lifted && styles.lifted]}
+    >
+      {top}
+      {children}
+      {bottom}
     </View>
   );
 }
+
 
 interface PropProps {
   prop: PropDef;
@@ -803,6 +947,10 @@ const styles = StyleSheet.create({
   batter: { position: 'absolute', backgroundColor: '#E9C27D', borderRadius: 999, borderWidth: 2, borderColor: '#B98A45' },
   lifted: { transform: [{ scale: 1.12 }], zIndex: 50 },
   wave: { fontSize: 24, height: 30 },
+  wheee: { fontSize: 18, fontWeight: '900', color: '#E53935' },
+  rope: { position: 'absolute', top: 0, width: 3, backgroundColor: '#5D4037' },
+  seat: { position: 'absolute', height: 16, borderRadius: 4, backgroundColor: '#FFCA28', borderWidth: 3, borderColor: '#5B3A24' },
+  ripple: { borderRadius: 999, backgroundColor: 'rgba(255,255,255,0.65)', borderWidth: 2, borderColor: '#29B6F6' },
   acc: { position: 'absolute', alignSelf: 'center', textAlign: 'center', left: 0, right: 0 },
   name: { fontSize: 14, fontWeight: '800', color: '#3B2B25', backgroundColor: 'rgba(255,255,255,0.75)', paddingHorizontal: 8, borderRadius: 8, overflow: 'hidden' },
   me: { color: '#3B5BFF' },
