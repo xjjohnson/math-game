@@ -1,6 +1,7 @@
 import { StyleSheet, View } from 'react-native';
+import { INK } from '@/constants/artStyle';
 
-const OUTLINE = '#5B3A24';
+const OUTLINE = INK;
 const LINE = 3;
 
 interface Props {

@@ -10,10 +10,11 @@ import { BAKERY, FARM, FLOOR, LIBRARY, MIXER_TALL, nestX, PARK, SCHOOL, SHOP, ty
 import { SWING_COUNT, SWING_PIVOT, SWING_SEAT_Y, swingName, swingX } from '@/utils/park';
 import type { TownPlace } from '@/utils/multiplayer/protocol';
 import { BUILDINGS, type BuildingId } from '@/utils/town';
+import { INK } from '@/constants/artStyle';
 
 export { FLOOR };
 
-const LINE = '#5B3A24';
+const LINE = INK;
 const WOOD = '#A86B45';
 const edge = { borderWidth: 3, borderColor: LINE } as const;
 

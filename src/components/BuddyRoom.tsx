@@ -66,6 +66,8 @@ import {
 } from '@/utils/home';
 import type { Picture } from '@/utils/easel';
 import { AREA_COUNT, BUDDY_KEY, FIXTURE_KEY, paintOf, type Placement } from '@/utils/room';
+import { INK } from '@/constants/artStyle';
+import { GroundShadow } from '@/components/GroundShadow';
 
 export interface HomeBuddy {
   /** Shop item id. */
@@ -125,7 +127,7 @@ interface Props {
 }
 
 const TRIM = '#A86B45';
-const OUTLINE = '#5B3A24';
+const OUTLINE = INK;
 const DOOR = '#C68B5E';
 /** Below this many pixels of movement a touch counts as a tap. */
 const TAP_SLOP = 6;
@@ -811,6 +813,13 @@ export function BuddyRoom(props: Props) {
                         top: -piece.height * 0.9,
                       },
                     ]}
+                  />
+                ) : null}
+                {buddy && !parent && !seat ? (
+                  <GroundShadow
+                    width={piece.width * 0.62}
+                    hidden={!!offset}
+                    style={{ left: piece.width * 0.19, bottom: -piece.width * 0.04 }}
                   />
                 ) : null}
                 <Ride piece={piece} seat={seat} on={seatOn} size={size} sliding={sliding.has(piece.key)}>

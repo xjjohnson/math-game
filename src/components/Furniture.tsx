@@ -1,6 +1,7 @@
 import { StyleSheet, View } from 'react-native';
 
 import type { FurnitureShape } from '@/constants/room';
+import { INK } from '@/constants/artStyle';
 
 interface Props {
   shape: FurnitureShape;
@@ -9,7 +10,7 @@ interface Props {
 }
 
 const WOOD = '#B07A4F';
-const DARK = '#5B3A24';
+const DARK = INK;
 const BOOK_COLORS = ['#EF5350', '#42A5F5', '#FFCA28', '#66BB6A', '#AB47BC', '#FF7043', '#26C6DA', '#EC407A'];
 
 /** Furniture with no good emoji, drawn in the home's flat style. */

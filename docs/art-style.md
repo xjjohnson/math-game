@@ -1,0 +1,34 @@
+# How things look
+
+One drawing style for the whole game, so a cupboard, a buddy and a button look like they came
+from the same picture book. Everything is drawn in code (no copied art). The values live in
+`src/constants/artStyle.ts`; screen colours for text and buttons stay in `src/constants/theme.ts`,
+which is checked for contrast.
+
+## The rules
+
+1. **One outline.** Everything drawn gets the same warm dark-brown outline, `INK` (`#4E3324`).
+   People and buddies use `inkWidth(size)` so a small figure and a big one look the same;
+   room pieces (walls, cupboards, counters) use `INK_ROOM` (3 px).
+2. **Soft colours, a few bright ones.** Most of a picture uses the `SOFT` colours (cream, sand,
+   peach, sky, mint...). `BRIGHT` colours are saved for the thing you should notice: a Play
+   button, a new item, a lit lamp.
+3. **One darker shade per colour.** The shadow side of a shape (under an arm, the side of a
+   cupboard, the bottom edge of a button) is `shade(color)`, about 18% darker and a bit warmer.
+   Highlights use `tint(color)`. No other gradients.
+4. **Everyone stands on a shadow.** People, buddies and standing things get a soft oval shadow on
+   the floor (`GroundShadow`, colour `SHADOW`). It hides while they are lifted or riding something.
+5. **Shiny eyes.** Eyes are dark dots with one small white `SHINE` dot, top right.
+6. **Round and chunky.** Big round heads, mitten hands, rounded corners on everything; no sharp
+   points except on things that are meant to be sharp (a star, a crown).
+
+## Where it's used
+
+| Step | What | State |
+| --- | --- | --- |
+| G1 | Shared outline, palette, shades, floor shadows at home and in Community | Built |
+| G2 | People and buddy bodies redrawn in SVG | Planned |
+| G3 | Drawn furniture, food and toys instead of emoji | Planned |
+| G4 | Rooms with depth: wall trim, windows, a front edge and floor strip | Planned |
+| G5 | Round icon buttons, red "new" dots, white panels | Planned |
+| G6 | Drawn menu background patterns | Planned |

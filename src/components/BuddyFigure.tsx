@@ -5,6 +5,7 @@ import { Text } from '@/components/AppText';
 import { useArmWave } from '@/components/Motion';
 import { BARE_SHOES, shoeLook } from '@/components/PersonAccessories';
 import { Sticker } from '@/components/Sticker';
+import { INK } from '@/constants/artStyle';
 
 /** What a buddy has on, ready to draw. */
 export interface Dressed {
@@ -31,7 +32,7 @@ interface Props {
   wave?: number;
 }
 
-const LINE = '#3E2C23';
+const LINE = INK;
 const SOCK_STRIPE = '#E57373';
 
 /** A buddy with a body: its face as the head, a round body, arms, feet and its clothes. */
