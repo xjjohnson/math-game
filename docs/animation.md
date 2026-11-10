@@ -42,8 +42,10 @@ stops when Animations is off in Settings or the phone's reduce-motion setting is
 12. **Screens zoom.** Opening a screen zooms it in quickly from a little smaller while it fades in
     (`ScreenZoom`, set once for every screen with the Stack's `screenLayout` in `src/app/_layout.tsx`),
     instead of the plain slide. With Animations off, screens just switch.
-13. **Buildings answer taps.** On the street, tapping a building makes it bounce; tapping its door bounces
-    it and zooms in toward the door before going inside (`StreetBuilding` in `community/Interiors.tsx`).
+13. **Buildings answer taps.** The town is a map seen from above (`community/TownMap.tsx`): drag to move
+    around (it keeps gliding a little after you let go), pinch, the ＋ and － buttons or the mouse wheel to
+    zoom. Tapping a building makes it bounce and names it; tapping it again zooms in toward its door and
+    goes inside. The camera math (`utils/townMap.ts`) never shows past the edge of the map.
 14. **Celebrations are short.** `Confetti`, `FloatUp` and `PopIn` play once and get out of the way.
 
 ## Where it's used
@@ -51,7 +53,8 @@ stops when Animations is off in Settings or the phone's reduce-motion setting is
 | Place | What moves |
 | --- | --- |
 | Buddy home, tree house and home visits | breathe, blink, nap, hop + wave on tap, dangle while carried, fall + land on drop, pop in, appliances, firelight |
-| Community (street and every building) | breathe, blink, walk to new spots, hop + wave on wave, dangle while carried, fall + land on drop, things slide, park rides, farm animals, buddy at the mixer |
+| Town map | drag and pinch, cars drive round the roads, fountain sprays, buildings bounce + zoom in |
+| Community buildings | breathe, blink, walk to new spots, hop + wave on wave, dangle while carried, fall + land on drop, things slide, park rides, farm animals, buddy at the mixer |
 | Home (Buddy Street) | your character and buddy breathe; tap your character to hop |
 | Rounds | buddy hops on right answers, shakes its head after misses, feedback pops in, confetti |
 

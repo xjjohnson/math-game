@@ -8,6 +8,7 @@ import { BringPanel } from '@/components/BringPanel';
 import { GridPaper, panelFace, pillFace } from '@/components/Chrome';
 import { TabBar, type TabId } from '@/components/TabBar';
 import { CommunityRoom } from '@/components/community/CommunityRoom';
+import { TownMap } from '@/components/community/TownMap';
 import { VisitPanel } from '@/components/VisitPanel';
 import { colors, radius, spacing, TAP_TARGET } from '@/constants/theme';
 import { usePlace } from '@/hooks/usePlace';
@@ -37,7 +38,11 @@ export function CommunityView({ place, actions, needsPermission = false, tab }: 
   return (
     <SafeAreaView style={styles.safe} edges={tab ? ['left', 'right'] : ['bottom', 'left', 'right']}>
       <View style={styles.fill}>
-        <CommunityRoom place={place} onDoor={goInside} onExit={() => router.back()} />
+        {place === 'street' ? (
+          <TownMap onDoor={goInside} />
+        ) : (
+          <CommunityRoom place={place} onDoor={goInside} onExit={() => router.back()} />
+        )}
         <View style={styles.top} pointerEvents="box-none">
           <Text style={styles.pill}>🪙 {profile?.coins ?? 0}</Text>
           <View style={styles.pills}>
