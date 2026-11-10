@@ -44,6 +44,8 @@ interface Props {
   asleep?: boolean;
   /** Change this number to wave once. */
   wave?: number;
+  /** A big open grin, for being picked up and carried. */
+  happy?: boolean;
 }
 
 const LINE = INK;
@@ -55,7 +57,7 @@ const UNDERWEAR = '#E3E3E3';
  * small body. Hair is its own piece, and every top and bottom can come off, leaving a
  * plain undershirt and shorts underneath.
  */
-export function PersonFigure({ look, size, dressed, gift, alive = false, asleep = false, wave }: Props) {
+export function PersonFigure({ look, size, dressed, gift, alive = false, asleep = false, wave, happy = false }: Props) {
   const u = size * look.height;
   const skin = SKIN_TONES[look.skin] ?? SKIN_TONES[0];
   const hair = HAIR_COLORS[look.hairColor] ?? HAIR_COLORS[0];
@@ -268,17 +270,33 @@ export function PersonFigure({ look, size, dressed, gift, alive = false, asleep 
             />
           </View>
         ))}
-        <View
-          style={[
-            box(cx - u * 0.035, eyeY + u * 0.035, u * 0.07, u * 0.035),
-            {
-              borderBottomWidth: line * 1.3,
-              borderColor: look.beard !== null ? '#F3E6DA' : LINE,
-              borderBottomLeftRadius: u * 0.04,
-              borderBottomRightRadius: u * 0.04,
-            },
-          ]}
-        />
+        {happy ? (
+          <View
+            style={[
+              box(cx - u * 0.045, eyeY + u * 0.035, u * 0.09, u * 0.055),
+              edge,
+              {
+                backgroundColor: '#8E3B3B',
+                borderTopLeftRadius: u * 0.012,
+                borderTopRightRadius: u * 0.012,
+                borderBottomLeftRadius: u * 0.05,
+                borderBottomRightRadius: u * 0.05,
+              },
+            ]}
+          />
+        ) : (
+          <View
+            style={[
+              box(cx - u * 0.035, eyeY + u * 0.035, u * 0.07, u * 0.035),
+              {
+                borderBottomWidth: line * 1.3,
+                borderColor: look.beard !== null ? '#F3E6DA' : LINE,
+                borderBottomLeftRadius: u * 0.04,
+                borderBottomRightRadius: u * 0.04,
+              },
+            ]}
+          />
+        )}
 
         {dressed.neck ? <Neckwear id={dressed.neck} f={fit} /> : null}
         {dressed.face ? <Glasses id={dressed.face} f={fit} /> : null}

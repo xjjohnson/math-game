@@ -403,7 +403,8 @@ export function dropBuddy(pieces: Piece[], piece: Piece, dx: number, dy: number,
     if (!best || far < best.far) best = { s, line, far };
   }
   if (best) return { x: baseX / size.width, y: best.line.y / size.height, on: FIXTURE_KEY + best.s.id };
-  return { x: baseX / size.width, y: baseY / size.height };
+  // Let go in the air (over the wall), it falls down onto the floor.
+  return { x: baseX / size.width, y: Math.max(baseY, size.floorY + size.unit * 0.05) / size.height };
 }
 
 /**

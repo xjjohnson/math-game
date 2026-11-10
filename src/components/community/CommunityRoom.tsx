@@ -868,22 +868,17 @@ interface PersonProps {
 }
 
 /**
- * Brings a person or buddy to life like at home: breathing in place, a hop and an arm wave
- * when they wave, and a little squash when they're put down.
+ * Brings a person or buddy to life like at home: breathing in place, and a hop and an arm wave
+ * when they wave. (Hanging from the finger, falling and the landing squash are `Glide`'s.)
  */
 function Alive({ figure, size, seed, waving, lifted, busy = false, shadow = false }: { figure: FigureLook; size: number; seed: string; waving: boolean; lifted: boolean; busy?: boolean; shadow?: boolean }) {
   const waves = useTimesOn(waving);
-  const landings = useTimesOn(!lifted);
-  // Whichever happened last plays: a wave hops, a landing squashes.
-  const last = useRef<{ waves: number; landings: number; kind: 'hop' | 'land' }>({ waves, landings, kind: 'land' });
-  if (waves !== last.current.waves) last.current = { waves, landings, kind: 'hop' };
-  else if (landings !== last.current.landings) last.current = { waves, landings, kind: 'land' };
   return (
     <>
       {shadow ? <GroundShadow width={size * 0.62} hidden={lifted} style={{ left: size * 0.19, top: size * 0.9 }} /> : null}
-      <Lively height={size} seed={seed} breathe={!lifted && !busy} bounce={waves + landings} bounceKind={last.current.kind}>
+      <Lively height={size} seed={seed} breathe={!lifted && !busy} bounce={waves} bounceKind="hop">
         <Busy active={busy}>
-          <Figure figure={figure} size={size} wave={waves || undefined} />
+          <Figure figure={figure} size={size} wave={waves || undefined} happy={lifted} />
         </Busy>
       </Lively>
     </>
@@ -1106,6 +1101,8 @@ function Riding({ ride, at, w, h, size, above, touchable, lifted, label, top, bo
       top={y - size - above + (above ? 16 : -6)}
       instant={lifted}
       walk={!ride}
+      dangle={!ride}
+      land
       grow={lifted ? 1.12 : 1}
       bounce={size * 0.05}
       style={[styles.standing, { width: size }, lifted && styles.raised]}
@@ -1163,6 +1160,7 @@ function Prop({ prop, shown, badge, caption, batter, said, splash, spot: at, lif
       top={at.y * h - box + size * 0.1}
       instant={lifted}
       walk={false}
+      land
       grow={lifted ? 1.12 : 1}
       style={[styles.prop, { width: box, height: box }, lifted && styles.raised]}
     >

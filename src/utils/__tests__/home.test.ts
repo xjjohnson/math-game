@@ -183,6 +183,20 @@ describe('dropping things', () => {
     expect(dropBuddy(pieces, buddy, fx, fy, size).on).toBeUndefined();
   });
 
+  it('drops a buddy let go over the wall down onto the floor, and keeps one let go on the floor', () => {
+    const pieces = layout(withThings([]));
+    const buddy = piece(pieces, `${BUDDY_KEY}puppy`);
+    const x = buddy.x + size.areaWidth * 0.3;
+    const [ax, ay] = to(buddy, x, size.floorY - size.unit * 0.8);
+    const fell = dropBuddy(pieces, buddy, ax, ay, size);
+    expect(fell.on).toBeUndefined();
+    expect(fell.y * size.height).toBeGreaterThan(size.floorY);
+    expect(fell.x * size.width).toBeCloseTo(x);
+    const low = size.floorY + (size.height - size.floorY) * 0.6;
+    const [fx, fy] = to(buddy, x, low);
+    expect(dropBuddy(pieces, buddy, fx, fy, size).y * size.height).toBeCloseTo(low);
+  });
+
   it('puts a buddy in the bathtub, behind its front, and on the toilet', () => {
     const p = withThings([]);
     const pieces = layout(p);
