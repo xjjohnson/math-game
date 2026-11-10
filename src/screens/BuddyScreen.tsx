@@ -7,6 +7,8 @@ import { Text } from '@/components/AppText';
 import { BigButton } from '@/components/BigButton';
 import { BuddyRoom } from '@/components/BuddyRoom';
 import { ChoiceButtons } from '@/components/ChoiceButtons';
+import { INK } from '@/constants/artStyle';
+import { GridPaper, NewDot, panelFace, pillFace, roundFace, TAB_TINTS } from '@/components/Chrome';
 import { DrawnItem, hasDrawing } from '@/components/DrawnItem';
 import { Furniture } from '@/components/Furniture';
 import { Confetti, Picked, SlideIn } from '@/components/Motion';
@@ -97,13 +99,14 @@ const BUILT_IN_LINES: Record<string, (name: string) => string> = {
 
 type Tab = 'care' | 'dress' | 'shop' | 'toys' | 'buddies' | 'paint';
 
-const TABS: { id: Tab; emoji: string; name: string }[] = [
-  { id: 'care', emoji: '❤️', name: 'Care' },
-  { id: 'dress', emoji: '👕', name: 'Dress up' },
-  { id: 'shop', emoji: '🛒', name: 'Shop' },
-  { id: 'toys', emoji: '🧺', name: 'Toys' },
-  { id: 'buddies', emoji: '🐾', name: 'Buddies' },
-  { id: 'paint', emoji: '🎨', name: 'Paint' },
+/** Each tab has its own soft colour, so a drawer is easy to tell apart. */
+const TABS: { id: Tab; emoji: string; name: string; tint: string }[] = [
+  { id: 'care', emoji: '❤️', name: 'Care', tint: TAB_TINTS.red },
+  { id: 'dress', emoji: '👕', name: 'Dress up', tint: TAB_TINTS.purple },
+  { id: 'shop', emoji: '🛒', name: 'Shop', tint: TAB_TINTS.yellow },
+  { id: 'toys', emoji: '🧺', name: 'Toys', tint: TAB_TINTS.green },
+  { id: 'buddies', emoji: '🐾', name: 'Buddies', tint: TAB_TINTS.orange },
+  { id: 'paint', emoji: '🎨', name: 'Paint', tint: TAB_TINTS.blue },
 ];
 
 /** Questions in one game of fetch. */
@@ -333,6 +336,8 @@ export function BuddyScreen() {
     }
   };
 
+  const careNow = careToday(profile, dateKey());
+  const careWaiting = !!buddyId && careNow.pets === 0 && careNow.treats === 0 && careNow.playHearts === 0;
   const back = () => (router.canGoBack() ? router.back() : router.replace('/'));
 
   return (
@@ -524,6 +529,7 @@ export function BuddyScreen() {
 
         {game || tab ? (
           <SlideIn key={game ? 'game' : tab ?? ''} style={styles.drawer}>
+            <GridPaper />
             {game ? (
               <View style={styles.game}>
                 <Text style={styles.hint}>
@@ -658,6 +664,7 @@ export function BuddyScreen() {
       </View>
 
       <View style={[styles.tabs, { paddingBottom: Math.max(insets.bottom, spacing.xs) }]}>
+        {/* A red dot on Care until the buddy has had some love today. */}
         {TABS.map((t) => {
           const on = tab === t.id && !game;
           return (
@@ -669,10 +676,13 @@ export function BuddyScreen() {
               }}
               accessibilityRole="tab"
               accessibilityState={{ selected: on, disabled: !!game }}
-              style={({ pressed }) => [styles.tab, on && styles.tabOn, pressed && styles.pressed]}
+              style={({ pressed }) => [styles.tab, on && [styles.tabOn, { backgroundColor: t.tint }], pressed && styles.pressed]}
             >
               <Picked on={on} ring="transparent" grow={1.25}>
-                <Text style={styles.tabEmoji}>{t.emoji}</Text>
+                <View style={[styles.tabIcon, { backgroundColor: t.tint }]}>
+                  <Text style={styles.tabEmoji}>{t.emoji}</Text>
+                  {t.id === 'care' && careWaiting ? <NewDot /> : null}
+                </View>
               </Picked>
               <Text style={[styles.tabName, on && styles.tabNameOn]} numberOfLines={1}>
                 {t.name}
@@ -1258,9 +1268,7 @@ const styles = StyleSheet.create({
     width: 48,
     height: 48,
     borderRadius: 24,
-    backgroundColor: colors.surface,
-    borderWidth: 3,
-    borderColor: colors.border,
+    ...roundFace,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -1274,9 +1282,7 @@ const styles = StyleSheet.create({
     minHeight: 48,
     paddingHorizontal: spacing.sm,
     borderRadius: 24,
-    backgroundColor: colors.surface,
-    borderWidth: 3,
-    borderColor: colors.border,
+    ...pillFace,
     justifyContent: 'center',
   },
   coinText: { fontSize: 18, fontWeight: '900', color: colors.text },
@@ -1300,12 +1306,11 @@ const styles = StyleSheet.create({
   bubbleText: { fontSize: 17, fontWeight: '800', color: colors.text, textAlign: 'center' },
   drawer: {
     maxHeight: '60%',
-    backgroundColor: colors.surface,
+    ...panelFace,
     borderTopLeftRadius: radius.lg,
     borderTopRightRadius: radius.lg,
-    borderWidth: 3,
     borderBottomWidth: 0,
-    borderColor: colors.border,
+    overflow: 'hidden',
     padding: spacing.sm,
     gap: spacing.sm,
   },
@@ -1320,11 +1325,12 @@ const styles = StyleSheet.create({
     // On a wide tablet the tabs stay together in the middle.
     justifyContent: 'center',
   },
-  tab: { flex: 1, maxWidth: 140, minHeight: 60, borderRadius: radius.md, alignItems: 'center', justifyContent: 'center' },
-  tabOn: { backgroundColor: colors.primary },
-  tabEmoji: { fontSize: 24 },
-  tabName: { fontSize: 13, fontWeight: '800', color: colors.text },
-  tabNameOn: { color: colors.primaryText },
+  tab: { flex: 1, maxWidth: 140, minHeight: 64, borderRadius: radius.md, alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: 'transparent' },
+  tabOn: { borderColor: INK },
+  tabIcon: { width: 38, height: 38, borderRadius: 19, alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: '#FFFFFF', boxShadow: `0px 0px 0px 1.5px ${INK}` },
+  tabEmoji: { fontSize: 20 },
+  tabName: { fontSize: 13, fontWeight: '800', color: colors.text, marginTop: 2 },
+  tabNameOn: { color: colors.text, fontWeight: '900' },
   bar: {
     height: 16,
     borderRadius: 8,
