@@ -7,6 +7,7 @@ import { PopIn } from '@/components/PopIn';
 import { colors, fontSizes, radius, spacing } from '@/constants/theme';
 import type { Grade } from '@/types';
 import { eggHint, eggsIn } from '@/utils/town';
+import { INK } from '@/constants/artStyle';
 
 interface Props {
   /** How many eggs the basket should end up holding. */
@@ -192,7 +193,7 @@ const styles = StyleSheet.create({
   five: { flexDirection: 'row', gap: 0, paddingHorizontal: 4, borderRadius: 10, backgroundColor: 'rgba(198,139,94,0.18)' },
   empty: { fontSize: 16, color: colors.textMuted },
   nudge: { fontSize: 15, fontWeight: '700', color: colors.wrong },
-  coop: { padding: spacing.sm, gap: 6, borderRadius: radius.lg, backgroundColor: '#C62828', borderWidth: 3, borderColor: '#5B3A24' },
+  coop: { padding: spacing.sm, gap: 6, borderRadius: radius.lg, backgroundColor: '#C62828', borderWidth: 3, borderColor: INK },
   coopTitle: { fontSize: 18, fontWeight: '900', color: '#fff', textAlign: 'center' },
   nests: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm, justifyContent: 'center' },
   nest: {
@@ -207,11 +208,11 @@ const styles = StyleSheet.create({
     borderColor: '#A86B45',
   },
   nestText: { fontSize: 14, fontWeight: '900', color: '#3B2B25' },
-  box: { padding: 4, gap: 3, borderRadius: 6, backgroundColor: '#A1887F', borderWidth: 2, borderColor: '#5B3A24' },
+  box: { padding: 4, gap: 3, borderRadius: 6, backgroundColor: '#A1887F', borderWidth: 2, borderColor: INK },
   boxSmall: { padding: 3, gap: 2 },
   boxRow: { flexDirection: 'row', gap: 3 },
   dot: { backgroundColor: '#FFFDF5', borderWidth: 1, borderColor: '#BCAAA4' },
-  crate: { alignItems: 'center', paddingHorizontal: 8, paddingVertical: 2, borderRadius: 6, backgroundColor: '#D7A77A', borderWidth: 3, borderColor: '#5B3A24' },
+  crate: { alignItems: 'center', paddingHorizontal: 8, paddingVertical: 2, borderRadius: 6, backgroundColor: '#D7A77A', borderWidth: 3, borderColor: INK },
   crateSmall: { paddingHorizontal: 5, borderWidth: 2 },
   truck: { backgroundColor: '#90CAF9' },
   crateText: { fontSize: 18, fontWeight: '900', color: '#3B2B25' },

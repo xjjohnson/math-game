@@ -10,6 +10,7 @@ import { Flicker, FloatUp, Lively, type BounceKind } from '@/components/Motion';
 import { PersonFigure } from '@/components/PersonFigure';
 import { BUDDY_SIZE } from '@/constants/room';
 import { useMotion } from '@/hooks/useAccessibility';
+import { INK } from '@/constants/artStyle';
 
 /** What happened in the tree house, for the buddy's speech bubble. */
 export type TreeHouseEvent =
@@ -47,7 +48,7 @@ export const SNACKS: [string, string][] = [
   ['🧁', 'a cupcake'],
 ];
 
-const OUTLINE = '#5B3A24';
+const OUTLINE = INK;
 const PLANKS = ['#C08A5B', '#B07A4F'];
 const BULBS = ['#FF5252', '#FFD740', '#69F0AE', '#40C4FF', '#E040FB'];
 const POP_MS = 1300;

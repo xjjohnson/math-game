@@ -3,8 +3,9 @@ import { Pressable, StyleSheet, View, type ViewStyle } from 'react-native';
 import { PlayScape, SwingSet, Trampoline, TreeWithHouse } from '@/components/Backyard';
 import { Bob, Flicker, Rumble, Spin } from '@/components/Motion';
 import type { Appliance } from '@/constants/room';
+import { INK } from '@/constants/artStyle';
 
-const OUTLINE = '#5B3A24';
+const OUTLINE = INK;
 const TRIM = '#A86B45';
 const PORCELAIN = '#FAFAFA';
 const WATER = '#81D4FA';

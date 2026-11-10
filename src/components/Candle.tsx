@@ -1,8 +1,9 @@
 import { StyleSheet, View } from 'react-native';
 
 import { Flicker } from '@/components/Motion';
+import { INK } from '@/constants/artStyle';
 
-const OUTLINE = '#5B3A24';
+const OUTLINE = INK;
 
 interface Props {
   width: number;

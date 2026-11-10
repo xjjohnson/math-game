@@ -30,6 +30,7 @@ import {
   type ColoringPage,
   type NumberLevel,
 } from '@/utils/easel';
+import { INK } from '@/constants/artStyle';
 
 interface Props {
   visible: boolean;
@@ -474,7 +475,7 @@ const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: '#FFF1C9' },
   header: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 12, paddingVertical: 8, gap: 8 },
   title: { flex: 1, fontSize: 22, fontWeight: '900', color: '#3B2B25' },
-  close: { width: 48, height: 48, borderRadius: 24, backgroundColor: '#FFFFFF', alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: '#3B2B25' },
+  close: { width: 48, height: 48, borderRadius: 24, backgroundColor: '#FFFFFF', alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: INK },
   closeText: { fontSize: 20, fontWeight: '900', color: '#3B2B25' },
   paperRow: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   paper: { backgroundColor: '#FFFFFF', borderWidth: 3, borderColor: '#A86B45', overflow: 'hidden' },
@@ -493,10 +494,10 @@ const styles = StyleSheet.create({
   swatch: { width: 44, height: 44, borderRadius: 22, borderWidth: 3, borderColor: 'rgba(0,0,0,0.25)', alignItems: 'center', justifyContent: 'center' },
   swatchOn: { borderWidth: 5, borderColor: '#FFEB3B', transform: [{ scale: 1.12 }] },
   swatchNumber: { fontSize: 17, fontWeight: '900', color: '#1B1B3A' },
-  action: { minHeight: 48, paddingHorizontal: 12, borderRadius: 14, backgroundColor: '#FFFFFF', justifyContent: 'center', borderWidth: 2, borderColor: '#3B2B25' },
+  action: { minHeight: 48, paddingHorizontal: 12, borderRadius: 14, backgroundColor: '#FFFFFF', justifyContent: 'center', borderWidth: 2, borderColor: INK },
   actionText: { fontSize: 16, fontWeight: '900', color: '#3B2B25' },
   panel: { position: 'absolute', left: 0, right: 0, top: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.45)', alignItems: 'center', justifyContent: 'center', padding: 12 },
-  panelBox: { width: '100%', maxWidth: 720, maxHeight: '94%', backgroundColor: '#FFF8E7', borderRadius: 20, padding: 8, gap: 8, borderWidth: 3, borderColor: '#3B2B25' },
+  panelBox: { width: '100%', maxWidth: 720, maxHeight: '94%', backgroundColor: '#FFF8E7', borderRadius: 20, padding: 8, gap: 8, borderWidth: 3, borderColor: INK },
   warn: { fontSize: 16, fontWeight: '800', color: '#BF360C', textAlign: 'center', paddingHorizontal: 8 },
   grid: { flexDirection: 'row', flexWrap: 'wrap', gap: 12, justifyContent: 'center', paddingBottom: 12 },
   card: { alignItems: 'center', gap: 4, padding: 6, borderRadius: 14, backgroundColor: '#FFFFFF', borderWidth: 2, borderColor: '#E0C9A6' },

@@ -71,6 +71,8 @@ import { carryInPark, offGround, parkLanding, rideAt, slidePath, SWING_PIVOT, ty
 import { SKIN_TONES } from '@/constants/wardrobe';
 import { figureFor, type FigureLook } from '@/utils/figures';
 import type { BuildingId } from '@/utils/town';
+import { INK } from '@/constants/artStyle';
+import { GroundShadow } from '@/components/GroundShadow';
 
 const FURS = ['#F2B880', '#E57373', '#81C784', '#64B5F6', '#BA68C8', '#FFD54F', '#4DB6AC', '#F06292'];
 const BELLIES = ['#FFE3C2', '#FFCDD2', '#C8E6C9', '#BBDEFB', '#E1BEE7', '#FFF9C4', '#B2DFDB', '#F8BBD0'];
@@ -869,7 +871,7 @@ interface PersonProps {
  * Brings a person or buddy to life like at home: breathing in place, a hop and an arm wave
  * when they wave, and a little squash when they're put down.
  */
-function Alive({ figure, size, seed, waving, lifted, busy = false }: { figure: FigureLook; size: number; seed: string; waving: boolean; lifted: boolean; busy?: boolean }) {
+function Alive({ figure, size, seed, waving, lifted, busy = false, shadow = false }: { figure: FigureLook; size: number; seed: string; waving: boolean; lifted: boolean; busy?: boolean; shadow?: boolean }) {
   const waves = useTimesOn(waving);
   const landings = useTimesOn(!lifted);
   // Whichever happened last plays: a wave hops, a landing squashes.
@@ -877,11 +879,14 @@ function Alive({ figure, size, seed, waving, lifted, busy = false }: { figure: F
   if (waves !== last.current.waves) last.current = { waves, landings, kind: 'hop' };
   else if (landings !== last.current.landings) last.current = { waves, landings, kind: 'land' };
   return (
-    <Lively height={size} seed={seed} breathe={!lifted && !busy} bounce={waves + landings} bounceKind={last.current.kind}>
-      <Busy active={busy}>
-        <Figure figure={figure} size={size} wave={waves || undefined} />
-      </Busy>
-    </Lively>
+    <>
+      {shadow ? <GroundShadow width={size * 0.62} hidden={lifted} style={{ left: size * 0.19, top: size * 0.9 }} /> : null}
+      <Lively height={size} seed={seed} breathe={!lifted && !busy} bounce={waves + landings} bounceKind={last.current.kind}>
+        <Busy active={busy}>
+          <Figure figure={figure} size={size} wave={waves || undefined} />
+        </Busy>
+      </Lively>
+    </>
   );
 }
 
@@ -917,7 +922,7 @@ function Person({ person, figure, isMe, waving, spot: at, lifted, ride, w, h, to
       }
     >
       <View>
-        <Alive figure={figure} size={token} seed={person.id} waving={waving} lifted={lifted} />
+        <Alive figure={figure} size={token} seed={person.id} waving={waving} lifted={lifted} shadow={!ride} />
         {acc ? <Text style={[styles.acc, accStyle]}>{acc}</Text> : null}
       </View>
     </Riding>
@@ -980,7 +985,7 @@ function Pal({ figure, seed, mine, spot: at, lifted, ride, hanging, job, w, h, s
         ) : undefined
       }
     >
-      <Alive figure={figure} size={size} seed={seed} waving={false} lifted={lifted} busy={job === 'mixing'} />
+      <Alive figure={figure} size={size} seed={seed} waving={false} lifted={lifted} busy={job === 'mixing'} shadow={!ride} />
     </Riding>
   );
 }
@@ -1214,7 +1219,7 @@ const styles = StyleSheet.create({
     color: '#3B2B25',
     backgroundColor: '#FFFFFF',
     borderWidth: 2,
-    borderColor: '#3B2B25',
+    borderColor: INK,
     borderRadius: 12,
     paddingHorizontal: 8,
     paddingVertical: 2,
@@ -1224,15 +1229,15 @@ const styles = StyleSheet.create({
   lifted: { transform: [{ scale: 1.12 }], zIndex: 50 },
   raised: { zIndex: 50 },
   standing: { alignItems: 'center' },
-  hangArm: { position: 'absolute', top: 0, backgroundColor: '#F2D3B3', borderWidth: 2, borderColor: '#3E2C23' },
-  hand: { position: 'absolute', backgroundColor: '#F2D3B3', borderWidth: 2, borderColor: '#3E2C23' },
+  hangArm: { position: 'absolute', top: 0, backgroundColor: '#F2D3B3', borderWidth: 2, borderColor: INK },
+  hand: { position: 'absolute', backgroundColor: '#F2D3B3', borderWidth: 2, borderColor: INK },
   helperSpot: { position: 'absolute', left: -60, right: -60, alignItems: 'center', zIndex: 60 },
-  helper: { fontSize: 13, fontWeight: '900', color: '#3B2B25', backgroundColor: '#FFFFFF', borderWidth: 2, borderColor: '#3B2B25', borderRadius: 10, paddingHorizontal: 6, overflow: 'hidden', height: 26 },
+  helper: { fontSize: 13, fontWeight: '900', color: '#3B2B25', backgroundColor: '#FFFFFF', borderWidth: 2, borderColor: INK, borderRadius: 10, paddingHorizontal: 6, overflow: 'hidden', height: 26 },
   helperBusy: { backgroundColor: '#FFE0EC', color: '#C2185B' },
   wave: { fontSize: 24, height: 30 },
   wheee: { fontSize: 18, fontWeight: '900', color: '#E53935' },
   rope: { position: 'absolute', top: 0, width: 3, backgroundColor: '#5D4037' },
-  seat: { position: 'absolute', height: 16, borderRadius: 4, backgroundColor: '#FFCA28', borderWidth: 3, borderColor: '#5B3A24' },
+  seat: { position: 'absolute', height: 16, borderRadius: 4, backgroundColor: '#FFCA28', borderWidth: 3, borderColor: INK },
   ripple: { borderRadius: 999, backgroundColor: 'rgba(255,255,255,0.65)', borderWidth: 2, borderColor: '#29B6F6' },
   acc: { position: 'absolute', alignSelf: 'center', textAlign: 'center', left: 0, right: 0 },
   name: { fontSize: 14, fontWeight: '800', color: '#3B2B25', backgroundColor: 'rgba(255,255,255,0.75)', paddingHorizontal: 8, borderRadius: 8, overflow: 'hidden' },

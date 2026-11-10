@@ -12,6 +12,7 @@ import {
   type PersonLook,
   type TopCut,
 } from '@/constants/wardrobe';
+import { INK } from '@/constants/artStyle';
 
 /** A piece of clothing ready to draw. */
 export interface Cloth {
@@ -45,7 +46,7 @@ interface Props {
   wave?: number;
 }
 
-const LINE = '#3B2B25';
+const LINE = INK;
 const UNDERSHIRT = '#FAFAFA';
 const UNDERWEAR = '#E3E3E3';
 

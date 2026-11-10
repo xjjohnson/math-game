@@ -5,6 +5,7 @@ import { Text } from '@/components/AppText';
 import { colors, radius, spacing, TAP_TARGET } from '@/constants/theme';
 import { speakText, stopSpeaking } from '@/utils/feedback';
 import { ingredientsFor, pageWords, recipeByName, type Book, type Page } from '@/utils/libraryBooks';
+import { INK } from '@/constants/artStyle';
 
 interface Props {
   /** The book to show, or null when none is open. */
@@ -169,7 +170,7 @@ function PageView({ page, big }: { page: Page; big: number }) {
 }
 
 const PAPER = '#FFFBEF';
-const LINE = '#5B3A24';
+const LINE = INK;
 
 const styles = StyleSheet.create({
   backdrop: { flex: 1, backgroundColor: 'rgba(30,20,10,0.55)', alignItems: 'center', justifyContent: 'center' },

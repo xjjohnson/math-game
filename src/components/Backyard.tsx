@@ -14,8 +14,9 @@ import Animated, {
 import { Bob, Flicker, seedOf, Swing } from '@/components/Motion';
 import { FORT, TREE_HOUSE } from '@/constants/room';
 import { useMotion } from '@/hooks/useAccessibility';
+import { INK } from '@/constants/artStyle';
 
-const OUTLINE = '#5B3A24';
+const OUTLINE = INK;
 const WOOD = '#B07A4F';
 const WOOD_DARK = '#8A5A36';
 const LEAVES = ['#4CAF50', '#43A047', '#66BB6A'];
