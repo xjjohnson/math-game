@@ -5,6 +5,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Text } from '@/components/AppText';
 import { BringPanel } from '@/components/BringPanel';
+import { GridPaper, panelFace, pillFace } from '@/components/Chrome';
 import { TabBar, type TabId } from '@/components/TabBar';
 import { CommunityRoom } from '@/components/community/CommunityRoom';
 import { VisitPanel } from '@/components/VisitPanel';
@@ -61,6 +62,7 @@ export function CommunityView({ place, actions, needsPermission = false, tab }: 
         {open ? (
           <View style={styles.panelSpot} pointerEvents="box-none">
             <View style={styles.panel}>
+              <GridPaper />
               {open === 'bring' ? <BringPanel /> : <VisitPanel needsPermission={needsPermission} />}
               <Pressable onPress={() => setOpen(null)} accessibilityRole="button" style={styles.close}>
                 <Text style={styles.visitText}>Close</Text>
@@ -81,12 +83,12 @@ const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: '#9BD4F5' },
   fill: { flex: 1 },
   top: { position: 'absolute', top: spacing.sm, left: spacing.sm, right: spacing.sm, flexDirection: 'row', justifyContent: 'space-between' },
-  pill: { fontSize: 20, fontWeight: '900', color: colors.text, backgroundColor: 'rgba(255,255,255,0.9)', paddingHorizontal: 14, paddingVertical: 6, borderRadius: radius.lg, overflow: 'hidden' },
+  pill: { fontSize: 20, fontWeight: '900', color: colors.text, ...pillFace, paddingHorizontal: 14, paddingVertical: 6, borderRadius: radius.lg, overflow: 'hidden' },
   pills: { flexDirection: 'row', gap: spacing.sm },
   visit: { minHeight: TAP_TARGET * 0.8 },
   visitText: { fontSize: 18, fontWeight: '800', color: colors.primary, textAlign: 'center' },
   panelSpot: { position: 'absolute', top: 64, left: spacing.md, right: spacing.md, alignItems: 'center' },
-  panel: { width: '100%', maxWidth: 560, padding: spacing.md, gap: spacing.sm, backgroundColor: 'rgba(255,255,255,0.96)', borderRadius: radius.lg, borderWidth: 3, borderColor: colors.border },
+  panel: { width: '100%', maxWidth: 560, padding: spacing.md, gap: spacing.sm, ...panelFace, boxShadow: '0px 4px 0px rgba(78, 51, 36, 0.18)', borderRadius: radius.lg, overflow: 'hidden' },
   close: { alignSelf: 'center', padding: spacing.sm },
   // On a wide tablet the buttons stay a comfortable size in the middle instead of running edge to edge.
   bottomSpot: { position: 'absolute', bottom: spacing.sm, left: spacing.sm, right: spacing.sm, alignItems: 'center' },

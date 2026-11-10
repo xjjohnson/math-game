@@ -30,8 +30,8 @@ which is checked for contrast.
 | G2 | People and buddy bodies redrawn in SVG; faces take a `mood` | Built |
 | G3 | Drawn furniture, food and toys instead of emoji (`DrawnItem`, 20 so far) | Building |
 | G4 | Rooms with depth: crown moulding, chair rail and darker lower wall, floorboards, wall shadow on the floor, a front edge | Built |
-| G5 | Round icon buttons, red "new" dots, white panels | Planned |
-| G6 | Drawn menu background patterns | Planned |
+| G5 | Round buttons with a white ring and shadow, red dots, colour-coded buddy home tabs, white panels on grid paper (`components/Chrome.tsx`) | Built |
+| G6 | Drawn menu background patterns: every themed background repeats small drawings in a darker shade of its colour (`constants/patterns.ts`), drifting like before | Built |
 
 ## Faces
 
