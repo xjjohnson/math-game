@@ -42,7 +42,9 @@ stops when Animations is off in Settings or the phone's reduce-motion setting is
 12. **Screens zoom.** Opening a screen zooms it in quickly from a little smaller while it fades in
     (`ScreenZoom`, set once for every screen with the Stack's `screenLayout` in `src/app/_layout.tsx`),
     instead of the plain slide. With Animations off, screens just switch.
-13. **Celebrations are short.** `Confetti`, `FloatUp` and `PopIn` play once and get out of the way.
+13. **Buildings answer taps.** On the street, tapping a building makes it bounce; tapping its door bounces
+    it and zooms in toward the door before going inside (`StreetBuilding` in `community/Interiors.tsx`).
+14. **Celebrations are short.** `Confetti`, `FloatUp` and `PopIn` play once and get out of the way.
 
 ## Where it's used
 
