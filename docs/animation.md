@@ -31,7 +31,11 @@ stops when Animations is off in Settings or the phone's reduce-motion setting is
 9. **Panels spring in; picks grow.** A drawer or panel slides in with a little overshoot (`SlideIn`), its
    choices pop in one after another (`PopIn` with a `delay`), and the picked one grows with a ring
    (`Picked`): Dress up, Buddies tray, Paint swatches, tabs and `OptionGroup`.
-10. **Celebrations are short.** `Confetti`, `FloatUp` and `PopIn` play once and get out of the way.
+10. **Rooms keep moving.** Even when nobody touches anything, something is going: radios send up music
+    notes and fish bowls bubbles (`ambient` on a room item, drawn with `Drifting`), TV and computer power
+    lights blink (`Twinkle`), the shop's checkout belt rolls (`Belt`), and the faint pictures behind
+    menus drift slowly upward (`DriftLoop` in `BackgroundDecor`).
+11. **Celebrations are short.** `Confetti`, `FloatUp` and `PopIn` play once and get out of the way.
 
 ## Where it's used
 

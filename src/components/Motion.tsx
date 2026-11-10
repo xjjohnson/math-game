@@ -1,4 +1,4 @@
-import { useEffect, useRef, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { StyleSheet, View, type StyleProp, type ViewStyle } from 'react-native';
 import Animated, {
   cancelAnimation,
@@ -675,6 +675,101 @@ export function Picked({
       {children}
       <Animated.View pointerEvents="none" style={[styles.ring, { borderColor: ring, borderRadius: radius + 5 }, ringLook]} />
     </Animated.View>
+  );
+}
+
+/**
+ * A moving belt, like a shop checkout: dark stripes that roll along toward `toward` without end.
+ * Still when motion is off.
+ */
+export function Belt({
+  width,
+  height,
+  toward = 1,
+  color = '#4A4A4A',
+  stripe = '#6E6E6E',
+  style,
+}: {
+  width: number;
+  height: number;
+  /** 1 rolls to the right, -1 to the left. */
+  toward?: 1 | -1;
+  color?: string;
+  stripe?: string;
+  style?: StyleProp<ViewStyle>;
+}) {
+  const { animate } = useMotion();
+  const gap = Math.max(10, height * 1.4);
+  const t = useSharedValue(0);
+  useEffect(() => {
+    if (!animate) return;
+    t.value = 0;
+    t.value = withRepeat(withTiming(1, { duration: 700, easing: Easing.linear }), -1);
+    return () => cancelAnimation(t);
+  }, [animate, t]);
+  const look = useAnimatedStyle(() => ({ transform: [{ translateX: (t.value - 1) * gap * toward }] }));
+  const count = Math.ceil(width / gap) + 2;
+  return (
+    <View pointerEvents="none" style={[{ width, height, backgroundColor: color, overflow: 'hidden', borderRadius: height / 2 }, style]}>
+      <Animated.View style={[{ flexDirection: 'row', position: 'absolute', left: -gap, top: 0, bottom: 0 }, look]}>
+        {Array.from({ length: count }, (_, i) => (
+          <View key={i} style={{ width: gap, height: '100%', justifyContent: 'center', alignItems: 'center' }}>
+            <View style={{ width: Math.max(2, gap * 0.18), height: '70%', backgroundColor: stripe, borderRadius: 2 }} />
+          </View>
+        ))}
+      </Animated.View>
+    </View>
+  );
+}
+
+/**
+ * Brightens and dims on its own rhythm, like a string of party lights; `seed` keeps neighbors out
+ * of step. Steady when `active` is off or motion is off.
+ */
+export function Twinkle({ children, seed, active = true, style }: { children: ReactNode; seed: string; active?: boolean; style?: StyleProp<ViewStyle> }) {
+  const { animate } = useMotion();
+  const t = useSharedValue(1);
+  useEffect(() => {
+    if (!animate || !active) {
+      cancelAnimation(t);
+      t.value = 1;
+      return;
+    }
+    const r = seedOf(seed);
+    const ms = 500 + r * 700;
+    t.value = withDelay(
+      Math.round(r * 1200),
+      withRepeat(withSequence(withTiming(0.35, { duration: ms, easing: Easing.inOut(Easing.sin) }), withTiming(1, { duration: ms, easing: Easing.inOut(Easing.sin) })), -1),
+    );
+    return () => cancelAnimation(t);
+  }, [animate, active, seed, t]);
+  const look = useAnimatedStyle(() => ({ opacity: t.value }));
+  return <Animated.View style={[style, look]}>{children}</Animated.View>;
+}
+
+/**
+ * A pattern that drifts slowly upward forever behind a screen. It draws `children` (something
+ * that fills its box, like a field of faint pictures) twice, one under the other, and slides both
+ * up by one box height, so the loop never shows a seam. Still when motion is off.
+ */
+export function DriftLoop({ children, seconds = 90 }: { children: ReactNode; seconds?: number }) {
+  const { animate } = useMotion();
+  const [tall, setTall] = useState(0);
+  const t = useSharedValue(0);
+  useEffect(() => {
+    if (!animate || tall <= 0) return;
+    t.value = 0;
+    t.value = withRepeat(withTiming(1, { duration: seconds * 1000, easing: Easing.linear }), -1);
+    return () => cancelAnimation(t);
+  }, [animate, tall, seconds, t]);
+  const look = useAnimatedStyle(() => ({ transform: [{ translateY: -t.value * tall }] }));
+  return (
+    <View style={[StyleSheet.absoluteFill, { overflow: 'hidden' }]} pointerEvents="none" onLayout={(e) => setTall(Math.round(e.nativeEvent.layout.height))}>
+      <Animated.View style={[StyleSheet.absoluteFill, look]}>
+        {children}
+        {animate && tall > 0 ? <View style={[StyleSheet.absoluteFill, { top: tall, bottom: -tall }]}>{children}</View> : null}
+      </Animated.View>
+    </View>
   );
 }
 

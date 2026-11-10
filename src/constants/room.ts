@@ -111,6 +111,8 @@ export interface RoomItem {
   lamp?: boolean;
   /** Pops up when it is tapped. */
   fx?: string;
+  /** Drifts up from it all the time, so the room keeps moving (a radio's music notes). */
+  ambient?: string;
   /** What the buddy says when it is tapped. */
   says?: string;
   /** Not sold in the shop (a picture painted at the School easel). */
@@ -199,13 +201,13 @@ export const ROOM_ITEMS: RoomItem[] = [
   // Living room
   { id: 'tv', name: 'TV', emoji: '📺', price: 40, size: 0.2, group: 'living', fx: '🎬', says: 'loves this show' },
   { id: 'piano', name: 'Piano', emoji: '🎹', price: 50, size: 0.22, group: 'living', fx: '🎶', says: 'plays a song' },
-  { id: 'radio', name: 'Radio', emoji: '📻', price: 25, size: 0.13, group: 'living', fx: '🎵', says: 'dances to the music' },
+  { id: 'radio', name: 'Radio', emoji: '📻', price: 25, size: 0.13, group: 'living', fx: '🎵', says: 'dances to the music', ambient: '🎵' },
   { id: 'clock', name: 'Clock', emoji: '🕰️', price: 25, size: 0.14, group: 'living', fx: '⏰', says: 'hears tick, tock' },
   { id: 'picture', name: 'Picture', emoji: '🖼️', price: 25, size: 0.18, group: 'living' },
   { id: 'plant', name: 'Plant', emoji: '🪴', price: 15, size: 0.18, group: 'living', fx: '💧', says: 'waters the plant' },
   { id: 'candleLiving', name: 'Candle', emoji: '🕯️', price: 15, size: 0.12, group: 'living', light: true, candle: '#FFF3E0' },
   { id: 'lamp', name: 'Lamp', emoji: '💡', price: 25, size: 0.16, group: 'living', light: true, lamp: true },
-  { id: 'fish', name: 'Fish bowl', emoji: '🐠', price: 30, size: 0.12, group: 'living', fx: '🫧', says: 'waves at the fish' },
+  { id: 'fish', name: 'Fish bowl', emoji: '🐠', price: 30, size: 0.12, group: 'living', fx: '🫧', says: 'waves at the fish', ambient: '🫧' },
   { id: 'trophy', name: 'Trophy', emoji: '🏆', price: 60, size: 0.14, group: 'living', fx: '🌟' },
   { id: 'globe', name: 'Globe', emoji: '🌍', price: 25, size: 0.13, group: 'living', fx: '✈️', says: 'spins the globe' },
   { id: 'telescope', name: 'Telescope', emoji: '🔭', price: 30, size: 0.17, group: 'living', fx: '🌟', says: 'spots a star' },

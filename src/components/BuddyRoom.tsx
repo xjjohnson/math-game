@@ -919,6 +919,11 @@ export function BuddyRoom(props: Props) {
                   </PopIn>
                 </Sunk>
                 </Ride>
+                {piece.item?.ambient && !offset ? (
+                  <Drifting rise={piece.height * 0.5} style={styles.zzz}>
+                    <Text style={{ fontSize: Math.round(piece.height * 0.32) }}>{piece.item.ambient}</Text>
+                  </Drifting>
+                ) : null}
                 {buddy && asleep ? (
                   <Drifting rise={piece.height * 0.25} style={styles.zzz}>
                     <Text style={{ fontSize: Math.round(piece.height * 0.3) }}>💤</Text>
