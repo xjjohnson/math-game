@@ -13,6 +13,7 @@ import { ColumnPad, NumberPad } from '@/components/NumberPad';
 import { PopIn } from '@/components/PopIn';
 import { isNotable, RoundResults } from '@/components/RoundResults';
 import { Screen } from '@/components/Screen';
+import { SpeakButton } from '@/components/SpeakButton';
 import { TimerBar } from '@/components/TimerBar';
 import { difficultyConfigFor } from '@/constants/grades';
 import { colors, fontSizes, radius, spacing } from '@/constants/theme';
@@ -143,6 +144,7 @@ function Round({ config, onPlayAgain }: { config: GameConfig; onPlayAgain: () =>
         <Text style={styles.status} accessibilityLabel={`${roundCoins} coins this round`}>
           🪙 {roundCoins}
         </Text>
+        <SpeakButton onPress={() => speakProblem(state.problem, true)} />
       </View>
       {config.adaptive ? (
         <Text style={styles.level}>Level: {difficultyConfigFor(state.difficulty, config.grade).label}</Text>
@@ -171,7 +173,6 @@ function Round({ config, onPlayAgain }: { config: GameConfig; onPlayAgain: () =>
             : undefined
         }
         cardStyle={cardStyleFor(profile)}
-        onSpeak={() => speakProblem(state.problem, true)}
       />
 
       {countModel && !showFeedback ? (
@@ -238,7 +239,7 @@ function Round({ config, onPlayAgain }: { config: GameConfig; onPlayAgain: () =>
 }
 
 const styles = StyleSheet.create({
-  statusRow: { flexDirection: 'row', justifyContent: 'space-between' },
+  statusRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   status: { fontSize: fontSizes.body, fontWeight: '800', color: colors.text, fontVariant: ['tabular-nums'] },
   level: { fontSize: 16, fontWeight: '700', color: colors.textMuted, textAlign: 'center' },
   countToggle: {

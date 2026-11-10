@@ -99,8 +99,22 @@ export interface Profile {
   homeRooms: string[];
   /** Order of the rooms in the home, left to right, as HomeArea ids. Missing means the starting order. */
   homeOrder?: string[];
+  /** What was picked on the New game screen last time, so it starts that way again. */
+  lastGame?: GameChoices;
   /** Community buildings whose daily job is done, for today only. */
   town: TownVisits;
+}
+
+/** New game screen picks (grade and difficulty are kept on the profile itself). */
+export interface GameChoices {
+  choice: Operation | 'tables';
+  tables: number[];
+  includeDivision: boolean;
+  timer: TimerSetting;
+  adaptive: boolean;
+  wordProblems: boolean;
+  showWork: boolean;
+  worksheet: boolean;
 }
 
 export interface TownVisits {

@@ -83,7 +83,7 @@ function WorkText({ line, color }: { line: WorkLine; color: string }) {
   const palette = usePalette();
   const tone =
     line.tone === 'mark'
-      ? { color: colors.accent }
+      ? { color: colors.accentStrong }
       : line.tone === 'answer'
         ? { color: palette.correct }
         : line.tone === 'struck'

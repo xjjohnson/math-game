@@ -24,7 +24,7 @@ export function MultiplayerScreen() {
       </Text>
       <BigButton
         label="📱 One phone, take turns"
-        color={colors.accent}
+        color={colors.accentStrong}
         accessibilityHint="Up to 6 players answer 10 questions each on this device."
         onPress={() => router.push('/pass-play')}
       />

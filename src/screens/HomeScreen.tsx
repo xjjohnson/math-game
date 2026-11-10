@@ -107,7 +107,7 @@ export function HomeScreen() {
           onPress={() => router.push('/mode')}
         />
       ) : (
-        <BigButton label="Create a player" color={colors.accent} onPress={() => router.push('/profiles')} />
+        <BigButton label="Create a player" color={colors.accentStrong} onPress={() => router.push('/profiles')} />
       )}
 
       {profile && daily && dailyOp ? (

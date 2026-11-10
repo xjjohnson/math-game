@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react';
-import { ScrollView, StyleSheet } from 'react-native';
+import { ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Text } from '@/components/AppText';
@@ -20,10 +20,12 @@ interface Props {
   tab?: TabId;
   /** Lets the page use more of a wide tablet (side-by-side layouts) and fill its height. */
   wide?: boolean;
+  /** Pinned under the scrolling part, e.g. a Start button that must always show. */
+  footer?: ReactNode;
 }
 
 /** Standard page wrapper: safe area, scrolling, centered column for tablets and PC. */
-export function Screen({ title, children, compact = false, noHeader = false, tab, wide = false }: Props) {
+export function Screen({ title, children, compact = false, noHeader = false, tab, wide = false, footer }: Props) {
   const profile = useActiveProfile();
   const background = backgroundColor(profile);
   return (
@@ -41,6 +43,7 @@ export function Screen({ title, children, compact = false, noHeader = false, tab
         {title ? <Text style={styles.title} accessibilityRole="header">{title}</Text> : null}
         {children}
       </ScrollView>
+      {footer ? <View style={styles.footer}>{footer}</View> : null}
       {tab ? <TabBar active={tab} /> : null}
     </SafeAreaView>
   );
@@ -57,6 +60,13 @@ const styles = StyleSheet.create({
   },
   compact: { paddingVertical: spacing.md, gap: spacing.sm },
   wide: { maxWidth: 1100, flexGrow: 1 },
+  footer: {
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.sm,
+    width: '100%',
+    maxWidth: 640,
+    alignSelf: 'center',
+  },
   title: {
     fontSize: fontSizes.title,
     fontWeight: '800',

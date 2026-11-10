@@ -1,4 +1,4 @@
-import { Pressable, StyleSheet } from 'react-native';
+import { StyleSheet } from 'react-native';
 
 import { Text } from '@/components/AppText';
 import { ColumnWork } from '@/components/ColumnWork';
@@ -19,8 +19,6 @@ interface Props {
   column?: ColumnProps;
   /** Look bought in the shop; defaults to the classic white card. */
   cardStyle?: CardStyle;
-  /** Shows a speaker button that reads the problem aloud. */
-  onSpeak?: () => void;
 }
 
 const SYMBOLS = Object.fromEntries(OPERATIONS.map((o) => [o.value, o.symbol])) as Record<
@@ -52,7 +50,7 @@ export interface ColumnProps {
   onToggleSign?: () => void;
 }
 
-export function FlashCard({ problem, reveal = false, column, cardStyle, onSpeak }: Props) {
+export function FlashCard({ problem, reveal = false, column, cardStyle }: Props) {
   const palette = usePalette();
   const look = cardStyle ?? {
     background: colors.surface,
@@ -110,28 +108,18 @@ export function FlashCard({ problem, reveal = false, column, cardStyle, onSpeak 
           </Text>
         </>
       )}
-      {onSpeak ? (
-        <Pressable
-          onPress={onSpeak}
-          style={styles.speaker}
-          accessibilityRole="button"
-          accessibilityLabel="Read the problem out loud"
-          hitSlop={12}
-        >
-          <Text style={styles.speakerIcon}>🔊</Text>
-        </Pressable>
-      ) : null}
     </PopIn>
   );
 }
 
-/** Two little pictures drawn in three of the card's corners (the top right is the speaker's). */
+/** Two little pictures drawn in the card's four corners. */
 function Corners({ pair }: { pair: [string, string] }) {
   const [first, second] = pair;
   return (
     <>
       <Text style={[styles.corner, { top: 4, left: 8 }]}>{first}</Text>
       <Text style={[styles.corner, { bottom: 4, left: 8 }]}>{second}</Text>
+      <Text style={[styles.corner, { top: 4, right: 8 }]}>{second}</Text>
       <Text style={[styles.corner, { bottom: 4, right: 8 }]}>{first}</Text>
     </>
   );
@@ -154,10 +142,8 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     lineHeight: 34,
     textAlign: 'center',
-    // Leaves room for the speaker button in the corner.
+    // Leaves room for the corner pictures some card looks have.
     paddingHorizontal: 36,
   },
   storyAnswer: { fontSize: fontSizes.button, fontWeight: '800', marginTop: spacing.sm },
-  speaker: { position: 'absolute', top: spacing.sm, right: spacing.sm, padding: spacing.xs },
-  speakerIcon: { fontSize: 28 },
 });

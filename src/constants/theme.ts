@@ -6,16 +6,20 @@ export const colors = {
   textMuted: '#4A4A6A',
   primary: '#3D5AFE',
   primaryText: '#FFFFFF',
-  correct: '#00A86B',
-  wrong: '#E53935',
+  // Text colors here are dark enough for white text on them and to read on the cream page (4.5:1).
+  correct: '#007A55',
+  wrong: '#C62828',
+  /** Bright orange for fills and bars only; never put text on it or use it as text. */
   accent: '#FF9800',
+  /** Darker orange for buttons with white text, and for orange text. */
+  accentStrong: '#B35300',
   border: '#1B1B3A',
   disabled: '#B8B8C8',
   operations: {
     add: '#3D5AFE',
     subtract: '#D81B60',
-    multiply: '#00897B',
-    divide: '#F57C00',
+    multiply: '#00796B',
+    divide: '#B35300',
   },
 } as const;
 

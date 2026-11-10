@@ -11,11 +11,14 @@ export interface Palette {
   operations: Record<Operation, string>;
 }
 
-/** Okabe-Ito colors: told apart with every common kind of color blindness. */
+/**
+ * Okabe-Ito colors: told apart with every common kind of color blindness. Darkened
+ * a little from the originals so white text on them and colored text both read (4.5:1).
+ */
 const COLORBLIND: Palette = {
   correct: '#0072B2',
-  wrong: '#D55E00',
-  operations: { add: '#0072B2', subtract: '#CC79A7', multiply: '#009E73', divide: '#B07800' },
+  wrong: '#B34E00',
+  operations: { add: '#0072B2', subtract: '#A8578A', multiply: '#007A5A', divide: '#8A5E00' },
 };
 
 const STANDARD: Palette = {

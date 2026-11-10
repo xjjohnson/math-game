@@ -137,7 +137,7 @@ function Stat({ label, value }: { label: string; value: string }) {
 }
 
 const styles = StyleSheet.create({
-  highScore: { fontSize: fontSizes.button, fontWeight: '900', color: colors.accent, textAlign: 'center' },
+  highScore: { fontSize: fontSizes.button, fontWeight: '900', color: colors.accentStrong, textAlign: 'center' },
   rewards: { alignItems: 'center', gap: spacing.xs },
   confetti: { top: -40, bottom: undefined, height: 420 },
   starRow: { flexDirection: 'row', gap: spacing.md },

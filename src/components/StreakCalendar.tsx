@@ -74,7 +74,7 @@ const styles = StyleSheet.create({
     borderWidth: 3,
     borderColor: 'transparent',
   },
-  played: { backgroundColor: colors.accent },
+  played: { backgroundColor: colors.accentStrong },
   today: { borderColor: colors.primary },
   future: { opacity: 0.35 },
   date: { fontWeight: '700', color: colors.text, fontVariant: ['tabular-nums'] },

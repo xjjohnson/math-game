@@ -9,7 +9,7 @@ import { OPERATIONS, TIMER_OPTIONS } from '@/constants/difficulty';
 import { DEFAULT_GRADE, GRADE_LIST, GRADES } from '@/constants/grades';
 import { colors, fontSizes, radius, spacing, TAP_TARGET } from '@/constants/theme';
 import { useActiveProfile, useProfiles } from '@/store/profiles';
-import type { Difficulty, GameConfig, InputStyle, Level, Operation, TimerSetting } from '@/types';
+import type { Difficulty, GameChoices, GameConfig, InputStyle, Level, Operation, TimerSetting } from '@/types';
 import { QUESTIONS_PER_ROUND } from '@/utils/gameSession';
 import { randomSeed } from '@/utils/seededRandom';
 
@@ -29,19 +29,21 @@ export function ModePickerScreen() {
   const profile = useActiveProfile();
   const updateProfile = useProfiles((s) => s.updateProfile);
 
-  const [choice, setChoice] = useState<Choice>('add');
+  // Starts with whatever was picked last time, so "same again" is one tap on Start.
+  const last = profile?.lastGame;
+  const [choice, setChoice] = useState<Choice>(last?.choice ?? 'add');
   const [level, setLevel] = useState<Level>({
     grade: profile?.grade ?? DEFAULT_GRADE,
     difficulty: profile?.lastDifficulty ?? 'easy',
   });
   const { difficulty } = level;
-  const [timer, setTimer] = useState<TimerSetting>(null);
-  const [adaptive, setAdaptive] = useState(false);
-  const [tables, setTables] = useState<number[]>([2]);
-  const [includeDivision, setIncludeDivision] = useState(false);
-  const [wordProblems, setWordProblems] = useState(false);
-  const [showWork, setShowWork] = useState(false);
-  const [worksheet, setWorksheet] = useState(false);
+  const [timer, setTimer] = useState<TimerSetting>(last?.timer ?? null);
+  const [adaptive, setAdaptive] = useState(last?.adaptive ?? false);
+  const [tables, setTables] = useState<number[]>(last?.tables.length ? last.tables : [2]);
+  const [includeDivision, setIncludeDivision] = useState(last?.includeDivision ?? false);
+  const [wordProblems, setWordProblems] = useState(last?.wordProblems ?? false);
+  const [showWork, setShowWork] = useState(last?.showWork ?? false);
+  const [worksheet, setWorksheet] = useState(last?.worksheet ?? false);
   const [more, setMore] = useState(false);
 
   const isTables = choice === 'tables';
@@ -52,6 +54,19 @@ export function ModePickerScreen() {
     );
 
   const start = () => {
+    if (profile) {
+      const lastGame: GameChoices = {
+        choice,
+        tables,
+        includeDivision,
+        timer,
+        adaptive,
+        wordProblems,
+        showWork,
+        worksheet,
+      };
+      updateProfile(profile.id, { lastGame });
+    }
     const config: GameConfig = {
       mode: isTables
         ? { kind: 'tables', tables, includeDivision }
@@ -84,7 +99,18 @@ export function ModePickerScreen() {
   ].filter(Boolean) as string[];
 
   return (
-    <Screen title="Choose a game">
+    <Screen
+      title="Choose a game"
+      // Start stays on screen however many options are open.
+      footer={
+        <BigButton
+          label="Start"
+          color={colors.correct}
+          disabled={isTables && tables.length === 0}
+          onPress={start}
+        />
+      }
+    >
       <View style={styles.tiles}>
         {OPERATIONS.map((o) => (
           <Tile
@@ -240,13 +266,6 @@ export function ModePickerScreen() {
           )}
         </View>
       ) : null}
-
-      <BigButton
-        label="Start"
-        color={colors.correct}
-        disabled={isTables && tables.length === 0}
-        onPress={start}
-      />
     </Screen>
   );
 }

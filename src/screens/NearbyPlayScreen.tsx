@@ -650,7 +650,7 @@ function Match({
               label={p.id === me ? 'You' : `${stickerText(p.avatar)} ${p.name}`}
               value={match.correct[p.id] ?? 0}
               total={RACE_TARGET}
-              color={p.id === me ? palette.correct : colors.accent}
+              color={p.id === me ? palette.correct : colors.accentStrong}
               faded={match.left.includes(p.id)}
             />
           ))}
