@@ -1,7 +1,7 @@
 import { Pressable, StyleSheet, View, type ViewStyle } from 'react-native';
 
 import { PlayScape, SwingSet, Trampoline, TreeWithHouse } from '@/components/Backyard';
-import { Bob, Flicker, Rumble, Spin } from '@/components/Motion';
+import { Bob, Flicker, Rumble, Spin, Twinkle } from '@/components/Motion';
 import type { Appliance } from '@/constants/room';
 import { INK } from '@/constants/artStyle';
 
@@ -122,8 +122,18 @@ function Tv({ w, h, on }: Drawn) {
           )}
         </View>
       </View>
+      <PowerLight on={on} seed="tv" style={at(w - pad * 1.9, h * 0.88 - pad * 0.85, pad * 0.7, pad * 0.7)} />
       <View style={[styles.tvStand, at(w * 0.42, h * 0.86, w * 0.16, h * 0.14)]} />
     </>
+  );
+}
+
+/** A little power light that blinks: slow red while off (asleep), quick green while on. */
+function PowerLight({ on, seed, style }: { on: boolean; seed: string; style: ViewStyle }) {
+  return (
+    <Twinkle seed={`${seed}${on ? 'on' : 'off'}`} style={style}>
+      <View style={{ flex: 1, borderRadius: 99, backgroundColor: on ? '#69F0AE' : '#FF5252' }} />
+    </Twinkle>
   );
 }
 
@@ -391,6 +401,7 @@ function Computer({ w, h, on }: Drawn) {
           )}
         </View>
       </View>
+      <PowerLight on={on} seed="pc" style={at(w * 0.86, screenH * 0.86, w * 0.04, w * 0.04)} />
       <View style={[styles.tvStand, at(w * 0.42, screenH - 2, w * 0.16, h * 0.14)]} />
       <View style={[styles.keyboard, at(w * 0.1, h * 0.86, w * 0.8, h * 0.12)]} />
     </>

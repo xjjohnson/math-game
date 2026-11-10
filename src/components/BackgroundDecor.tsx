@@ -1,6 +1,7 @@
 import { StyleSheet, View } from 'react-native';
 
 import { Text } from '@/components/AppText';
+import { DriftLoop } from '@/components/Motion';
 
 interface Props {
   decor: string[];
@@ -12,7 +13,8 @@ const TILT = [-14, 8, -4, 12, -10, 4];
 
 /**
  * Faint pictures scattered behind a screen for the themed backgrounds. Fixed
- * spots (no randomness) so the pattern doesn't jump between screens.
+ * spots (no randomness) so the pattern doesn't jump between screens; the whole
+ * field drifts slowly upward and wraps around.
  */
 export function BackgroundDecor({ decor }: Props) {
   if (decor.length === 0) return null;
@@ -45,7 +47,8 @@ export function BackgroundDecor({ decor }: Props) {
       accessibilityElementsHidden
       importantForAccessibility="no-hide-descendants"
     >
-      {spots}
+      {/* Drifts up very slowly, so menus feel alive without pulling the eye. */}
+      <DriftLoop>{spots}</DriftLoop>
     </View>
   );
 }

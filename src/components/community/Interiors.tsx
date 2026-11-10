@@ -2,7 +2,7 @@ import { Fragment, useState, type ReactNode } from 'react';
 import { Pressable, StyleSheet, View, type ViewStyle } from 'react-native';
 
 import { Text } from '@/components/AppText';
-import { Rumble, Spin, Swing } from '@/components/Motion';
+import { Belt, Rumble, Spin, Swing } from '@/components/Motion';
 import { Chalkboard } from '@/components/community/Chalkboard';
 import { PaintingView } from '@/components/PaintingView';
 import { useEaselPicture } from '@/services/easel';
@@ -309,6 +309,12 @@ function Shop({ w, h, on, tap }: Part) {
 
       {/* Counter and till: tap the till to open it */}
       <View style={[edge, rect(w, h, SHOP.counter.x0, SHOP.counter.x1, SHOP.counter.top, FLOOR), { backgroundColor: WOOD, borderRadius: 6 }]} />
+      {/* The checkout belt, always rolling toward the till */}
+      <Belt
+        width={(SHOP.counter.x1 - SHOP.counter.x0 - 0.016) * w}
+        height={Math.max(10, h * 0.03)}
+        style={{ position: 'absolute', left: (SHOP.counter.x0 + 0.008) * w, top: SHOP.counter.top * h + 5 }}
+      />
       <Pressable
         onPress={() => tap('till')}
         accessibilityRole="button"
