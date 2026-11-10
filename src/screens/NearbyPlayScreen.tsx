@@ -270,7 +270,7 @@ export function NearbyPlayScreen() {
 
   if (!Nearby) {
     return (
-      <Screen title="Several phones">
+      <Screen>
         <Text style={styles.body}>Playing on several phones needs the Math Game app on Android.</Text>
       </Screen>
     );
@@ -400,7 +400,7 @@ export function NearbyPlayScreen() {
   const friends = roster.length - 1;
 
   return (
-    <Screen title="Several phones">
+    <Screen>
       {notice ? (
         <Text style={styles.notice} accessibilityLiveRegion="polite">
           {notice}
@@ -641,7 +641,7 @@ function Match({
   const waitingForCall = setup.mode === 'race' && match.correct[me] >= RACE_TARGET;
 
   return (
-    <Screen>
+    <Screen center>
       {setup.mode === 'race' ? (
         <View style={styles.bars}>
           {players.map((p) => (

@@ -31,7 +31,7 @@ export function SettingsScreen() {
   const settings = useSettings();
 
   return (
-    <Screen title="Settings">
+    <Screen>
       {TOGGLES.map(({ key, label }) => (
         <View key={key} style={styles.row}>
           <Text style={styles.label}>{label}</Text>

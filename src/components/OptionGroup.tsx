@@ -1,4 +1,4 @@
-import { StyleSheet, View } from 'react-native';
+import { StyleSheet, useWindowDimensions, View } from 'react-native';
 
 import { Text } from '@/components/AppText';
 import { BigButton } from '@/components/BigButton';
@@ -21,6 +21,8 @@ interface Props<T> {
 
 /** A labelled row of big buttons where exactly one is selected. */
 export function OptionGroup<T>({ label, options, value, onChange, compact }: Props<T>) {
+  // Two big buttons side by side don't fit labels like "🎨 Backgrounds" on a narrow phone.
+  const narrow = useWindowDimensions().width < 400;
   return (
     <View style={styles.group} accessibilityRole="radiogroup" accessibilityLabel={label}>
       <Text style={styles.label}>{label}</Text>
@@ -33,6 +35,7 @@ export function OptionGroup<T>({ label, options, value, onChange, compact }: Pro
             outline={o.value !== value}
             selected={o.value === value}
             onPress={() => onChange(o.value)}
+            small={narrow || compact}
             style={[styles.option, compact && styles.compact]}
           />
         ))}

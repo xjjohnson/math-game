@@ -9,9 +9,9 @@ import { Nearby } from '../../modules/math-nearby';
 
 export function MultiplayerScreen() {
   return (
-    <Screen title="Play with a friend">
+    <Screen>
       <BigButton
-        label="📱📱 Several phones"
+        label={Nearby ? '📱📱 Several phones' : '📱📱 Several phones (Android only)'}
         color={colors.primary}
         disabled={!Nearby}
         accessibilityHint="Race, or team up against waves or a monster, with up to 7 friends on their own phones nearby."

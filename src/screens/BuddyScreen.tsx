@@ -168,7 +168,7 @@ export function BuddyScreen() {
 
   if (!profile) {
     return (
-      <Screen title="My buddy">
+      <Screen>
         <Text style={styles.line}>Pick a player first.</Text>
       </Screen>
     );
@@ -178,7 +178,7 @@ export function BuddyScreen() {
 
   if (owned.length === 0) {
     return (
-      <Screen title="My buddy">
+      <Screen>
         <Text style={styles.big}>🐾</Text>
         <Text style={styles.line}>
           You don't have a buddy yet. Buddies cheer you on while you play, and you can pet them,
@@ -186,7 +186,7 @@ export function BuddyScreen() {
         </Text>
         <BigButton
           label="🛍️ Find a buddy in the Shop"
-          color={colors.operations.subtract}
+          color={colors.primary}
           onPress={() => router.push('/shop')}
         />
       </Screen>

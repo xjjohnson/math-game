@@ -19,7 +19,7 @@ export function ProgressScreen() {
   const profile = useActiveProfile();
   if (!profile) {
     return (
-      <Screen title="My progress" tab="me">
+      <Screen tab="me">
         <Text style={styles.empty}>Pick a player first.</Text>
       </Screen>
     );

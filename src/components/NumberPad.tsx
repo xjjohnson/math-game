@@ -3,6 +3,7 @@ import { Platform, Pressable, StyleSheet, View } from 'react-native';
 
 import { Text } from '@/components/AppText';
 import { colors, fontSizes, radius, spacing, TAP_TARGET } from '@/constants/theme';
+import { useBigScreen } from '@/hooks/useBigScreen';
 
 interface Props {
   onSubmit: (value: number) => void;
@@ -21,6 +22,7 @@ export function NumberPad({
   disabled = false,
 }: Props) {
   const [entry, setEntry] = useState('');
+  const big = useBigScreen();
 
   const press = (key: string) => {
     if (disabled) return;
@@ -76,11 +78,12 @@ export function NumberPad({
               accessibilityLabel={key === '⌫' ? 'Delete' : key === '±' ? 'Minus' : key}
               style={({ pressed }) => [
                 styles.key,
+                big && styles.bigKey,
                 hidden && styles.hidden,
                 pressed && styles.pressed,
               ]}
             >
-              <Text style={styles.keyText}>{key === '±' ? '−' : key}</Text>
+              <Text style={[styles.keyText, big && styles.bigKeyText]}>{key === '±' ? '−' : key}</Text>
             </Pressable>
           );
         })}
@@ -92,12 +95,13 @@ export function NumberPad({
         accessibilityLabel="Check answer"
         style={({ pressed }) => [
           styles.key,
+          big && styles.bigKey,
           styles.check,
           (disabled || entry === '' || entry === '-') && styles.checkDisabled,
           pressed && styles.pressed,
         ]}
       >
-        <Text style={[styles.keyText, styles.checkText]}>Check</Text>
+        <Text style={[styles.keyText, big && styles.bigKeyText, styles.checkText]}>Check</Text>
       </Pressable>
     </View>
   );
@@ -134,6 +138,9 @@ const styles = StyleSheet.create({
   checkDisabled: { backgroundColor: colors.disabled },
   checkText: { color: colors.primaryText },
   compactKey: { minHeight: 56 },
+  // Tablets: taller keys, so the pad fills the space under the card.
+  bigKey: { minHeight: 96 },
+  bigKeyText: { fontSize: 40 },
   compactCheck: { flexBasis: '30%', flexGrow: 1 },
   sheetRow: { flexDirection: 'row', gap: spacing.xs },
   sheetKey: { flexBasis: 0, minHeight: 56 },
@@ -154,6 +161,7 @@ const COLUMN_KEYS = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '⌫', '0', 'c
  * the whole problem fits on a phone without scrolling.
  */
 export function ColumnPad({ onKey, onCheck, canCheck, disabled = false }: ColumnPadProps) {
+  const big = useBigScreen();
   useEffect(() => {
     if (Platform.OS !== 'web' || disabled) return;
     const onKeyDown = (e: KeyboardEvent) => {
@@ -184,13 +192,14 @@ export function ColumnPad({ onKey, onCheck, canCheck, disabled = false }: Column
             style={({ pressed }) => [
               styles.key,
               styles.compactKey,
+              big && styles.bigKey,
               check && styles.check,
               check && styles.compactCheck,
               check && !canCheck && styles.checkDisabled,
               pressed && styles.pressed,
             ]}
           >
-            <Text style={[styles.keyText, check && styles.checkText]}>{check ? '✓' : key}</Text>
+            <Text style={[styles.keyText, big && styles.bigKeyText, check && styles.checkText]}>{check ? '✓' : key}</Text>
           </Pressable>
         );
       })}

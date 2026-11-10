@@ -27,7 +27,7 @@ export function ProfilesScreen() {
   };
 
   return (
-    <Screen title="Players">
+    <Screen>
       {profiles.map((p) => {
         const active = p.id === activeProfileId;
         return (

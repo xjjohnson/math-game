@@ -3,6 +3,7 @@ import { Pressable, StyleSheet, View } from 'react-native';
 import { Text } from '@/components/AppText';
 import { PencilDigit } from '@/components/PencilDigit';
 import { colors, radius } from '@/constants/theme';
+import { useBigScreen } from '@/hooks/useBigScreen';
 import type { Problem } from '@/types';
 import type { ColumnEntry, ColumnLayout, ColumnRow } from '@/utils/columnEntry';
 
@@ -32,6 +33,8 @@ interface Props {
 /** Bigger boxes when there are few columns; all of them fit a phone either way. */
 const cellSize = (columns: number) => (columns <= 4 ? 52 : columns <= 5 ? 46 : 40);
 const PENCIL = '#55556B';
+/** Carry/borrow boxes are at least 44 px tall so small fingers can hit them. */
+const CARRY_BOX = 44;
 
 /**
  * A problem written in columns, like on paper: carry boxes on top, the two
@@ -53,7 +56,8 @@ export function ColumnWork({
   onSelect,
   onToggleSign,
 }: Props) {
-  const cell = cellSize(layout.width);
+  // Tablets get bigger digits and boxes, so the card fills the screen.
+  const cell = Math.round(cellSize(layout.width) * (useBigScreen() ? 1.35 : 1));
   const rowHeight = Math.round(cell * 1.05);
   const font = { fontSize: Math.round(cell * 0.82), lineHeight: rowHeight, color: ink };
   const pencil = { fontSize: Math.round(cell * 0.95), lineHeight: rowHeight, color: ink };
@@ -64,7 +68,7 @@ export function ColumnWork({
   const typing = entry !== null && !reveal;
   const subtract = problem.operation === 'subtract';
   // How far a carry travels: from the answer box one column right, up past both numbers.
-  const carryFrom = { x: cell, y: rowHeight * 2 + 14 + box.height / 2 + 6 };
+  const carryFrom = { x: cell, y: rowHeight * 2 + 14 + box.height / 2 + CARRY_BOX / 2 - 10 };
 
   const digitRow = (digits: (string | null)[], lead: string | null, struck?: (i: number) => boolean) => (
     <View style={styles.row}>
@@ -84,7 +88,7 @@ export function ColumnWork({
     <View style={styles.wrap}>
       {entry ? (
         <View style={styles.row}>
-          <Text style={[styles.carryHint, { width: cell }]}>{subtract ? 'borrow' : 'carry'}</Text>
+          <Text style={[styles.carryHint, { width: cell }]} numberOfLines={1} adjustsFontSizeToFit>{subtract ? 'borrow' : 'carry'}</Text>
           {cols.map((i) => {
             const selected = typing && selectable && entry.cursor.row === 'carry' && entry.cursor.col === i;
             const mark = entry.carries[i];
@@ -98,7 +102,7 @@ export function ColumnWork({
                 accessibilityLabel={`Work box above the ${placeName(layout.width - 1 - i)}${mark ? `, ${mark}` : ''}`}
                 style={[styles.carryCell, { width: cell }]}
               >
-                <View style={[styles.carryBox, selectable && styles.carryBoxDashed, selected && styles.selected]}>
+                <View style={[styles.carryBox, { minWidth: Math.min(cell - 4, CARRY_BOX) }, selectable && styles.carryBoxDashed, selected && styles.selected]}>
                   {mark ? (
                     <PencilDigit
                       key={mark}
@@ -177,18 +181,17 @@ const styles = StyleSheet.create({
   row: { flexDirection: 'row', alignItems: 'center' },
   digit: { fontWeight: '900', textAlign: 'center', fontVariant: ['tabular-nums'] },
   struck: { textDecorationLine: 'line-through', opacity: 0.45 },
-  carryHint: { fontSize: 11, fontWeight: '700', color: colors.textMuted, textAlign: 'center' },
+  carryHint: { fontSize: 14, fontWeight: '700', color: colors.textMuted, textAlign: 'center' },
   carryCell: { alignItems: 'center' },
   carryBox: {
-    minWidth: 32,
-    height: 32,
+    height: CARRY_BOX,
     paddingHorizontal: 2,
     borderRadius: 8,
     alignItems: 'center',
     justifyContent: 'center',
   },
   carryBoxDashed: { borderWidth: 2, borderStyle: 'dashed', borderColor: colors.disabled },
-  carryText: { fontSize: 24, lineHeight: 30, color: PENCIL },
+  carryText: { fontSize: 26, lineHeight: 32, color: PENCIL },
   line: { height: 5, borderRadius: 3, marginVertical: 4 },
   answerBox: {
     borderWidth: 3,

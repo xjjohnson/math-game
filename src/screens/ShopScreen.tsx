@@ -21,7 +21,7 @@ export function ShopScreen() {
 
   if (!profile) {
     return (
-      <Screen title="Shop" tab="shop">
+      <Screen tab="shop">
         <Text style={styles.message}>Pick a player first.</Text>
       </Screen>
     );
@@ -50,7 +50,7 @@ export function ShopScreen() {
   };
 
   return (
-    <Screen title="Shop" tab="shop">
+    <Screen tab="shop">
       <Text style={styles.balance}>🪙 {profile.coins} coins</Text>
       <OptionGroup label="Shop for" value={category} onChange={setCategory} options={SHOP_CATEGORIES} />
       {message ? (
@@ -107,7 +107,7 @@ export function ShopScreen() {
               key={item.id}
               onPress={() => choose(item)}
               accessibilityRole="button"
-              accessibilityLabel={`${item.name}, ${status}`}
+              accessibilityLabel={`${item.name}, ${status}${!owned && !affordable ? `, need ${item.price - profile.coins} more coins` : ''}`}
               accessibilityState={{ selected: using, disabled: !owned && !affordable }}
               style={({ pressed }) => [
                 styles.item,
@@ -118,7 +118,10 @@ export function ShopScreen() {
             >
               <Preview item={item} />
               <Text style={styles.name}>{item.name}</Text>
-              <Text style={[styles.status, using && styles.statusUsing]}>{status}</Text>
+              <Text style={[styles.status, using && styles.statusUsing, !owned && styles.price]}>{status}</Text>
+              {!owned && !affordable ? (
+                <Text style={styles.need}>Need {item.price - profile.coins} more</Text>
+              ) : null}
             </Pressable>
           );
         })}
@@ -193,7 +196,8 @@ const styles = StyleSheet.create({
     padding: spacing.md,
   },
   using: { borderColor: colors.correct, borderWidth: 5 },
-  locked: { opacity: 0.55 },
+  // Not enough coins yet: still clear to see, just marked as "save up for it".
+  locked: { borderStyle: 'dashed', borderColor: colors.disabled, backgroundColor: '#FBF9F3' },
   pressed: { transform: [{ scale: 0.97 }] },
   swatch: {
     width: 72,
@@ -209,4 +213,6 @@ const styles = StyleSheet.create({
   name: { fontSize: fontSizes.body, fontWeight: '800', color: colors.text },
   status: { fontSize: 16, fontWeight: '700', color: colors.textMuted },
   statusUsing: { color: colors.correct },
+  price: { fontSize: fontSizes.body, fontWeight: '900', color: colors.text },
+  need: { fontSize: 15, fontWeight: '700', color: colors.accentStrong },
 });

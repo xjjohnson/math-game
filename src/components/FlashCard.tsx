@@ -7,6 +7,7 @@ import { OPERATIONS } from '@/constants/difficulty';
 import type { CardStyle } from '@/constants/shop';
 import { colors, fontSizes, radius, spacing } from '@/constants/theme';
 import { usePalette } from '@/hooks/useAccessibility';
+import { useBigScreen } from '@/hooks/useBigScreen';
 import type { Problem } from '@/types';
 import { columnLayout, type ColumnEntry, type ColumnLayout, type ColumnRow } from '@/utils/columnEntry';
 import { spokenProblem } from '@/utils/feedback';
@@ -52,6 +53,7 @@ export interface ColumnProps {
 
 export function FlashCard({ problem, reveal = false, column, cardStyle }: Props) {
   const palette = usePalette();
+  const big = useBigScreen();
   const look = cardStyle ?? {
     background: colors.surface,
     text: colors.text,
@@ -76,7 +78,7 @@ export function FlashCard({ problem, reveal = false, column, cardStyle }: Props)
       {look.corners ? <Corners pair={look.corners} /> : null}
       {problem.story ? (
         <>
-          <Text style={[styles.story, ink]}>{problem.story}</Text>
+          <Text style={[styles.story, big && styles.storyBig, ink]}>{problem.story}</Text>
           <Text style={[styles.storyAnswer, { color: palette.correct }, !reveal && styles.hidden]}>
             {problem.prompt} = {problem.answer}
           </Text>
@@ -100,10 +102,10 @@ export function FlashCard({ problem, reveal = false, column, cardStyle }: Props)
         />
       ) : (
         <>
-          <Text style={[styles.prompt, ink]} adjustsFontSizeToFit numberOfLines={1}>
+          <Text style={[styles.prompt, big && styles.promptBig, ink]} adjustsFontSizeToFit numberOfLines={1}>
             {problem.prompt}
           </Text>
-          <Text style={[styles.answer, { color: palette.correct }, !reveal && styles.hidden]}>
+          <Text style={[styles.answer, big && styles.answerBig, { color: palette.correct }, !reveal && styles.hidden]}>
             = {problem.answer}
           </Text>
         </>
@@ -137,6 +139,9 @@ const styles = StyleSheet.create({
   prompt: { fontSize: fontSizes.problem, fontWeight: '900' },
   answer: { fontSize: fontSizes.title, fontWeight: '800' },
   hidden: { opacity: 0 },
+  promptBig: { fontSize: 96 },
+  answerBig: { fontSize: 52 },
+  storyBig: { fontSize: 32, lineHeight: 44 },
   story: {
     fontSize: 24,
     fontWeight: '700',

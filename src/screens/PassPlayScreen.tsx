@@ -83,7 +83,7 @@ function Setup({ team, onStart }: { team: boolean; onStart: (state: PassState) =
     setSeats((s) => (s.includes(id) ? s.filter((x) => x !== id) : s.length < MAX_PASS_PLAYERS ? [...s, id] : s));
 
   return (
-    <Screen title={team ? 'Team up' : 'Take turns'}>
+    <Screen>
       {team ? (
         <Text style={styles.note}>
           Take turns answering 10 each. Every right answer hits the monster, so beat it together!
@@ -245,7 +245,7 @@ function Game({ start, onAgain }: { start: PassState; onAgain: () => void }) {
 
   const owner = profiles.find((p) => p.id === current.profileId);
   return (
-    <Screen>
+    <Screen center>
       <View style={styles.statusRow}>
         <Text style={styles.status}>
           {stickerText(current.avatar)} {current.name}

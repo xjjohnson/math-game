@@ -134,7 +134,7 @@ function Round({ config, onPlayAgain }: { config: GameConfig; onPlayAgain: () =>
   const typingColumns = isStacked(state.problem) && (inputStyle !== 'choices' || !!config.showWork);
 
   return (
-    <Screen compact>
+    <Screen compact center>
       <View style={styles.statusRow}>
         <Text style={styles.status}>
           {state.index + 1} / {config.questionCount}
