@@ -40,7 +40,7 @@ export function Screen({ title, children, compact = false, noHeader = false, tab
           : [...(tab ? [] : ['bottom' as const]), 'left', 'right']
       }
     >
-      <BackgroundDecor decor={backgroundDecor(profile)} />
+      <BackgroundDecor id={profile?.equipped.background} color={background} decor={backgroundDecor(profile)} />
       <ScrollView contentContainerStyle={[styles.content, compact && styles.compact, wide && styles.wide, center && styles.center]}>
         {title ? <Text style={styles.title} accessibilityRole="header">{title}</Text> : null}
         {children}
