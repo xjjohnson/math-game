@@ -25,7 +25,10 @@ stops when Animations is off in Settings or the phone's reduce-motion setting is
 7. **One body everywhere.** People and buddies are drawn with `Figure` (from `figureFor` in
    `src/utils/figures.ts`): your own buddies wear what they wear at home; a friend's come in their
    own colors and starting clothes.
-8. **Celebrations are short.** `Confetti`, `FloatUp` and `PopIn` play once and get out of the way.
+8. **Dressing up poofs.** A piece of clothing put on (tapped in Dress up or dropped on someone) pops on
+   in a little cloud (`Poof`) and the wearer stretches up (`bounceKind="pop"`); the piece it replaced
+   falls off, bounces on the floor and fades (`Tumble`), since it went back to the wardrobe.
+9. **Celebrations are short.** `Confetti`, `FloatUp` and `PopIn` play once and get out of the way.
 
 ## Where it's used
 

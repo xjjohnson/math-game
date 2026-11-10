@@ -1,6 +1,6 @@
 import { WEARABLES } from '@/constants/wardrobe';
 import { makeProfile } from '@/test/fixtures';
-import { lookOf, moveWearable, outfitOf, setLook, takeOff, undress, wear } from '@/utils/wardrobe';
+import { lookOf, moveWearable, outfitChange, outfitOf, setLook, takeOff, undress, wear } from '@/utils/wardrobe';
 
 describe('buddy clothes', () => {
   it('buys a piece once, then puts it on and takes it off for free', () => {
@@ -84,5 +84,17 @@ describe('moving clothes between buddies', () => {
     const off = takeOff(makeProfile(), 'buddy-dad', 'jeans');
     expect(outfitOf(off, 'buddy-dad')).toEqual({ shirt: 'sweaterTan' });
     expect(off.wardrobe).toContain('jeans');
+  });
+});
+
+describe('outfitChange', () => {
+  it('tells what popped on and what fell off', () => {
+    expect(outfitChange({}, { hat: 'cap' })).toEqual({ on: [{ slot: 'hat', id: 'cap' }], off: [] });
+    expect(outfitChange({ hat: 'cap', feet: 'boots' }, { hat: 'crown', feet: 'boots' })).toEqual({
+      on: [{ slot: 'hat', id: 'crown' }],
+      off: [{ slot: 'hat', id: 'cap' }],
+    });
+    expect(outfitChange({ neck: 'scarf' }, {})).toEqual({ on: [], off: [{ slot: 'neck', id: 'scarf' }] });
+    expect(outfitChange({ hat: 'cap' }, { hat: 'cap' })).toEqual({ on: [], off: [] });
   });
 });

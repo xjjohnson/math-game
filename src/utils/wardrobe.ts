@@ -102,3 +102,26 @@ export function takeOff(profile: Profile, buddyId: string, wearableId: string): 
   const wardrobe = profile.wardrobe.includes(item.id) ? profile.wardrobe : [...profile.wardrobe, item.id];
   return { ...profile, wardrobe, outfits: { ...profile.outfits, [buddyId]: outfit } };
 }
+
+export type OutfitSlot = keyof Outfit;
+
+/**
+ * What changed between two outfits: pieces put on (new in a spot, or swapped in) and pieces
+ * that came off (taken off, or swapped out), for the dress-up poof and the old piece falling.
+ */
+export function outfitChange(before: Outfit, after: Outfit): { on: { slot: OutfitSlot; id: string }[]; off: { slot: OutfitSlot; id: string }[] } {
+  const on: { slot: OutfitSlot; id: string }[] = [];
+  const off: { slot: OutfitSlot; id: string }[] = [];
+  const slots = new Set([...Object.keys(before), ...Object.keys(after)] as OutfitSlot[]);
+  for (const slot of slots) {
+    const was = before[slot];
+    const now = after[slot];
+    if (was === now) continue;
+    if (now) on.push({ slot, id: now });
+    if (was) off.push({ slot, id: was });
+  }
+  return { on, off };
+}
+
+/** How far down a buddy each spot is worn, as a share of its height from the top of its box. */
+export const SLOT_HEIGHT: Record<OutfitSlot, number> = { hat: 0.14, face: 0.3, neck: 0.48, shirt: 0.6, legs: 0.78, feet: 0.93 };

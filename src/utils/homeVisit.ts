@@ -57,6 +57,7 @@ export function homeBuddiesOf(profile: Profile): HomeBuddy[] {
         ...body,
         dressed: dressedOf(profile, id),
         person: personOf(profile, id),
+        outfit: outfitOf(profile, id),
       },
     ];
   });
