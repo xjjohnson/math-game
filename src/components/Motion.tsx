@@ -13,6 +13,7 @@ import Animated, {
   type SharedValue,
 } from 'react-native-reanimated';
 
+import { colors } from '@/constants/theme';
 import { useMotion } from '@/hooks/useAccessibility';
 import { dangleTilt, fallMs } from '@/utils/motion';
 
@@ -600,6 +601,83 @@ export function Busy({ children, active, style }: { children: ReactNode; active:
   return <Animated.View style={[{ transformOrigin: 'bottom' }, style, look]}>{children}</Animated.View>;
 }
 
+/**
+ * Springs a panel in from off to one side (`from`) when it appears, overshooting a touch and settling,
+ * like a drawer sliding out. Remount with a new `key` to play it again (a different tab). Still when
+ * motion is off.
+ */
+export function SlideIn({
+  children,
+  from = 'bottom',
+  distance = 80,
+  delay = 0,
+  style,
+}: {
+  children: ReactNode;
+  from?: 'bottom' | 'left' | 'right';
+  distance?: number;
+  delay?: number;
+  style?: StyleProp<ViewStyle>;
+}) {
+  const { animate } = useMotion();
+  const t = useSharedValue(animate ? 0 : 1);
+  useEffect(() => {
+    if (animate) t.value = withDelay(delay, withSpring(1, PANEL));
+    // Only on mount.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+  const look = useAnimatedStyle(() => {
+    const off = (1 - t.value) * distance;
+    return {
+      opacity: Math.min(1, t.value * 2.5),
+      transform: from === 'bottom' ? [{ translateY: off }] : [{ translateX: from === 'left' ? -off : off }],
+    };
+  });
+  return <Animated.View style={[style, look]}>{children}</Animated.View>;
+}
+
+/** A quick spring with a little overshoot, for panels sliding in. */
+const PANEL = { damping: 13, stiffness: 190, mass: 0.9 };
+
+/**
+ * A choice that shows it's picked: it grows a little with a springy bounce and a colored ring
+ * pops in around it. Shrinks back and the ring fades when something else is picked.
+ */
+export function Picked({
+  on,
+  children,
+  ring = colors.primary,
+  radius = 16,
+  grow = 1.1,
+  style,
+}: {
+  on: boolean;
+  children: ReactNode;
+  /** The ring's color. */
+  ring?: string;
+  /** The ring's corner rounding, to match the choice's shape. */
+  radius?: number;
+  grow?: number;
+  style?: StyleProp<ViewStyle>;
+}) {
+  const { animate } = useMotion();
+  const t = useSharedValue(on ? 1 : 0);
+  useEffect(() => {
+    t.value = animate ? withSpring(on ? 1 : 0, { damping: 9, stiffness: 260 }) : on ? 1 : 0;
+  }, [on, animate, t]);
+  const look = useAnimatedStyle(() => ({ transform: [{ scale: 1 + (grow - 1) * t.value }] }));
+  const ringLook = useAnimatedStyle(() => ({
+    opacity: Math.min(1, Math.max(0, t.value)),
+    transform: [{ scale: 1.25 - 0.25 * t.value }],
+  }));
+  return (
+    <Animated.View style={[style, look]}>
+      {children}
+      <Animated.View pointerEvents="none" style={[styles.ring, { borderColor: ring, borderRadius: radius + 5 }, ringLook]} />
+    </Animated.View>
+  );
+}
+
 /** Little clouds that burst out from a spot and fade: the poof of clothes popping on. */
 export function Poof({ size, style }: { size: number; style?: StyleProp<ViewStyle> }) {
   const { animate } = useMotion();
@@ -740,6 +818,7 @@ const styles = StyleSheet.create({
   // A held figure hangs from the top, where the finger has it.
   hang: { width: '100%', height: '100%', transformOrigin: 'top', alignItems: 'center', justifyContent: 'flex-end' },
   cover: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, overflow: 'hidden' },
+  ring: { position: 'absolute', left: -5, top: -5, right: -5, bottom: -5, borderWidth: 3 },
   puff: { position: 'absolute', left: 0, top: 0, backgroundColor: '#FFFFFF', borderWidth: 2, borderColor: '#E4E0F0' },
   bit: { position: 'absolute', top: 0, width: 8, borderRadius: 2 },
 });

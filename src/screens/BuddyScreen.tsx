@@ -8,7 +8,8 @@ import { BigButton } from '@/components/BigButton';
 import { BuddyRoom } from '@/components/BuddyRoom';
 import { ChoiceButtons } from '@/components/ChoiceButtons';
 import { Furniture } from '@/components/Furniture';
-import { Confetti } from '@/components/Motion';
+import { Confetti, Picked, SlideIn } from '@/components/Motion';
+import { PopIn } from '@/components/PopIn';
 import { Screen } from '@/components/Screen';
 import { Sticker } from '@/components/Sticker';
 import { stickerText } from '@/constants/art';
@@ -490,7 +491,7 @@ export function BuddyScreen() {
         </View>
 
         {game || tab ? (
-          <View style={styles.drawer}>
+          <SlideIn key={game ? 'game' : tab ?? ''} style={styles.drawer}>
             {game ? (
               <View style={styles.game}>
                 <Text style={styles.hint}>
@@ -614,7 +615,7 @@ export function BuddyScreen() {
                 }}
               />
             ) : null}
-          </View>
+          </SlideIn>
         ) : null}
       </View>
 
@@ -632,7 +633,9 @@ export function BuddyScreen() {
               accessibilityState={{ selected: on, disabled: !!game }}
               style={({ pressed }) => [styles.tab, on && styles.tabOn, pressed && styles.pressed]}
             >
-              <Text style={styles.tabEmoji}>{t.emoji}</Text>
+              <Picked on={on} ring="transparent" grow={1.25}>
+                <Text style={styles.tabEmoji}>{t.emoji}</Text>
+              </Picked>
               <Text style={[styles.tabName, on && styles.tabNameOn]} numberOfLines={1}>
                 {t.name}
               </Text>
@@ -760,18 +763,29 @@ function DressDrawer({ profile, name, buddyId, onWear, onUndress, onLook, onTake
     ...(look ? LOOK_TABS : []),
   ];
   const tab = tabs.some((t) => t.id === picked) ? picked : 'shirt';
-  const swatch = (key: string, label: string, selected: boolean, onPress: () => void, child: ReactNode) => (
-    <Pressable
-      key={key}
-      onPress={onPress}
-      accessibilityRole="button"
-      accessibilityLabel={label}
-      accessibilityState={{ selected }}
-      style={({ pressed }) => [styles.thing, selected && styles.using, pressed && styles.pressed]}
-    >
-      {child}
-    </Pressable>
+  let n = 0;
+  /** One choice in the row: pops in a moment after the one before it, and grows with a ring when picked. */
+  const tile = (key: string, selected: boolean, child: ReactNode) => (
+    <PopIn key={`${tab}:${key}`} delay={Math.min(n++, 8) * 35} damping={11}>
+      <Picked on={selected} ring={colors.correct} radius={radius.md} grow={1.06}>
+        {child}
+      </Picked>
+    </PopIn>
   );
+  const swatch = (key: string, label: string, selected: boolean, onPress: () => void, child: ReactNode) =>
+    tile(
+      key,
+      selected,
+      <Pressable
+        onPress={onPress}
+        accessibilityRole="button"
+        accessibilityLabel={label}
+        accessibilityState={{ selected }}
+        style={({ pressed }) => [styles.thing, selected && styles.using, pressed && styles.pressed]}
+      >
+        {child}
+      </Pressable>,
+    );
   let row: ReactNode;
   if (look && tab === 'hair') {
     row = HAIR_STYLES.map((h) =>
@@ -803,9 +817,10 @@ function DressDrawer({ profile, name, buddyId, onWear, onUndress, onLook, onTake
       ...WEARABLES.filter((w) => w.slot === tab).map((w) => {
         const free = canWear(profile, buddyId, w.id);
         const on = outfit[w.slot] === w.id;
-        return (
+        return tile(
+          w.id,
+          on,
           <Pressable
-            key={w.id}
             onPress={() => onWear(w.id)}
             accessibilityRole="button"
             accessibilityLabel={`${w.name}${free ? '' : `, ${w.price} coins`}${on ? ', wearing' : ''}`}
@@ -825,19 +840,22 @@ function DressDrawer({ profile, name, buddyId, onWear, onUndress, onLook, onTake
               <Text style={styles.thingEmoji}>{w.emoji}</Text>
             )}
             <Text style={styles.thingPrice}>{on ? '✓ On' : free ? 'Yours' : `🪙 ${w.price}`}</Text>
-          </Pressable>
+          </Pressable>,
         );
       }),
-      <Pressable
-        key="alloff"
-        onPress={onUndress}
-        accessibilityRole="button"
-        accessibilityLabel={`Take everything off ${name}`}
-        style={({ pressed }) => [styles.thing, pressed && styles.pressed]}
-      >
-        <Text style={styles.thingEmoji}>🧺</Text>
-        <Text style={styles.thingPrice}>All off</Text>
-      </Pressable>,
+      tile(
+        'alloff',
+        false,
+        <Pressable
+          onPress={onUndress}
+          accessibilityRole="button"
+          accessibilityLabel={`Take everything off ${name}`}
+          style={({ pressed }) => [styles.thing, pressed && styles.pressed]}
+        >
+          <Text style={styles.thingEmoji}>🧺</Text>
+          <Text style={styles.thingPrice}>All off</Text>
+        </Pressable>,
+      ),
     ];
   }
   const lookTab = LOOK_TABS.some((t) => t.id === tab);
@@ -1043,13 +1061,14 @@ function BuddiesDrawer({ profile, buddies, isHome, using, onPick, onHome }: Budd
     <>
       <Text style={styles.hint}>Tap a buddy to be with it. Invite others over, or send them for a nap.</Text>
       <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chips}>
-        {buddies.map((item) => {
+        {buddies.map((item, i) => {
           if (item.category !== 'companion') return null;
           const withYou = item.id === using;
           const here = isHome(item.id);
           const level = buddyLevel(buddyHearts(profile, item.id));
           return (
-            <View key={item.id} style={styles.buddyCol}>
+            <PopIn key={item.id} delay={Math.min(i, 8) * 40} damping={11} style={styles.buddyCol}>
+              <Picked on={withYou} ring={colors.correct} radius={radius.lg}>
               <Pressable
                 onPress={() => onPick(item.id)}
                 accessibilityRole="button"
@@ -1060,6 +1079,7 @@ function BuddiesDrawer({ profile, buddies, isHome, using, onPick, onHome }: Budd
                 <Sticker value={item.companion.emoji} size={34} />
                 <Text style={styles.small}>Lv {level}</Text>
               </Pressable>
+              </Picked>
               {withYou ? (
                 <Text style={styles.small}>⭐ With you</Text>
               ) : (
@@ -1072,7 +1092,7 @@ function BuddiesDrawer({ profile, buddies, isHome, using, onPick, onHome }: Budd
                   <Text style={styles.small}>{here ? '💤 Nap' : '🏠 Invite'}</Text>
                 </Pressable>
               )}
-            </View>
+            </PopIn>
           );
         })}
       </ScrollView>
@@ -1095,8 +1115,8 @@ function PaintDrawer({ paint, areaName, onPaint, canLeft, canRight, onMove }: Pa
     <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chips}>
       <Text style={styles.paintLabel}>{part === 'wall' ? '🎨 Walls' : '🟫 Floor'}</Text>
       {list.map((color, i) => (
+        <Picked key={color} on={paint[part] === i} radius={22} grow={1.15}>
         <Pressable
-          key={color}
           onPress={() => onPaint(part, i)}
           accessibilityRole="button"
           accessibilityLabel={`${part === 'wall' ? 'Wall' : 'Floor'} color ${i + 1}`}
@@ -1108,6 +1128,7 @@ function PaintDrawer({ paint, areaName, onPaint, canLeft, canRight, onMove }: Pa
             pressed && styles.pressed,
           ]}
         />
+        </Picked>
       ))}
     </ScrollView>
   );
@@ -1127,14 +1148,16 @@ function PaintDrawer({ paint, areaName, onPaint, canLeft, canRight, onMove }: Pa
 
 function Chip({ label, on, onPress }: { label: string; on: boolean; onPress: () => void }) {
   return (
-    <Pressable
-      onPress={onPress}
-      accessibilityRole="button"
-      accessibilityState={{ selected: on }}
-      style={({ pressed }) => [styles.chip, on && styles.chipOn, pressed && styles.pressed]}
-    >
-      <Text style={[styles.chipText, on && styles.chipTextOn]}>{label}</Text>
-    </Pressable>
+    <Picked on={on} radius={22} grow={1.06}>
+      <Pressable
+        onPress={onPress}
+        accessibilityRole="button"
+        accessibilityState={{ selected: on }}
+        style={({ pressed }) => [styles.chip, on && styles.chipOn, pressed && styles.pressed]}
+      >
+        <Text style={[styles.chipText, on && styles.chipTextOn]}>{label}</Text>
+      </Pressable>
+    </Picked>
   );
 }
 
@@ -1255,7 +1278,8 @@ const styles = StyleSheet.create({
   game: { gap: spacing.sm },
   problem: { fontSize: 40, fontWeight: '900', color: colors.text, textAlign: 'center' },
   row: { flexDirection: 'row', gap: spacing.sm, justifyContent: 'center' },
-  chips: { gap: spacing.sm, paddingHorizontal: spacing.xs, alignItems: 'center' },
+  // Room around each choice for the ring and grow of a picked one (Picked), so the row doesn't clip it.
+  chips: { gap: spacing.sm + 2, paddingHorizontal: spacing.sm + 2, paddingVertical: 8, alignItems: 'center' },
   chip: {
     minHeight: 44,
     paddingHorizontal: spacing.md,

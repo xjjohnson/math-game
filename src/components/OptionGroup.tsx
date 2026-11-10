@@ -2,7 +2,8 @@ import { StyleSheet, useWindowDimensions, View } from 'react-native';
 
 import { Text } from '@/components/AppText';
 import { BigButton } from '@/components/BigButton';
-import { colors, fontSizes, spacing } from '@/constants/theme';
+import { Picked } from '@/components/Motion';
+import { colors, fontSizes, radius, spacing } from '@/constants/theme';
 
 interface Option<T> {
   value: T;
@@ -28,16 +29,16 @@ export function OptionGroup<T>({ label, options, value, onChange, compact }: Pro
       <Text style={styles.label}>{label}</Text>
       <View style={styles.options}>
         {options.map((o) => (
-          <BigButton
-            key={o.label}
-            label={o.label}
-            color={o.color}
-            outline={o.value !== value}
-            selected={o.value === value}
-            onPress={() => onChange(o.value)}
-            small={narrow || compact}
-            style={[styles.option, compact && styles.compact]}
-          />
+          <Picked key={o.label} on={o.value === value} ring={o.color} radius={radius.lg} grow={1.04} style={[styles.option, compact && styles.compact]}>
+            <BigButton
+              label={o.label}
+              color={o.color}
+              outline={o.value !== value}
+              selected={o.value === value}
+              onPress={() => onChange(o.value)}
+              small={narrow || compact}
+            />
+          </Picked>
         ))}
       </View>
     </View>
