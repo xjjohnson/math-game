@@ -69,6 +69,7 @@ import type { Picture } from '@/utils/easel';
 import { AREA_COUNT, BUDDY_KEY, FIXTURE_KEY, paintOf, type Placement } from '@/utils/room';
 import { INK } from '@/constants/artStyle';
 import { GroundShadow } from '@/components/GroundShadow';
+import { DrawnItem, hasDrawing } from '@/components/DrawnItem';
 
 export interface HomeBuddy {
   /** Shop item id. */
@@ -906,6 +907,8 @@ export function BuddyRoom(props: Props) {
                         <Lamp width={piece.width} height={piece.height} lit={lit.has(piece.key)} />
                       ) : piece.item?.candle ? (
                         <Candle width={piece.width} height={piece.height} wax={piece.item.candle} lit={lit.has(piece.key)} seed={piece.key} />
+                      ) : hasDrawing(piece.item?.id) && piece.item ? (
+                        <DrawnItem id={piece.item.id} width={piece.width} height={piece.height} />
                       ) : (
                         piece.item?.emoji.startsWith('@') ? (
                           <Sticker value={piece.item.emoji} size={Math.round(piece.height * 0.85)} />
