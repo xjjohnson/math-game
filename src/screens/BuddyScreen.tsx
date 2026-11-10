@@ -74,7 +74,8 @@ import { generate } from '@/utils/mathEngine';
 import { areasOf, BUDDY_KEY, buddiesHome, FIXTURE_KEY, ownsArea } from '@/utils/room';
 import { createRng, pick, randomSeed } from '@/utils/seededRandom';
 import { owns } from '@/utils/shop';
-import { canWear, lookOf, outfitOf } from '@/utils/wardrobe';
+import { canWear, lookOf, moodOf, MOOD_EMOJI, MOOD_NAME, outfitOf } from '@/utils/wardrobe';
+import { MOODS, type Mood } from '@/components/PersonFigure';
 import { playSound } from '@/utils/soundEffects';
 
 /** The tabs along the bottom; each opens a drawer over the home. */
@@ -132,7 +133,7 @@ export function BuddyScreen() {
     for (const p of savedPictures) out[PICTURE_KEY + p.id] = p;
     return out;
   }, [savedPictures]);
-  const { careForBuddy, equip, buyRoomItem, buyHomeRoom, moveInRoom, moveHomeRoom, setPlaced, paintRoom, setBuddyHome, wear, undress, setLook, takeOff, moveWearable } =
+  const { careForBuddy, equip, buyRoomItem, buyHomeRoom, moveInRoom, moveHomeRoom, setPlaced, paintRoom, setBuddyHome, wear, undress, setLook, setMood, takeOff, moveWearable } =
     useProfiles();
   const insets = useSafeAreaInsets();
   const [line, setLine] = useState<string | null>(
@@ -154,13 +155,33 @@ export function BuddyScreen() {
   const [carried, setCarried] = useState<{ item: Wearable; x: number; y: number } | null>(null);
   const rng = useRef(createRng(randomSeed()));
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  /** A face a buddy pulls for a moment on its own (eating, being given something), over its set one. */
+  const [moment, setMoment] = useState<{ buddyId: string; mood: Mood } | null>(null);
+  const momentTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(
     () => () => {
       if (timer.current) clearTimeout(timer.current);
+      if (momentTimer.current) clearTimeout(momentTimer.current);
     },
     [],
   );
+
+  /** Shows `steps` of faces on a buddy one after another (each for its ms), then its own face again. */
+  const feel = (buddyId: string, ...steps: [Mood, number][]) => {
+    if (momentTimer.current) clearTimeout(momentTimer.current);
+    const next = (i: number) => {
+      const step = steps[i];
+      if (!step) {
+        momentTimer.current = null;
+        setMoment(null);
+        return;
+      }
+      setMoment({ buddyId, mood: step[0] });
+      momentTimer.current = setTimeout(() => next(i + 1), step[1]);
+    };
+    next(0);
+  };
 
   useEffect(() => {
     if (!line) return;
@@ -207,7 +228,7 @@ export function BuddyScreen() {
 
   const say = (text: string) => setLine(text);
   const home = buddiesHome(profile);
-  const homeBuddies = homeBuddiesOf(profile);
+  const homeBuddies = homeBuddiesOf(profile).map((b) => (moment && b.id === moment.buddyId ? { ...b, mood: moment.mood } : b));
 
   /** Makes another buddy the one you're with. The one before stays home where it stood. */
   const switchTo = (id: string) => {
@@ -232,6 +253,8 @@ export function BuddyScreen() {
       } else {
         say(happy);
       }
+      // Eating a treat pulls a silly yum face; a pet makes it beam.
+      if (buddyId) feel(buddyId, action === 'treat' ? ['silly', 2200] : ['happy', 1800]);
       return true;
     }
     if (result.reason === 'coins') say(`A treat costs ${TREAT_PRICE} coins. Play a round to earn more!`);
@@ -278,7 +301,10 @@ export function BuddyScreen() {
       return;
     }
     const holder = thing.on?.startsWith(BUDDY_KEY) ? nameOf(thing.on.slice(BUDDY_KEY.length)) : null;
-    if (holder && FOOD_GROUPS.includes(item.group) && !item.says) say(`${holder} takes a bite of the ${what}. Yum! 😋`);
+    if (holder && FOOD_GROUPS.includes(item.group) && !item.says) {
+      say(`${holder} takes a bite of the ${what}. Yum! 😋`);
+      feel(thing.on!.slice(BUDDY_KEY.length), ['silly', 2200]);
+    }
     else if (item.light) say(`Click! ${stickerText(item.emoji)}`);
     else if (item.says) say(`${holder ?? name} ${item.says}! ${item.fx ?? ''}`);
     else if (holder) say(`${holder} holds the ${what} tight.`);
@@ -340,7 +366,12 @@ export function BuddyScreen() {
             const item = findRoomItem(profile.room.things.find((t) => t.key === key)?.itemId ?? '');
             const what = item?.name.toLowerCase() ?? 'thing';
             if (place.in) say(`The ${what} is in the ${findCupboard(place.in)?.name ?? 'cupboard'}.`);
-            else if (place.on?.startsWith(BUDDY_KEY)) say(`${nameOf(place.on.slice(BUDDY_KEY.length))} is holding the ${what}!`);
+            else if (place.on?.startsWith(BUDDY_KEY)) {
+              const holder = place.on.slice(BUDDY_KEY.length);
+              say(`${nameOf(holder)} is holding the ${what}!`);
+              // Given something: a surprised face, then a big smile.
+              feel(holder, ['surprised', 900], ['happy', 1800]);
+            }
           }}
           onPlaceBuddy={(id, place) => {
             moveInRoom(profile.id, BUDDY_KEY + id, place);
@@ -513,6 +544,12 @@ export function BuddyScreen() {
                 name={name}
                 treat={companion?.treat ?? '🍪'}
                 hasBuddy={!!companion}
+                mood={buddyId ? moodOf(profile, buddyId) : 'smile'}
+                onMood={(mood) => {
+                  if (!buddyId) return;
+                  setMood(profile.id, buddyId, mood);
+                  say(`${name} feels ${MOOD_NAME[mood].toLowerCase()}. ${MOOD_EMOJI[mood]}`);
+                }}
                 onPet={() => doCare('pet', `❤️ ${name} loves that!`)}
                 onTreat={() => doCare('treat', `❤️❤️ Yum! ${companion?.treat ?? ''} ${name} says thank you!`)}
                 onFetch={() => {
@@ -661,12 +698,15 @@ interface CareDrawerProps {
   name: string;
   treat: string;
   hasBuddy: boolean;
+  /** The face the buddy is set to, and setting a new one. */
+  mood: Mood;
+  onMood: (mood: Mood) => void;
   onPet: () => void;
   onTreat: () => void;
   onFetch: () => void;
 }
 
-function CareDrawer({ profile, name, treat, hasBuddy, onPet, onTreat, onFetch }: CareDrawerProps) {
+function CareDrawer({ profile, name, treat, hasBuddy, mood, onMood, onPet, onTreat, onFetch }: CareDrawerProps) {
   if (!hasBuddy) return <Text style={styles.hint}>Pick a buddy in 🐾 Buddies first.</Text>;
   const hearts = buddyHearts(profile, profile.equipped.companion);
   const level = buddyLevel(hearts);
@@ -723,6 +763,24 @@ function CareDrawer({ profile, name, treat, hasBuddy, onPet, onTreat, onFetch }:
           }
         />
       </View>
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chips} accessibilityLabel="Feelings">
+        <Text style={styles.paintLabel}>Feelings</Text>
+        {MOODS.map((m, i) => (
+          <PopIn key={m} delay={i * 35} damping={11}>
+            <Picked on={mood === m} radius={22} grow={1.15}>
+              <Pressable
+                onPress={() => onMood(m)}
+                accessibilityRole="button"
+                accessibilityLabel={`${MOOD_NAME[m]} face`}
+                accessibilityState={{ selected: mood === m }}
+                style={({ pressed }) => [styles.feeling, mood === m && styles.feelingOn, pressed && styles.pressed]}
+              >
+                <Text style={styles.feelingEmoji}>{MOOD_EMOJI[m]}</Text>
+              </Pressable>
+            </Picked>
+          </PopIn>
+        ))}
+      </ScrollView>
     </>
   );
 }
@@ -1357,6 +1415,9 @@ const styles = StyleSheet.create({
   },
   swatchEmoji: { fontSize: 18 },
   colorDot: { width: 40, height: 40, borderRadius: 20, borderWidth: 2, borderColor: colors.border },
+  feeling: { width: 46, height: 46, borderRadius: 23, borderWidth: 2, borderColor: colors.border, backgroundColor: colors.surface, alignItems: 'center', justifyContent: 'center' },
+  feelingOn: { borderColor: colors.primary, backgroundColor: '#E8ECFF' },
+  feelingEmoji: { fontSize: 26, lineHeight: 32 },
   swatch: { width: 44, height: 44, borderRadius: 22, borderWidth: 2, borderColor: colors.border },
   swatchOn: { borderWidth: 5, borderColor: colors.primary },
   action: {

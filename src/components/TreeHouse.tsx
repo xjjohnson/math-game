@@ -329,9 +329,9 @@ export function TreeHouseInside({ width: w, height: h, buddies, onEvent, onTapBu
                 <View pointerEvents="none" style={[styles.cushion, at(fig * 0.1, fig * 0.86, fig * 0.8, fig * 0.16), { backgroundColor: BULBS[(i + 2) % BULBS.length], borderRadius: fig, opacity: held ? 0 : 1 }]} />
                 <Lively height={fig} seed={b.id} breathe={!held} bounce={bump?.n} bounceKind={bump?.kind} style={StyleSheet.absoluteFill}>
                   {b.person ? (
-                    <PersonFigure look={b.person.look} size={fig} dressed={b.person.dressed} gift={b.gift} alive happy={held} wave={bump?.kind === 'hop' ? bump.n : undefined} />
+                    <PersonFigure look={b.person.look} size={fig} dressed={b.person.dressed} gift={b.gift} alive mood={held ? 'happy' : b.mood} wave={bump?.kind === 'hop' ? bump.n : undefined} />
                   ) : (
-                    <BuddyFigure value={b.emoji} size={fig} fur={b.fur} belly={b.belly} dressed={b.dressed} gift={b.gift} wave={bump?.kind === 'hop' ? bump.n : undefined} />
+                    <BuddyFigure value={b.emoji} size={fig} fur={b.fur} belly={b.belly} dressed={b.dressed} gift={b.gift} mood={held ? 'happy' : b.mood} wave={bump?.kind === 'hop' ? bump.n : undefined} />
                   )}
                 </Lively>
               </View>

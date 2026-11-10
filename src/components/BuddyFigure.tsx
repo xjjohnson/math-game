@@ -6,7 +6,10 @@ import Svg, { Circle, ClipPath, Defs, Ellipse, G, Rect } from 'react-native-svg'
 import { Text } from '@/components/AppText';
 import { useArmWave } from '@/components/Motion';
 import { BARE_SHOES, shoeLook } from '@/components/PersonAccessories';
+import type { Mood } from '@/components/PersonFigure';
+import { PopIn } from '@/components/PopIn';
 import { Sticker } from '@/components/Sticker';
+import { MOOD_EMOJI } from '@/utils/wardrobe';
 import { INK, inkWidth, shade } from '@/constants/artStyle';
 
 /** What a buddy has on, ready to draw. */
@@ -32,12 +35,14 @@ interface Props {
   gift?: string | null;
   /** Change this number to wave once. */
   wave?: number;
+  /** How it feels: anything but the everyday smile shows as a little face in a bubble by its head. */
+  mood?: Mood;
 }
 
 const SOCK_STRIPE = '#E57373';
 
 /** A buddy with a body: its face as the head, a round body with a soft belly, paw arms, feet and its clothes. */
-export function BuddyFigure({ value, size, fur, belly, dressed, gift, wave }: Props) {
+export function BuddyFigure({ value, size, fur, belly, dressed, gift, wave, mood = 'smile' }: Props) {
   const shirt = dressed.shirt;
   const s = size;
   const line = inkWidth(s);
@@ -146,12 +151,18 @@ export function BuddyFigure({ value, size, fur, belly, dressed, gift, wave }: Pr
       {gift ? (
         <Text style={[styles.part, { fontSize: Math.round(s * 0.22), top: -s * 0.08, right: s * 0.02 }]}>{gift}</Text>
       ) : null}
+      {mood !== 'smile' ? (
+        <PopIn key={mood} damping={9} style={[styles.part, styles.feeling, { top: -s * 0.04, left: s * 0.02, width: s * 0.26, height: s * 0.26, borderRadius: s, borderWidth: line }]}>
+          <Text style={{ fontSize: Math.round(s * 0.17), lineHeight: Math.round(s * 0.22) }}>{MOOD_EMOJI[mood]}</Text>
+        </PopIn>
+      ) : null}
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   part: { position: 'absolute' },
+  feeling: { backgroundColor: '#FFFFFF', borderColor: INK, alignItems: 'center', justifyContent: 'center' },
   backArm: { transformOrigin: 'top', transform: [{ rotate: '20deg' }] },
   center: { left: 0, textAlign: 'center' },
   head: { alignItems: 'center', justifyContent: 'center', overflow: 'visible' },

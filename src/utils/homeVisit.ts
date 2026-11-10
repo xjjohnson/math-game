@@ -7,7 +7,7 @@ import { buddyHearts, buddyLevel, giftForLevel } from '@/utils/buddy';
 import { ROOM_SPAN } from '@/constants/room';
 import { AREA_COUNT, buddiesHome } from '@/utils/room';
 import { owns } from '@/utils/shop';
-import { clothOf, lookOf, outfitOf } from '@/utils/wardrobe';
+import { clothOf, lookOf, moodOf, outfitOf } from '@/utils/wardrobe';
 
 /** A buddy's outfit as things to draw. */
 export function dressedOf(profile: Profile, buddyId: string): Dressed {
@@ -58,6 +58,7 @@ export function homeBuddiesOf(profile: Profile): HomeBuddy[] {
         dressed: dressedOf(profile, id),
         person: personOf(profile, id),
         outfit: outfitOf(profile, id),
+        mood: moodOf(profile, id),
       },
     ];
   });

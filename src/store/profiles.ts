@@ -31,7 +31,8 @@ import {
 import { grantStarRewards } from '@/utils/starLevels';
 import { finishShift, type BuildingId, type ShiftPay } from '@/utils/town';
 import { buyItem, equipItem, freeAvatars, type BuyResult } from '@/utils/shop';
-import { moveWearable, setLook, takeOff, undress, wear, type MoveResult, type WearResult } from '@/utils/wardrobe';
+import { moveWearable, setLook, setMood, takeOff, undress, wear, type MoveResult, type WearResult } from '@/utils/wardrobe';
+import type { Mood } from '@/components/PersonFigure';
 import type { PersonLook } from '@/constants/wardrobe';
 
 function emptyStats(): Profile['stats'] {
@@ -128,6 +129,8 @@ interface ProfilesState {
   moveWearable: (id: string, fromId: string, toId: string, wearableId: string) => MoveResult;
   /** Changes a person buddy's hair, skin or beard. */
   setLook: (id: string, buddyId: string, change: Partial<PersonLook>) => void;
+  /** Sets the face a buddy shows (Feelings). */
+  setMood: (id: string, buddyId: string, mood: Mood) => void;
   /** Finishes a job in the community and returns what it paid. */
   finishShift: (id: string, building: BuildingId, correct: number) => ShiftPay;
 }
@@ -272,6 +275,8 @@ export const useProfiles = create<ProfilesState>()(
       },
       setLook: (id, buddyId, change) =>
         set((s) => ({ profiles: s.profiles.map((p) => (p.id === id ? setLook(p, buddyId, change) : p)) })),
+      setMood: (id, buddyId, mood) =>
+        set((s) => ({ profiles: s.profiles.map((p) => (p.id === id ? setMood(p, buddyId, mood) : p)) })),
       finishShift: (id, building, correct) => {
         const current = get().profiles.find((p) => p.id === id);
         if (!current) return { coins: 0, hearts: 0, bonus: 0 };

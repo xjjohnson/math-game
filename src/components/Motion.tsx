@@ -773,6 +773,28 @@ export function DriftLoop({ children, seconds = 90 }: { children: ReactNode; sec
   );
 }
 
+/**
+ * Wraps each screen so it zooms in quickly from a little smaller as it opens (with the stack's fade),
+ * instead of sliding across. Still when motion is off.
+ */
+export function ScreenZoom({ children }: { children: ReactNode }) {
+  const { animate } = useMotion();
+  const t = useSharedValue(animate ? 0 : 1);
+  useEffect(() => {
+    if (animate) t.value = withTiming(1, { duration: ZOOM_MS, easing: Easing.out(Easing.cubic) });
+    // Only when the screen opens.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+  const look = useAnimatedStyle(() => ({
+    opacity: 0.4 + t.value * 0.6,
+    transform: [{ scale: 0.92 + t.value * 0.08 }],
+  }));
+  return <Animated.View style={[styles.screen, look]}>{children}</Animated.View>;
+}
+
+/** How long a screen takes to zoom in. */
+export const ZOOM_MS = 240;
+
 /** Little clouds that burst out from a spot and fade: the poof of clothes popping on. */
 export function Poof({ size, style }: { size: number; style?: StyleProp<ViewStyle> }) {
   const { animate } = useMotion();
@@ -914,6 +936,7 @@ const styles = StyleSheet.create({
   hang: { width: '100%', height: '100%', transformOrigin: 'top', alignItems: 'center', justifyContent: 'flex-end' },
   cover: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, overflow: 'hidden' },
   ring: { position: 'absolute', left: -5, top: -5, right: -5, bottom: -5, borderWidth: 3 },
+  screen: { flex: 1 },
   puff: { position: 'absolute', left: 0, top: 0, backgroundColor: '#FFFFFF', borderWidth: 2, borderColor: '#E4E0F0' },
   bit: { position: 'absolute', top: 0, width: 8, borderRadius: 2 },
 });

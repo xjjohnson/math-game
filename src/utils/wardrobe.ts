@@ -1,4 +1,4 @@
-import type { Cloth } from '@/components/PersonFigure';
+import type { Cloth, Mood } from '@/components/PersonFigure';
 import { findWearable, isPerson, PEOPLE, type PersonLook } from '@/constants/wardrobe';
 import type { Outfit, Profile } from '@/types';
 
@@ -125,3 +125,21 @@ export function outfitChange(before: Outfit, after: Outfit): { on: { slot: Outfi
 
 /** How far down a buddy each spot is worn, as a share of its height from the top of its box. */
 export const SLOT_HEIGHT: Record<OutfitSlot, number> = { hat: 0.14, face: 0.3, neck: 0.48, shirt: 0.6, legs: 0.78, feet: 0.93 };
+
+/** Sets the face a buddy shows from Feelings; the everyday smile clears it. */
+export function setMood(profile: Profile, buddyId: string, mood: Mood): Profile {
+  const moods = { ...(profile.moods ?? {}) };
+  if (mood === 'smile') delete moods[buddyId];
+  else moods[buddyId] = mood;
+  return { ...profile, moods };
+}
+
+/** The face a buddy shows: the one set in Feelings, or its everyday smile. */
+export function moodOf(profile: Profile, buddyId: string): Mood {
+  return profile.moods?.[buddyId] ?? 'smile';
+}
+
+/** A feeling's little picture, for the Feelings row and an animal buddy's face bubble. */
+export const MOOD_EMOJI: Record<Mood, string> = { smile: '🙂', happy: '😄', sad: '😢', surprised: '😮', cross: '😠', silly: '😜' };
+/** A feeling's name, read out and shown under its button. */
+export const MOOD_NAME: Record<Mood, string> = { smile: 'Smile', happy: 'Happy', sad: 'Sad', surprised: 'Surprised', cross: 'Cross', silly: 'Silly' };
