@@ -1,8 +1,11 @@
-import { Fragment, useState, type ReactNode } from 'react';
+import { Fragment, useEffect, useRef, useState, type ReactNode } from 'react';
 import { Pressable, StyleSheet, View, type ViewStyle } from 'react-native';
 
 import { Text } from '@/components/AppText';
-import { Belt, Rumble, Spin, Swing } from '@/components/Motion';
+import Animated, { Easing, useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
+
+import { Belt, Lively, Rumble, Spin, Swing } from '@/components/Motion';
+import { useMotion } from '@/hooks/useAccessibility';
 import { Chalkboard } from '@/components/community/Chalkboard';
 import { PaintingView } from '@/components/PaintingView';
 import { useEaselPicture } from '@/services/easel';
@@ -156,24 +159,7 @@ function Street({ w, h, floorY, screenW, onDoor }: { w: number; h: number; floor
       {BUILDINGS.map((b, i) => {
         const bw = Math.min(gap * 0.7, screenW * 0.5);
         const bh = h * 0.42;
-        return (
-          <View key={b.id} style={{ position: 'absolute', left: (i + 0.5) * gap + gap * 0.15, top: floorY - bh, width: bw, height: bh }}>
-            <View style={[edge, { flex: 1, backgroundColor: b.color, borderRadius: 8, alignItems: 'center' }]}>
-              <View style={[styles.awning, { backgroundColor: '#fff' }]} />
-              <Text style={styles.streetEmoji}>{b.emoji}</Text>
-              <Text style={styles.streetName} numberOfLines={2}>{b.name}</Text>
-              <View style={[edge, styles.window, { width: bw * 0.5, height: bh * 0.22 }]} />
-            </View>
-            <Pressable
-              onPress={() => onDoor(b.id)}
-              accessibilityRole="button"
-              accessibilityLabel={`Go into the ${b.name}`}
-              style={({ pressed }) => [edge, styles.door, { width: bw * 0.34, height: bh * 0.4, left: bw * 0.33 }, pressed && { opacity: 0.7 }]}
-            >
-              <View style={styles.knob} />
-            </Pressable>
-          </View>
-        );
+        return <StreetBuilding key={b.id} b={b} left={(i + 0.5) * gap + gap * 0.15} top={floorY - bh} bw={bw} bh={bh} onDoor={onDoor} />;
       })}
       <View style={{ position: 'absolute', left: 0, right: 0, top: floorY, height: h * 0.04, backgroundColor: '#CFD8DC' }} />
       <View style={{ position: 'absolute', left: 0, right: 0, bottom: 0, height: h * 0.14, backgroundColor: '#78909C' }} />
@@ -183,6 +169,83 @@ function Street({ w, h, floorY, screenW, onDoor }: { w: number; h: number; floor
     </>
   );
 }
+
+/**
+ * A building on the street. Tapping its front makes it bounce; tapping the door bounces it and zooms
+ * in toward the door before going inside.
+ */
+function StreetBuilding({
+  b,
+  left,
+  top,
+  bw,
+  bh,
+  onDoor,
+}: {
+  b: (typeof BUILDINGS)[number];
+  left: number;
+  top: number;
+  bw: number;
+  bh: number;
+  onDoor: (id: BuildingId) => void;
+}) {
+  const { animate } = useMotion();
+  const [bounces, setBounces] = useState(0);
+  const zoom = useSharedValue(0);
+  const going = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(
+    () => () => {
+      if (going.current) clearTimeout(going.current);
+    },
+    [],
+  );
+  const enter = () => {
+    if (going.current) return;
+    setBounces((n) => n + 1);
+    if (!animate) return onDoor(b.id);
+    zoom.value = withTiming(1, { duration: ENTER_MS, easing: Easing.in(Easing.quad) });
+    going.current = setTimeout(() => {
+      onDoor(b.id);
+      // Back on the street later, it stands as it was.
+      going.current = setTimeout(() => {
+        going.current = null;
+        zoom.value = 0;
+      }, 500);
+    }, ENTER_MS);
+  };
+  const look = useAnimatedStyle(() => ({
+    zIndex: zoom.value > 0 ? 30 : 0,
+    opacity: 1 - zoom.value * 0.5,
+    transform: [{ scale: 1 + zoom.value * 2.2 }],
+  }));
+  return (
+    <Animated.View style={[{ position: 'absolute', left, top, width: bw, height: bh, transformOrigin: '50% 80%' }, look]}>
+      <Lively height={bh} bounce={bounces} bounceKind="pop" style={{ flex: 1 }}>
+        <Pressable
+          onPress={() => setBounces((n) => n + 1)}
+          accessibilityLabel={b.name}
+          style={[edge, { flex: 1, backgroundColor: b.color, borderRadius: 8, alignItems: 'center' }]}
+        >
+          <View style={[styles.awning, { backgroundColor: '#fff' }]} />
+          <Text style={styles.streetEmoji}>{b.emoji}</Text>
+          <Text style={styles.streetName} numberOfLines={2}>{b.name}</Text>
+          <View style={[edge, styles.window, { width: bw * 0.5, height: bh * 0.22 }]} />
+        </Pressable>
+        <Pressable
+          onPress={enter}
+          accessibilityRole="button"
+          accessibilityLabel={`Go into the ${b.name}`}
+          style={({ pressed }) => [edge, styles.door, { width: bw * 0.34, height: bh * 0.4, left: bw * 0.33 }, pressed && { opacity: 0.7 }]}
+        >
+          <View style={styles.knob} />
+        </Pressable>
+      </Lively>
+    </Animated.View>
+  );
+}
+
+/** How long the zoom toward a building's door takes before going inside. */
+const ENTER_MS = 320;
 
 function School({ w, h, on, tap, onDrawing, onEasel }: Part & { onDrawing?: (drawing: boolean) => void; onEasel?: () => void }) {
   const b = SCHOOL.board;
