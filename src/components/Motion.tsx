@@ -14,6 +14,7 @@ import Animated, {
 } from 'react-native-reanimated';
 
 import { useMotion } from '@/hooks/useAccessibility';
+import { dangleTilt, fallMs } from '@/utils/motion';
 
 /** A steady number from a string, so each buddy keeps its own rhythm. */
 export function seedOf(text: string): number {
@@ -427,6 +428,11 @@ export function Swing({
  * there instead of jumping: a smooth glide with a little waddle and bounce for each step. While
  * `instant` (a finger is carrying it) it follows exactly. `grow` scales it up, for being held.
  * Jumps straight there when motion is off.
+ *
+ * Picking up and dropping (`dangle`, `land`): while carried, a `dangle` piece hangs from the
+ * finger and swings behind it like a pendulum, stretching a little. Let go above where it ends
+ * up, it falls there (speeding up like a real drop) instead of walking, and a `land` piece
+ * squashes when it touches down.
  */
 export function Glide({
   left,
@@ -435,6 +441,8 @@ export function Glide({
   walk = true,
   grow = 1,
   bounce = 6,
+  dangle = false,
+  land = false,
   children,
   style,
   pointerEvents,
@@ -448,6 +456,10 @@ export function Glide({
   grow?: number;
   /** How high each step bounces, in points. */
   bounce?: number;
+  /** Hangs and swings from the finger while carried, for people and buddies. */
+  dangle?: boolean;
+  /** Falls to where it was let go over and squashes on landing. */
+  land?: boolean;
   children: ReactNode;
   style?: StyleProp<ViewStyle>;
   pointerEvents?: 'auto' | 'none' | 'box-none' | 'box-only';
@@ -458,20 +470,50 @@ export function Glide({
   const y = useSharedValue(top);
   const steps = useSharedValue(0);
   const size = useSharedValue(grow);
+  const swing = useSharedValue(0);
+  const stretch = useSharedValue(0);
+  const squash = useSharedValue(0);
   const first = useRef(true);
+  const wasHeld = useRef(instant);
+  const lastLeft = useRef(left);
   useEffect(() => {
+    const dropped = wasHeld.current && !instant;
+    wasHeld.current = instant;
+    const moveX = left - lastLeft.current;
+    lastLeft.current = left;
     if (first.current) {
       first.current = false;
       return;
     }
+    if (dangle && animate) {
+      if (instant && Math.abs(moveX) > 0.5) {
+        // Swinging out behind the finger, then back and forth until it settles.
+        swing.value = withSequence(withTiming(dangleTilt(moveX), { duration: 90 }), withSpring(0, PENDULUM));
+      } else if (!instant) {
+        swing.value = withSpring(0, PENDULUM);
+      }
+    }
     const far = Math.hypot(left - x.value, top - y.value);
     cancelAnimation(steps);
     steps.value = 0;
+    const squashAfter = (ms: number) => {
+      if (!land || !animate) return;
+      squash.value = withDelay(ms, withSequence(withTiming(1, { duration: 80 }), withSpring(0, SETTLE)));
+    };
     if (!animate || instant || far < 1) {
       cancelAnimation(x);
       cancelAnimation(y);
       x.value = left;
       y.value = top;
+      if (dropped) squashAfter(0);
+      return;
+    }
+    if (dropped && land && top > y.value + 4) {
+      // Let go up high: drop down, speeding up, and squash on the floor.
+      const ms = fallMs(top - y.value);
+      x.value = withTiming(left, { duration: ms, easing: Easing.out(Easing.quad) });
+      y.value = withTiming(top, { duration: ms, easing: Easing.in(Easing.quad) });
+      squashAfter(ms);
       return;
     }
     const ms = glideMs(far);
@@ -479,14 +521,20 @@ export function Glide({
     x.value = withTiming(left, { duration: ms, easing: ease });
     y.value = withTiming(top, { duration: ms, easing: ease });
     if (walk && far > 30) steps.value = withTiming(stepsFor(ms), { duration: ms, easing: Easing.linear });
+    if (dropped) squashAfter(dropped && walk ? 0 : ms);
     // Only a new place (or picking up / letting go) moves it.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [left, top, instant, animate]);
   useEffect(() => {
     size.value = animate ? withSpring(grow, SETTLE) : grow;
   }, [grow, animate, size]);
+  useEffect(() => {
+    // Hanging from the finger pulls it a little longer; let go, it springs back.
+    stretch.value = animate && dangle && instant ? withSpring(1, SETTLE) : withSpring(0, SETTLE);
+  }, [instant, dangle, animate, stretch]);
   const look = useAnimatedStyle(() => {
     const s = steps.value;
+    const q = squash.value;
     return {
       left: x.value,
       top: y.value,
@@ -494,15 +542,27 @@ export function Glide({
         { translateY: -Math.abs(Math.sin(s * Math.PI)) * bounce },
         { rotate: `${Math.sin(s * Math.PI) * 5}deg` },
         { scale: size.value },
+        { scaleX: 1 + q * 0.12 },
+        { scaleY: 1 - q * 0.16 },
       ],
     };
   });
+  const hang = useAnimatedStyle(() => ({
+    transform: [
+      { rotate: `${swing.value}deg` },
+      { scaleY: 1 + stretch.value * 0.06 },
+      { scaleX: 1 - stretch.value * 0.03 },
+    ],
+  }));
   return (
     <Animated.View pointerEvents={pointerEvents} accessibilityLabel={accessibilityLabel} style={[styles.glide, style, look]}>
-      {children}
+      {dangle ? <Animated.View style={[styles.hang, hang]}>{children}</Animated.View> : children}
     </Animated.View>
   );
 }
+
+/** A loose spring for a held figure swinging back and forth under the finger. */
+const PENDULUM = { damping: 3.2, stiffness: 70, mass: 0.8 };
 
 /** How long a walk of `far` points takes: about 450 points a second, never under 60ms or over 0.9s. */
 export function glideMs(far: number): number {
@@ -597,6 +657,8 @@ const styles = StyleSheet.create({
   // Breathing and squashing keep the feet on the floor.
   feet: { transformOrigin: 'bottom' },
   glide: { position: 'absolute', transformOrigin: 'bottom' },
+  // A held figure hangs from the top, where the finger has it.
+  hang: { width: '100%', height: '100%', transformOrigin: 'top', alignItems: 'center', justifyContent: 'flex-end' },
   cover: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, overflow: 'hidden' },
   bit: { position: 'absolute', top: 0, width: 8, borderRadius: 2 },
 });

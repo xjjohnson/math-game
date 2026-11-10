@@ -6,7 +6,7 @@ import { Text } from '@/components/AppText';
 import { Birds } from '@/components/Backyard';
 import { BuddyFigure } from '@/components/BuddyFigure';
 import type { HomeBuddy } from '@/components/BuddyRoom';
-import { Flicker, FloatUp, Lively, type BounceKind } from '@/components/Motion';
+import { Flicker, FloatUp, Glide, Lively, type BounceKind } from '@/components/Motion';
 import { PersonFigure } from '@/components/PersonFigure';
 import { BUDDY_SIZE } from '@/constants/room';
 import { useMotion } from '@/hooks/useAccessibility';
@@ -185,8 +185,8 @@ export function TreeHouseInside({ width: w, height: h, buddies, onEvent, onTapBu
       onTapBuddy(d.id);
       return;
     }
+    // Let go, it drops to the floor and squashes there (Glide).
     setSpots((all) => ({ ...all, [d.id]: clampSpot(all[d.id] ?? d.from) }));
-    setBumps((all) => ({ ...all, [d.id]: { n: (all[d.id]?.n ?? 0) + 1, kind: 'land' } }));
   };
 
   const bulbs = Math.max(8, Math.round(cw / 45));
@@ -305,27 +305,37 @@ export function TreeHouseInside({ width: w, height: h, buddies, onEvent, onTapBu
           const bump = bumps[b.id];
           const held = dragging === b.id;
           return (
-            <View
+            <Glide
               key={b.id}
-              accessible
-              accessibilityLabel={`${b.name}. Drag to move`}
-              onStartShouldSetResponder={() => true}
-              onResponderGrant={(e) => grab(b.id, spot, e)}
-              onResponderMove={move}
-              onResponderRelease={letGo}
-              onResponderTerminate={letGo}
-              onResponderTerminationRequest={() => false}
-              style={[at(spot.x - fig / 2, spot.y - fig, fig, fig), held && styles.lifted]}
+              left={spot.x - fig / 2}
+              top={spot.y - fig}
+              instant={held}
+              dangle
+              land
+              grow={held ? 1.08 : 1}
+              style={[{ width: fig, height: fig }, held && styles.raised]}
             >
-              <View pointerEvents="none" style={[styles.cushion, at(fig * 0.1, fig * 0.86, fig * 0.8, fig * 0.16), { backgroundColor: BULBS[(i + 2) % BULBS.length], borderRadius: fig, opacity: held ? 0 : 1 }]} />
-              <Lively height={fig} seed={b.id} breathe={!held} bounce={bump?.n} bounceKind={bump?.kind} style={StyleSheet.absoluteFill}>
-                {b.person ? (
-                  <PersonFigure look={b.person.look} size={fig} dressed={b.person.dressed} gift={b.gift} alive wave={bump?.kind === 'hop' ? bump.n : undefined} />
-                ) : (
-                  <BuddyFigure value={b.emoji} size={fig} fur={b.fur} belly={b.belly} dressed={b.dressed} gift={b.gift} wave={bump?.kind === 'hop' ? bump.n : undefined} />
-                )}
-              </Lively>
-            </View>
+              <View
+                accessible
+                accessibilityLabel={`${b.name}. Drag to move`}
+                onStartShouldSetResponder={() => true}
+                onResponderGrant={(e) => grab(b.id, spot, e)}
+                onResponderMove={move}
+                onResponderRelease={letGo}
+                onResponderTerminate={letGo}
+                onResponderTerminationRequest={() => false}
+                style={StyleSheet.absoluteFill}
+              >
+                <View pointerEvents="none" style={[styles.cushion, at(fig * 0.1, fig * 0.86, fig * 0.8, fig * 0.16), { backgroundColor: BULBS[(i + 2) % BULBS.length], borderRadius: fig, opacity: held ? 0 : 1 }]} />
+                <Lively height={fig} seed={b.id} breathe={!held} bounce={bump?.n} bounceKind={bump?.kind} style={StyleSheet.absoluteFill}>
+                  {b.person ? (
+                    <PersonFigure look={b.person.look} size={fig} dressed={b.person.dressed} gift={b.gift} alive happy={held} wave={bump?.kind === 'hop' ? bump.n : undefined} />
+                  ) : (
+                    <BuddyFigure value={b.emoji} size={fig} fur={b.fur} belly={b.belly} dressed={b.dressed} gift={b.gift} wave={bump?.kind === 'hop' ? bump.n : undefined} />
+                  )}
+                </Lively>
+              </View>
+            </Glide>
           );
         })}
 
@@ -394,7 +404,7 @@ const styles = StyleSheet.create({
   chest: { backgroundColor: '#A1887F', borderWidth: 3, borderColor: OUTLINE, borderRadius: 4, alignItems: 'center' },
   lock: { marginTop: -6, width: 14, height: 16, borderRadius: 3, backgroundColor: '#FFCA28', borderWidth: 2, borderColor: OUTLINE },
   cushion: { borderWidth: 2, borderColor: OUTLINE },
-  lifted: { transform: [{ scale: 1.08 }], zIndex: 5 },
+  raised: { zIndex: 5 },
   callUp: { backgroundColor: '#FFF8E7', borderWidth: 3, borderColor: OUTLINE, borderRadius: 20, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 10 },
   callUpText: { fontSize: 20, fontWeight: '800', color: '#5B3A24' },
   down: { backgroundColor: '#FFF8E7', borderWidth: 3, borderColor: OUTLINE, borderRadius: 20, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 10 },

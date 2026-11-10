@@ -12,7 +12,10 @@ stops when Animations is off in Settings or the phone's reduce-motion setting is
 2. **Nobody teleports.** A person, buddy or thing that changes spot walks or slides there with `Glide`
    (a waddle and small bounce per step for people and buddies, a plain slide for things). While a
    finger carries it, it follows the finger exactly. Moves from friends' phones glide too.
-3. **Put down = land.** Letting go of someone plays a small squash (`bounceKind="land"`).
+3. **Picked up = dangle; put down = fall and land.** Carried people and buddies hang from the finger and
+   swing behind it like a pendulum, stretching a little and grinning (`Glide` with `dangle`, `happy` on
+   `PersonFigure`). Let go up high, they fall to the floor (or onto the seat under them), speeding up as
+   they drop, and squash when they touch down (`Glide` with `land`). Things squash on landing too.
 4. **Tap = react.** Tapping a person or buddy makes it hop and wave an arm (`useArmWave`);
    tapping a thing wiggles it.
 5. **Working = busy.** Someone doing a job bobs and rocks while it runs (`Busy`), with a short bubble
@@ -28,8 +31,8 @@ stops when Animations is off in Settings or the phone's reduce-motion setting is
 
 | Place | What moves |
 | --- | --- |
-| Buddy home and home visits | breathe, blink, nap, hop + wave on tap, land on drop, pop in, appliances, firelight |
-| Community (street and every building) | breathe, blink, walk to new spots, hop + wave on wave, land on drop, things slide, park rides, farm animals, buddy at the mixer |
+| Buddy home, tree house and home visits | breathe, blink, nap, hop + wave on tap, dangle while carried, fall + land on drop, pop in, appliances, firelight |
+| Community (street and every building) | breathe, blink, walk to new spots, hop + wave on wave, dangle while carried, fall + land on drop, things slide, park rides, farm animals, buddy at the mixer |
 | Home (Buddy Street) | your character and buddy breathe; tap your character to hop |
 | Rounds | buddy hops on right answers, shakes its head after misses, feedback pops in, confetti |
 

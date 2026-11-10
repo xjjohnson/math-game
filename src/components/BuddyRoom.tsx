@@ -21,7 +21,7 @@ import { PersonFigure, type PersonDressed } from '@/components/PersonFigure';
 import { Furniture } from '@/components/Furniture';
 import { FramedPicture } from '@/components/PaintingView';
 import { Lamp } from '@/components/Lamp';
-import { Bob, Drifting, Flicker, FloatUp, Lively, Rumble, Spin, Swing, type BounceKind } from '@/components/Motion';
+import { Bob, Drifting, Flicker, FloatUp, Glide, Lively, Rumble, Spin, Swing, type BounceKind } from '@/components/Motion';
 import { PopIn } from '@/components/PopIn';
 import { Sticker } from '@/components/Sticker';
 import { ApplianceView } from '@/components/Appliance';
@@ -363,7 +363,7 @@ export function BuddyRoom(props: Props) {
   };
 
   const dropPiece = (piece: Piece, dx: number, dy: number) => {
-    bump(piece.key, 'land');
+    // The landing squash plays when it touches down (PieceView), not when the finger lets go.
     stopSlide(piece.key);
     if (piece.buddyId) onPlaceBuddy(piece.buddyId, dropBuddy(pieces, piece, dx, dy, size));
     else onPlaceThing(piece.key, dropThing(pieces, piece, dx, dy, size, open));
@@ -800,6 +800,7 @@ export function BuddyRoom(props: Props) {
                 box={{ left: piece.x - piece.width / 2, top: piece.y - piece.height, width: piece.width, height: piece.height }}
                 offset={offset ?? null}
                 wobble={tidying && !piece.buddyId}
+                alive={!!piece.buddyId}
                 label={buddy ? buddy.name : piece.item?.name ?? 'Thing'}
               >
                 {lit.has(piece.key) ? (
@@ -843,6 +844,7 @@ export function BuddyRoom(props: Props) {
                             gift={buddy.gift}
                             alive
                             asleep={asleep}
+                            happy={!!offset}
                             wave={b?.kind === 'hop' ? b.n : undefined}
                           />
                         ) : (
@@ -1456,25 +1458,30 @@ interface PieceViewProps {
   /** How far it has been carried, while it or what it rests on is being dragged. */
   offset: { dx: number; dy: number } | null;
   wobble: boolean;
+  /** A buddy or person: hangs from the finger while carried and walks to new spots. */
+  alive: boolean;
   label: string;
   children: ReactNode;
 }
 
 /** A buddy or thing in the home. Dragging is handled by the layer it sits in. */
-function PieceView({ box, offset, wobble, label, children }: PieceViewProps) {
+function PieceView({ box, offset, wobble, alive, label, children }: PieceViewProps) {
+  // Carried, it follows the finger; let go, it falls (and squashes) or walks to where it ends up.
   return (
-    <View
-      accessible
-      accessibilityLabel={label}
-      style={[
-        styles.piece,
-        { left: box.left + (offset?.dx ?? 0), top: box.top + (offset?.dy ?? 0), width: box.width, height: box.height },
-        offset && styles.lifted,
-        wobble && styles.wobble,
-      ]}
+    <Glide
+      left={box.left + (offset?.dx ?? 0)}
+      top={box.top + (offset?.dy ?? 0)}
+      instant={!!offset}
+      walk={alive}
+      dangle={alive}
+      land
+      grow={offset ? 1.08 : 1}
+      style={[styles.piece, { width: box.width, height: box.height }, offset && styles.raised]}
     >
-      {children}
-    </View>
+      <View accessible accessibilityLabel={label} style={[styles.fill, wobble && styles.wobble]}>
+        {children}
+      </View>
+    </Glide>
   );
 }
 
@@ -1803,7 +1810,7 @@ const styles = StyleSheet.create({
     borderColor: OUTLINE,
     opacity: 0.9,
   },
-  lifted: { transform: [{ scale: 1.08 }], zIndex: 10 },
+  raised: { zIndex: 10 },
   wobble: { transform: [{ rotate: '-6deg' }], opacity: 0.85 },
   glow: { position: 'absolute', borderRadius: 999, backgroundColor: 'rgba(255, 214, 102, 0.45)' },
   zzz: { position: 'absolute', right: -8, top: -12 },

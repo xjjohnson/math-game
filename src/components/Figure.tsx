@@ -10,12 +10,14 @@ interface Props {
   /** Change this number to wave once. */
   wave?: number;
   gift?: string | null;
+  /** A big grin (people), for being carried. */
+  happy?: boolean;
 }
 
 /** A whole-body person or buddy, drawn the same way everywhere: home, Community and visits. */
-export function Figure({ figure, size, alive = true, wave, gift }: Props) {
+export function Figure({ figure, size, alive = true, wave, gift, happy }: Props) {
   return figure.kind === 'person' ? (
-    <PersonFigure look={figure.look} size={size} dressed={figure.dressed} gift={gift} alive={alive} wave={wave} />
+    <PersonFigure look={figure.look} size={size} dressed={figure.dressed} gift={gift} alive={alive} wave={wave} happy={happy} />
   ) : (
     <BuddyFigure value={figure.emoji} size={size} fur={figure.fur} belly={figure.belly} dressed={figure.dressed} gift={gift} wave={wave} />
   );
