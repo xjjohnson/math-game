@@ -28,8 +28,8 @@ which is checked for contrast.
 | --- | --- | --- |
 | G1 | Shared outline, palette, shades, floor shadows at home and in Community | Built (PR #79) |
 | G2 | People and buddy bodies redrawn in SVG; faces take a `mood` | Built |
-| G3 | Drawn furniture, food and toys instead of emoji | Planned |
-| G4 | Rooms with depth: wall trim, windows, a front edge and floor strip | Planned |
+| G3 | Drawn furniture, food and toys instead of emoji (`DrawnItem`, 20 so far) | Building |
+| G4 | Rooms with depth: crown moulding, chair rail and darker lower wall, floorboards, wall shadow on the floor, a front edge | Built |
 | G5 | Round icon buttons, red "new" dots, white panels | Planned |
 | G6 | Drawn menu background patterns | Planned |
 
@@ -37,3 +37,12 @@ which is checked for contrast.
 
 `PersonFigure` takes `mood`: `smile` (everyday), `happy` (open grin, used while carried),
 `sad`, `surprised`, `cross` and `silly`. `Figure` passes it through. Sleeping is still `asleep`.
+
+## Drawn room things
+
+`components/DrawnItem.tsx` draws room things in the outlined style instead of their emoji, in the
+room and in the shop list. Each drawing fills a 100 x 100 box standing on its bottom edge, so seats
+line up with the item's `seat` height. Small things use `grow()` to fill their box like an emoji.
+Add more ids to `DRAWINGS` bit by bit, most-seen first. Drawn so far: couch, chair, bed, TV, plant,
+clock, radio, apples, bread, cookies, cupcake, milk, hot cocoa, teddy bear, ball, rubber duck,
+blocks, books, backpack, balloon.

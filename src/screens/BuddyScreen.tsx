@@ -7,6 +7,7 @@ import { Text } from '@/components/AppText';
 import { BigButton } from '@/components/BigButton';
 import { BuddyRoom } from '@/components/BuddyRoom';
 import { ChoiceButtons } from '@/components/ChoiceButtons';
+import { DrawnItem, hasDrawing } from '@/components/DrawnItem';
 import { Furniture } from '@/components/Furniture';
 import { Confetti, Picked, SlideIn } from '@/components/Motion';
 import { PopIn } from '@/components/PopIn';
@@ -1015,6 +1016,7 @@ function ShopDrawer({ coins, month, areaId, full, onBuy }: ShopDrawerProps) {
 
 /** An emoji, or a small drawing for furniture without one. */
 function ItemPicture({ item }: { item: RoomItem }) {
+  if (hasDrawing(item.id)) return <DrawnItem id={item.id} width={40} height={40} />;
   if (!item.draw) return <Sticker value={item.emoji} size={32} />;
   const height = 30;
   const width = Math.min(52, height * (item.wide ?? 1));

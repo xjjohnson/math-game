@@ -67,8 +67,9 @@ import {
 } from '@/utils/home';
 import type { Picture } from '@/utils/easel';
 import { AREA_COUNT, BUDDY_KEY, FIXTURE_KEY, paintOf, type Placement } from '@/utils/room';
-import { INK } from '@/constants/artStyle';
+import { INK, shade, SHADOW, tint } from '@/constants/artStyle';
 import { GroundShadow } from '@/components/GroundShadow';
+import { DrawnItem, hasDrawing } from '@/components/DrawnItem';
 
 export interface HomeBuddy {
   /** Shop item id. */
@@ -906,6 +907,8 @@ export function BuddyRoom(props: Props) {
                         <Lamp width={piece.width} height={piece.height} lit={lit.has(piece.key)} />
                       ) : piece.item?.candle ? (
                         <Candle width={piece.width} height={piece.height} wax={piece.item.candle} lit={lit.has(piece.key)} seed={piece.key} />
+                      ) : hasDrawing(piece.item?.id) && piece.item ? (
+                        <DrawnItem id={piece.item.id} width={piece.width} height={piece.height} />
                       ) : (
                         piece.item?.emoji.startsWith('@') ? (
                           <Sticker value={piece.item.emoji} size={Math.round(piece.height * 0.85)} />
@@ -1161,16 +1164,61 @@ interface AreaProps {
   floor: string;
 }
 
-/** One area's wall and floor. */
+/** Floorboard lines, closer together at the back so the floor seems to go away from you. */
+const BOARD_LINES = [0.1, 0.24, 0.42, 0.65];
+
+/** One area's wall and floor, with a little depth: trim, a lower wall, floorboards and a front edge. */
 function Area({ id, index, size, wall, floor }: AreaProps) {
+  const indoor = id !== 'backyard';
+  const floorH = size.height - size.floorY;
+  const lip = Math.max(8, Math.round(floorH * 0.09));
+  const board = shade(floor, 0.1);
+  const seams = Math.max(3, Math.round(size.areaWidth / Math.max(60, size.screen * 0.22)));
   return (
     <View style={[styles.area, { left: index * size.areaWidth, width: size.areaWidth, backgroundColor: wall }]}>
       {id === 'backyard' ? <BackyardSky width={size.areaWidth} floorY={size.floorY} fence={wall} /> : null}
-      <View style={[styles.floor, { top: size.floorY, backgroundColor: floor }]} />
+      {indoor ? (
+        <>
+          {/* Crown moulding along the ceiling, and a darker lower wall under a rail. */}
+          <View style={[styles.crown, { backgroundColor: shade(wall, 0.12) }]} />
+          <View style={[styles.lowerWall, { top: size.floorY * 0.62, height: size.floorY * 0.38, backgroundColor: shade(wall, 0.06) }]} />
+          <View style={[styles.chairRail, { top: size.floorY * 0.62 - 4 }]} />
+        </>
+      ) : null}
+      <View style={[styles.floor, { top: size.floorY, backgroundColor: floor }]}>
+        {indoor ? (
+          <>
+            {/* The wall's soft shadow on the floor, then the boards. */}
+            <View style={[styles.floorShade, { height: Math.max(6, floorH * 0.08) }]} />
+            {BOARD_LINES.map((k, row) => (
+              <View key={k} style={[styles.boardLine, { top: floorH * k, backgroundColor: board }]}>
+                {Array.from({ length: seams }, (_, i) => (
+                  <View
+                    key={i}
+                    style={[
+                      styles.boardSeam,
+                      {
+                        backgroundColor: board,
+                        left: `${((i + (row % 2) * 0.5) / seams) * 100}%`,
+                        top: 0,
+                        height: floorH * ((BOARD_LINES[row + 1] ?? 1) - k) - lip * (row === BOARD_LINES.length - 1 ? 1 : 0),
+                      },
+                    ]}
+                  />
+                ))}
+              </View>
+            ))}
+            {/* The front edge of the floor, nearest you. */}
+            <View style={[styles.floorLip, { height: lip, backgroundColor: shade(floor, 0.22) }]} />
+          </>
+        ) : null}
+      </View>
       {id === 'backyard' ? (
         <Lawn width={size.areaWidth} top={size.floorY} height={size.height - size.floorY} />
       ) : (
-        <View style={[styles.baseboard, { top: size.floorY - 8 }]} />
+        <View style={[styles.baseboard, { top: size.floorY - 12 }]}>
+          <View style={styles.baseboardTop} />
+        </View>
       )}
       {id === 'bedroom' || id === 'bedroom2' || id === 'bedroom3' || id === 'bathroom' || id === 'playroom' ? (
         <View
@@ -1611,7 +1659,15 @@ const styles = StyleSheet.create({
     borderTopWidth: 3,
     borderColor: OUTLINE,
   },
-  baseboard: { position: 'absolute', left: 0, right: 0, height: 8, backgroundColor: TRIM },
+  baseboard: { position: 'absolute', left: 0, right: 0, height: 12, backgroundColor: TRIM, borderTopWidth: 2, borderColor: OUTLINE },
+  baseboardTop: { height: 3, backgroundColor: tint(TRIM, 0.25) },
+  crown: { position: 'absolute', left: 0, right: 0, top: 0, height: 10, borderBottomWidth: 2, borderColor: OUTLINE },
+  lowerWall: { position: 'absolute', left: 0, right: 0 },
+  chairRail: { position: 'absolute', left: 0, right: 0, height: 8, backgroundColor: TRIM, borderTopWidth: 2, borderBottomWidth: 2, borderColor: OUTLINE },
+  floorShade: { position: 'absolute', left: 0, right: 0, top: 0, backgroundColor: SHADOW },
+  boardLine: { position: 'absolute', left: 0, right: 0, height: 2 },
+  boardSeam: { position: 'absolute', width: 2 },
+  floorLip: { position: 'absolute', left: 0, right: 0, bottom: 0, borderTopWidth: 2, borderColor: OUTLINE },
   divider: {
     position: 'absolute',
     left: -5,
