@@ -39,7 +39,10 @@ stops when Animations is off in Settings or the phone's reduce-motion setting is
     profile; people change their face, animals show a little face bubble by the head). Faces also change
     on their own for a moment: grinning while carried, a silly yum face while eating or after a treat,
     beaming after a pet, and surprised then happy when handed something (`feel` in BuddyScreen).
-12. **Celebrations are short.** `Confetti`, `FloatUp` and `PopIn` play once and get out of the way.
+12. **Screens zoom.** Opening a screen zooms it in quickly from a little smaller while it fades in
+    (`ScreenZoom`, set once for every screen with the Stack's `screenLayout` in `src/app/_layout.tsx`),
+    instead of the plain slide. With Animations off, screens just switch.
+13. **Celebrations are short.** `Confetti`, `FloatUp` and `PopIn` play once and get out of the way.
 
 ## Where it's used
 

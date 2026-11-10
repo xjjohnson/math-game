@@ -7,7 +7,9 @@ import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { Platform } from 'react-native';
 
+import { ScreenZoom } from '@/components/Motion';
 import { colors } from '@/constants/theme';
+import { useMotion } from '@/hooks/useAccessibility';
 import { useActiveProfile } from '@/store/profiles';
 import { backgroundColor } from '@/utils/shop';
 
@@ -22,11 +24,15 @@ export default function RootLayout() {
   // Loads in the background; text falls back to the system font until it's ready.
   useFonts({ Lexend_400Regular, Lexend_700Bold, Lexend_900Black, PatrickHand_400Regular });
   const background = backgroundColor(useActiveProfile());
+  const { animate } = useMotion();
   return (
     <>
       <StatusBar style="dark" />
       <Stack
+        // Screens zoom in quickly and fade, instead of sliding across (docs/animation.md).
+        screenLayout={({ children }) => <ScreenZoom>{children}</ScreenZoom>}
         screenOptions={{
+          animation: animate ? 'fade' : 'none',
           headerStyle: { backgroundColor: background },
           headerTintColor: colors.text,
           headerTitleStyle: { fontWeight: '800' },
