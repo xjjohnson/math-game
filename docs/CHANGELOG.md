@@ -1,5 +1,11 @@
 # Change log
 
+## 2026-11-10 (UI review: nice-to-have items)
+
+- The problem card shows "= ?" until you answer, then the answer, so the card never looks half done. The answer is no longer hidden on the page where a browser search could find it.
+- Home: the coins, streak and stars bubbles now say what they count ("coins", "days in a row", "stars").
+- PC: a thick blue ring shows which button the keyboard is on.
+
 ## 2026-11-10 (UI review: should-fix items)
 
 - Small phones: the New game tiles put the sign above the word, so "Multiplication" fits, and two-across buttons like "🎨 Backgrounds" in the Shop use slightly smaller text.

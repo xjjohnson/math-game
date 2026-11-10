@@ -60,9 +60,9 @@ export function HomeScreen() {
   const scene = (
     <View style={[styles.scene, wide && styles.sceneWide]}>
       <View style={styles.pills}>
-        <Pill text={`🪙 ${profile?.coins ?? 0}`} label={`${profile?.coins ?? 0} coins`} />
-        <Pill text={`🔥 ${days} ${days === 1 ? 'day' : 'days'}`} label={`${days} day streak`} />
-        <Pill text={`⭐ ${profile?.stars ?? 0}`} label={`${profile?.stars ?? 0} stars`} />
+        <Pill text={`🪙 ${profile?.coins ?? 0}`} caption="coins" label={`${profile?.coins ?? 0} coins`} />
+        <Pill text={`🔥 ${days}`} caption={days === 1 ? 'day in a row' : 'days in a row'} label={`${days} day streak`} />
+        <Pill text={`⭐ ${profile?.stars ?? 0}`} caption="stars" label={`${profile?.stars ?? 0} stars`} />
       </View>
       {profile ? (
         <>
@@ -176,10 +176,12 @@ export function HomeScreen() {
   );
 }
 
-function Pill({ text, label }: { text: string; label: string }) {
+/** A number with a small word under it, so nobody has to guess what it counts. */
+function Pill({ text, caption, label }: { text: string; caption: string; label: string }) {
   return (
     <View style={styles.pill} accessible accessibilityLabel={label}>
       <Text style={styles.pillText}>{text}</Text>
+      <Text style={styles.pillCaption}>{caption}</Text>
     </View>
   );
 }
@@ -198,8 +200,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   pills: { flexDirection: 'row', justifyContent: 'space-between', alignSelf: 'stretch', gap: spacing.xs },
-  pill: { backgroundColor: colors.surface, borderRadius: 20, paddingHorizontal: 12, paddingVertical: 6 },
-  pillText: { fontSize: 15, fontWeight: '800', color: colors.text, fontVariant: ['tabular-nums'] },
+  pill: { backgroundColor: colors.surface, borderRadius: 16, paddingHorizontal: 12, paddingVertical: 4, alignItems: 'center' },
+  pillText: { fontSize: 15, fontWeight: '800', color: colors.text, fontVariant: ['tabular-nums'], textAlign: 'center' },
+  pillCaption: { fontSize: 11, fontWeight: '700', color: colors.textMuted, textAlign: 'center' },
   bubble: {
     backgroundColor: colors.surface,
     borderRadius: 18,

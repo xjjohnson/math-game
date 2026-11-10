@@ -5,10 +5,18 @@ import { PatrickHand_400Regular } from '@expo-google-fonts/patrick-hand/400Regul
 import { useFonts } from 'expo-font';
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
+import { Platform } from 'react-native';
 
 import { colors } from '@/constants/theme';
 import { useActiveProfile } from '@/store/profiles';
 import { backgroundColor } from '@/utils/shop';
+
+// PC/web: a thick, clear ring around whatever the keyboard is on (the browser's default is thin).
+if (Platform.OS === 'web' && typeof document !== 'undefined') {
+  const style = document.createElement('style');
+  style.textContent = `:focus-visible { outline: 3px solid ${colors.primary} !important; outline-offset: 2px; }`;
+  document.head.appendChild(style);
+}
 
 export default function RootLayout() {
   // Loads in the background; text falls back to the system font until it's ready.

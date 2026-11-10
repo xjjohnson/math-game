@@ -79,8 +79,9 @@ export function FlashCard({ problem, reveal = false, column, cardStyle }: Props)
       {problem.story ? (
         <>
           <Text style={[styles.story, big && styles.storyBig, ink]}>{problem.story}</Text>
-          <Text style={[styles.storyAnswer, { color: palette.correct }, !reveal && styles.hidden]}>
-            {problem.prompt} = {problem.answer}
+          {/* Only put on the page once shown, so it can't be found early (working out the sum is part of a story). */}
+          <Text style={[styles.storyAnswer, { color: palette.correct }]}>
+            {reveal ? `${problem.prompt} = ${problem.answer}` : ' '}
           </Text>
         </>
       ) : isStacked(problem) ? (
@@ -105,8 +106,9 @@ export function FlashCard({ problem, reveal = false, column, cardStyle }: Props)
           <Text style={[styles.prompt, big && styles.promptBig, ink]} adjustsFontSizeToFit numberOfLines={1}>
             {problem.prompt}
           </Text>
-          <Text style={[styles.answer, big && styles.answerBig, { color: palette.correct }, !reveal && styles.hidden]}>
-            = {problem.answer}
+          {/* "= ?" holds the answer's place until it is shown, so the card never looks half done. */}
+          <Text style={[styles.answer, big && styles.answerBig, { color: reveal ? palette.correct : colors.textMuted }]}>
+            = {reveal ? problem.answer : '?'}
           </Text>
         </>
       )}
@@ -138,7 +140,6 @@ const styles = StyleSheet.create({
   },
   prompt: { fontSize: fontSizes.problem, fontWeight: '900' },
   answer: { fontSize: fontSizes.title, fontWeight: '800' },
-  hidden: { opacity: 0 },
   promptBig: { fontSize: 96 },
   answerBig: { fontSize: 52 },
   storyBig: { fontSize: 32, lineHeight: 44 },
