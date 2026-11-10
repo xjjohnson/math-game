@@ -817,9 +817,9 @@ export function BuddyRoom(props: Props) {
                 ) : null}
                 {buddy && !parent && !seat ? (
                   <GroundShadow
-                    width={piece.width * 0.62}
+                    width={piece.height * 0.42}
                     hidden={!!offset}
-                    style={{ left: piece.width * 0.19, bottom: -piece.width * 0.04 }}
+                    style={{ left: piece.width / 2 - piece.height * 0.21, bottom: -piece.height * 0.035 }}
                   />
                 ) : null}
                 <Ride piece={piece} seat={seat} on={seatOn} size={size} sliding={sliding.has(piece.key)}>
