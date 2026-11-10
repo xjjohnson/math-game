@@ -22,10 +22,12 @@ interface Props {
   wide?: boolean;
   /** Pinned under the scrolling part, e.g. a Start button that must always show. */
   footer?: ReactNode;
+  /** Centers the content up and down, so a game on a tablet doesn't leave the bottom half empty. */
+  center?: boolean;
 }
 
 /** Standard page wrapper: safe area, scrolling, centered column for tablets and PC. */
-export function Screen({ title, children, compact = false, noHeader = false, tab, wide = false, footer }: Props) {
+export function Screen({ title, children, compact = false, noHeader = false, tab, wide = false, footer, center = false }: Props) {
   const profile = useActiveProfile();
   const background = backgroundColor(profile);
   return (
@@ -39,7 +41,7 @@ export function Screen({ title, children, compact = false, noHeader = false, tab
       }
     >
       <BackgroundDecor decor={backgroundDecor(profile)} />
-      <ScrollView contentContainerStyle={[styles.content, compact && styles.compact, wide && styles.wide]}>
+      <ScrollView contentContainerStyle={[styles.content, compact && styles.compact, wide && styles.wide, center && styles.center]}>
         {title ? <Text style={styles.title} accessibilityRole="header">{title}</Text> : null}
         {children}
       </ScrollView>
@@ -60,6 +62,7 @@ const styles = StyleSheet.create({
   },
   compact: { paddingVertical: spacing.md, gap: spacing.sm },
   wide: { maxWidth: 1100, flexGrow: 1 },
+  center: { flexGrow: 1, justifyContent: 'center', maxWidth: 760 },
   footer: {
     paddingHorizontal: spacing.lg,
     paddingVertical: spacing.sm,

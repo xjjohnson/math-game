@@ -15,6 +15,8 @@ interface Props {
   selected?: boolean;
   style?: StyleProp<ViewStyle>;
   accessibilityHint?: string;
+  /** Smaller text and side padding, for rows of several buttons on a narrow phone. */
+  small?: boolean;
 }
 
 /** Extra-large, high-contrast button used throughout the app. */
@@ -28,9 +30,12 @@ export function BigButton({
   selected,
   style,
   accessibilityHint,
+  small = false,
 }: Props) {
-  const background = disabled ? colors.disabled : outline ? colors.surface : color;
-  const foreground = outline ? color : textColor;
+  // Disabled reads as "not now" (pale with dark dashed text), not as a broken grey button.
+  const background = disabled ? DISABLED_FILL : outline ? colors.surface : color;
+  const foreground = disabled ? colors.textMuted : outline ? color : textColor;
+  const border = disabled ? colors.disabled : outline ? color : colors.border;
   return (
     <Pressable
       onPress={onPress}
@@ -41,15 +46,19 @@ export function BigButton({
       accessibilityState={{ disabled, selected }}
       style={({ pressed }) => [
         styles.button,
-        { backgroundColor: background, borderColor: outline ? color : colors.border },
+        { backgroundColor: background, borderColor: border },
+        disabled && styles.disabled,
+        small && styles.small,
         pressed && !disabled && styles.pressed,
         style,
       ]}
     >
-      <Text style={[styles.label, { color: foreground }]}>{label}</Text>
+      <Text style={[styles.label, small && styles.smallLabel, { color: foreground }]}>{label}</Text>
     </Pressable>
   );
 }
+
+const DISABLED_FILL = '#EFEBDF';
 
 const styles = StyleSheet.create({
   button: {
@@ -61,6 +70,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+  disabled: { borderStyle: 'dashed' },
+  small: { paddingHorizontal: spacing.sm },
+  smallLabel: { fontSize: 18 },
   pressed: { transform: [{ scale: 0.97 }], opacity: 0.9 },
   label: { fontSize: fontSizes.button, fontWeight: '800', textAlign: 'center' },
 });

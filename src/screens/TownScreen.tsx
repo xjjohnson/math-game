@@ -59,7 +59,7 @@ export function TownScreen() {
       actions={
         <>
           <BigButton style={{ flex: 1, paddingHorizontal: 8 }} label="🏫 School" color={colors.primary} onPress={() => goInside('school')} />
-          <BigButton style={{ flex: 1, paddingHorizontal: 8 }} label="🐾 Buddy home" color={colors.operations.divide} onPress={() => router.push('/buddy')} />
+          <BigButton style={{ flex: 1, paddingHorizontal: 8 }} label="🐾 Buddy home" color={colors.text} onPress={() => router.push('/buddy')} />
         </>
       }
     />

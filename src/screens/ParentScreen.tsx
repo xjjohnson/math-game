@@ -39,14 +39,14 @@ export function ParentScreen() {
 
   if (!open) {
     return (
-      <Screen title="Parent area">
+      <Screen>
         <PinPad title="Enter the parent code" message={message} onComplete={submit} />
       </Screen>
     );
   }
 
   return (
-    <Screen title="Parent area">
+    <Screen>
       <SavedData />
       <PayoutSettings />
       <ParentReport />

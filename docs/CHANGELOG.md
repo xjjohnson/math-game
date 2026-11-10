@@ -1,5 +1,14 @@
 # Change log
 
+## 2026-11-10 (UI review: should-fix items)
+
+- Small phones: the New game tiles put the sign above the word, so "Multiplication" fits, and two-across buttons like "🎨 Backgrounds" in the Shop use slightly smaller text.
+- Each screen shows its name once (in the top bar), not twice.
+- Buttons that just go somewhere (Friends, Tricky ones, Buddy home, Find a buddy) no longer borrow the +, −, ×, ÷ colors.
+- Things you can't use yet look clear instead of broken: grey buttons are pale with a dashed edge and dark text, "Several phones" says "(Android only)", and Shop items you can't afford show a bigger price and "Need X more" in place of fading out.
+- Tablets and PC: the play screens sit in the middle of the screen with bigger digits, answer boxes and number keys.
+- Carry and borrow boxes are 44 px tall and the "carry" label is bigger, so they are easier to tap.
+
 ## 2026-11-10 (UI review: must-fix items)
 
 - The 🔊 read-aloud button moved out of the problem card to the row above it (next to the coins), so it never covers a carry box in Show my work. It is also bigger (48 px).

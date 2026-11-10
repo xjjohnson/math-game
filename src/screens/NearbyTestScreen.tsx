@@ -76,7 +76,7 @@ export function NearbyTestScreen() {
 
   if (!Nearby) {
     return (
-      <Screen title="Nearby test">
+      <Screen>
         <Text style={styles.body}>This test needs the Math Game app on an Android phone.</Text>
       </Screen>
     );
@@ -122,7 +122,7 @@ export function NearbyTestScreen() {
   };
 
   return (
-    <Screen title="Nearby test">
+    <Screen>
       <Text style={styles.body}>
         On one phone tap Host. On the other tap Find, then tap the first phone's name.
       </Text>

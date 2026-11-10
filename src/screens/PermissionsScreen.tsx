@@ -36,7 +36,7 @@ export function PermissionsScreen() {
 
   if (!Nearby) {
     return (
-      <Screen title="Play nearby">
+      <Screen>
         <Text style={styles.body}>
           Playing with a friend uses Bluetooth and Wi-Fi between two Android phones, so it only
           works in the Math Game app on Android. It isn't in the web version or in Expo Go.
@@ -49,7 +49,7 @@ export function PermissionsScreen() {
   const blocked = list.some(({ permission }) => statuses[permission] === 'blocked');
 
   return (
-    <Screen title="Play nearby">
+    <Screen>
       <Text style={styles.body}>
         To find a friend's phone, Math Game needs these. Nothing leaves the two phones, and no
         internet is used.

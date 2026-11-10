@@ -1,6 +1,6 @@
 import { router } from 'expo-router';
 import { useState } from 'react';
-import { Pressable, StyleSheet, Switch, View } from 'react-native';
+import { Pressable, StyleSheet, Switch, useWindowDimensions, View } from 'react-native';
 
 import { Text } from '@/components/AppText';
 import { BigButton } from '@/components/BigButton';
@@ -100,7 +100,6 @@ export function ModePickerScreen() {
 
   return (
     <Screen
-      title="Choose a game"
       // Start stays on screen however many options are open.
       footer={
         <BigButton
@@ -285,6 +284,8 @@ function Tile({
   onPress: () => void;
   wide?: boolean;
 }) {
+  // On a narrow phone the symbol goes above the word, so "Multiplication" fits.
+  const narrow = useWindowDimensions().width < 400 && !wide;
   return (
     <Pressable
       onPress={onPress}
@@ -294,6 +295,7 @@ function Tile({
       style={({ pressed }) => [
         styles.tile,
         wide && styles.tileWide,
+        narrow && styles.tileNarrow,
         { borderColor: color, backgroundColor: on ? color : colors.surface },
         pressed && styles.pressed,
       ]}
@@ -369,6 +371,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.sm,
   },
   tileWide: { flexBasis: '100%' },
+  tileNarrow: { flexDirection: 'column', gap: 0, paddingVertical: spacing.xs },
   tileSymbol: { fontSize: 30, fontWeight: '900' },
   tileLabel: { fontSize: 18, fontWeight: '800' },
   card: {

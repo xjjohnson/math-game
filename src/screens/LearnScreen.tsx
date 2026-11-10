@@ -12,7 +12,7 @@ import { LESSONS } from '@/utils/lessons';
 export function LearnScreen() {
   const palette = usePalette();
   return (
-    <Screen title="Learn how">
+    <Screen>
       <Text style={styles.intro}>Pick a way to work out answers. These are the ways you learn them at school.</Text>
       {OPERATIONS.map((o) => (
         <View key={o.value} style={styles.section}>

@@ -123,7 +123,7 @@ export function HomeScreen() {
           {tricky > 0 ? (
             <BigButton
               label={`🎯 Tricky ones (${tricky})`}
-              color={colors.operations.multiply}
+              color={colors.text}
               style={styles.half}
               accessibilityHint="Ten easy-going questions on facts you missed lately. Get one right twice to clear it."
               onPress={() => {
@@ -137,7 +137,7 @@ export function HomeScreen() {
 
       {profile ? (
         <View style={styles.pair}>
-          <BigButton label="👥 Friends" color={colors.operations.add} style={styles.half} onPress={() => router.push('/multiplayer')} />
+          <BigButton label="👥 Friends" color={colors.primary} style={styles.half} onPress={() => router.push('/multiplayer')} />
           <BigButton
             label="📚 Learn how"
             color={colors.primary}
