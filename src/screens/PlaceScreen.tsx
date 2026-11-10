@@ -24,7 +24,7 @@ export function PlaceScreen() {
           <BigButton
             style={school ? { flex: 1, paddingHorizontal: 8 } : undefined}
             label={`${building.emoji} ${done ? 'Practice' : 'Do the job'}: ${building.reward === 'coins' ? 'earn coins' : 'earn hearts'}`}
-            color={done ? colors.accent : colors.correct}
+            color={done ? colors.accentStrong : colors.correct}
             onPress={() => router.push({ pathname: '/shift', params: { building: building.id } })}
           />
           {school ? (

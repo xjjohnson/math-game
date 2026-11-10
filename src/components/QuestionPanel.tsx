@@ -1,10 +1,11 @@
 import { useEffect, useState } from 'react';
-import { StyleSheet } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 
 import { Text } from '@/components/AppText';
 import { ChoiceButtons } from '@/components/ChoiceButtons';
 import { FlashCard, isStacked } from '@/components/FlashCard';
 import { ColumnPad, NumberPad } from '@/components/NumberPad';
+import { SpeakButton } from '@/components/SpeakButton';
 import { difficultyConfigFor } from '@/constants/grades';
 import { fontSizes } from '@/constants/theme';
 import { usePalette } from '@/hooks/useAccessibility';
@@ -73,6 +74,9 @@ export function QuestionPanel({ problem, difficulty, grade, inputStyle, onAnswer
 
   return (
     <>
+      <View style={styles.speakRow}>
+        <SpeakButton onPress={() => speakProblem(problem, true)} />
+      </View>
       <FlashCard
         problem={problem}
         reveal={answered}
@@ -88,7 +92,6 @@ export function QuestionPanel({ problem, difficulty, grade, inputStyle, onAnswer
               }
             : undefined
         }
-        onSpeak={() => speakProblem(problem, true)}
       />
       {answered ? (
         <Text style={[styles.feedback, { color: correct ? palette.correct : palette.wrong }]}>
@@ -117,5 +120,6 @@ export function QuestionPanel({ problem, difficulty, grade, inputStyle, onAnswer
 }
 
 const styles = StyleSheet.create({
+  speakRow: { flexDirection: 'row', justifyContent: 'flex-end' },
   feedback: { fontSize: fontSizes.button, fontWeight: '800', textAlign: 'center' },
 });

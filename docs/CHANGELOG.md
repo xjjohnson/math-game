@@ -1,5 +1,11 @@
 # Change log
 
+## 2026-11-10 (UI review: must-fix items)
+
+- The 🔊 read-aloud button moved out of the problem card to the row above it (next to the coins), so it never covers a carry box in Show my work. It is also bigger (48 px).
+- Easier-to-read colors: green, red, teal and orange buttons and text are a little darker, so white text on them is clear. Bright orange is now only for bars and dots. The colorblind colors got the same treatment.
+- New game: the Start button is always at the bottom of the screen, and the screen remembers what you picked last time (game, tables, timer, word problems, worksheet and so on), so playing the same again is one tap.
+
 ## 2026-11-08 (mixer buddy has to be on the mixer)
 
 - A buddy only runs the bakery mixer when it is hanging on the mixer. Standing next to it on the floor does nothing.

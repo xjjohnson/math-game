@@ -135,7 +135,7 @@ export function NearbyTestScreen() {
       />
       <BigButton
         label="🔍 Find"
-        color={colors.accent}
+        color={colors.accentStrong}
         outline={role !== 'finding'}
         onPress={() => run('finding', () => nearby.startFinding())}
       />
