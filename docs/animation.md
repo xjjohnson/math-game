@@ -28,7 +28,10 @@ stops when Animations is off in Settings or the phone's reduce-motion setting is
 8. **Dressing up poofs.** A piece of clothing put on (tapped in Dress up or dropped on someone) pops on
    in a little cloud (`Poof`) and the wearer stretches up (`bounceKind="pop"`); the piece it replaced
    falls off, bounces on the floor and fades (`Tumble`), since it went back to the wardrobe.
-9. **Celebrations are short.** `Confetti`, `FloatUp` and `PopIn` play once and get out of the way.
+9. **Panels spring in; picks grow.** A drawer or panel slides in with a little overshoot (`SlideIn`), its
+   choices pop in one after another (`PopIn` with a `delay`), and the picked one grows with a ring
+   (`Picked`): Dress up, Buddies tray, Paint swatches, tabs and `OptionGroup`.
+10. **Celebrations are short.** `Confetti`, `FloatUp` and `PopIn` play once and get out of the way.
 
 ## Where it's used
 
