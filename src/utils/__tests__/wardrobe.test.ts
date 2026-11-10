@@ -1,6 +1,6 @@
 import { WEARABLES } from '@/constants/wardrobe';
 import { makeProfile } from '@/test/fixtures';
-import { lookOf, moveWearable, outfitChange, outfitOf, setLook, takeOff, undress, wear } from '@/utils/wardrobe';
+import { lookOf, moveWearable, moodOf, outfitChange, outfitOf, setMood, setLook, takeOff, undress, wear } from '@/utils/wardrobe';
 
 describe('buddy clothes', () => {
   it('buys a piece once, then puts it on and takes it off for free', () => {
@@ -96,5 +96,18 @@ describe('outfitChange', () => {
     });
     expect(outfitChange({ neck: 'scarf' }, {})).toEqual({ on: [], off: [{ slot: 'neck', id: 'scarf' }] });
     expect(outfitChange({ hat: 'cap' }, { hat: 'cap' })).toEqual({ on: [], off: [] });
+  });
+});
+
+describe('feelings', () => {
+  it('sets a face, and the everyday smile clears it', () => {
+    const p = makeProfile();
+    expect(moodOf(p, 'buddy-pup')).toBe('smile');
+    const sad = setMood(p, 'buddy-pup', 'sad');
+    expect(moodOf(sad, 'buddy-pup')).toBe('sad');
+    expect(moodOf(sad, 'buddy-kitty')).toBe('smile');
+    const back = setMood(sad, 'buddy-pup', 'smile');
+    expect(moodOf(back, 'buddy-pup')).toBe('smile');
+    expect(back.moods).toEqual({});
   });
 });

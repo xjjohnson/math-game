@@ -35,7 +35,11 @@ stops when Animations is off in Settings or the phone's reduce-motion setting is
     notes and fish bowls bubbles (`ambient` on a room item, drawn with `Drifting`), TV and computer power
     lights blink (`Twinkle`), the shop's checkout belt rolls (`Belt`), and the faint pictures behind
     menus drift slowly upward (`DriftLoop` in `BackgroundDecor`).
-11. **Celebrations are short.** `Confetti`, `FloatUp` and `PopIn` play once and get out of the way.
+11. **Faces show feelings.** Care has a Feelings row that sets a buddy's face (saved as `moods` on the
+    profile; people change their face, animals show a little face bubble by the head). Faces also change
+    on their own for a moment: grinning while carried, a silly yum face while eating or after a treat,
+    beaming after a pet, and surprised then happy when handed something (`feel` in BuddyScreen).
+12. **Celebrations are short.** `Confetti`, `FloatUp` and `PopIn` play once and get out of the way.
 
 ## Where it's used
 

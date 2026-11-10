@@ -47,6 +47,7 @@ import {
   type Season,
   PICTURE_ITEM,
 } from '@/constants/room';
+import type { Mood } from '@/components/PersonFigure';
 import { findWearable, type PersonLook } from '@/constants/wardrobe';
 import type { BuddySpot, Outfit, Room } from '@/types';
 import { outfitChange, SLOT_HEIGHT, type OutfitSlot } from '@/utils/wardrobe';
@@ -85,6 +86,8 @@ export interface HomeBuddy {
   person?: { look: PersonLook; dressed: PersonDressed };
   /** What it has on, by spot, so a change can poof on (and the old piece fall off). */
   outfit?: Outfit;
+  /** The face it shows right now (set in Feelings, or for a moment while eating or given something). */
+  mood?: Mood;
 }
 
 interface Props {
@@ -885,7 +888,7 @@ export function BuddyRoom(props: Props) {
                             gift={buddy.gift}
                             alive
                             asleep={asleep}
-                            happy={!!offset}
+                            mood={offset ? 'happy' : buddy.mood}
                             wave={b?.kind === 'hop' ? b.n : undefined}
                           />
                         ) : (
@@ -897,6 +900,7 @@ export function BuddyRoom(props: Props) {
                             dressed={buddy.dressed}
                             gift={buddy.gift}
                             wave={b?.kind === 'hop' ? b.n : undefined}
+                            mood={offset ? 'happy' : buddy.mood}
                           />
                         )
                       ) : piece.item?.id === PICTURE_ITEM ? (

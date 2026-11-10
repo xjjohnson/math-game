@@ -1,3 +1,4 @@
+import type { Mood } from '@/components/PersonFigure';
 import type { PersonLook } from '@/constants/wardrobe';
 
 export type Operation = 'add' | 'subtract' | 'multiply' | 'divide';
@@ -95,6 +96,8 @@ export interface Profile {
   outfits: Record<string, Outfit>;
   /** How each person buddy looks (hair, skin, beard), once changed from its start. */
   looks: Record<string, PersonLook>;
+  /** The face each buddy was set to in Feelings; missing means its everyday smile. */
+  moods?: Record<string, Mood>;
   /** Ids of the extra rooms (HomeArea.price) bought for the buddies' home. */
   homeRooms: string[];
   /** Order of the rooms in the home, left to right, as HomeArea ids. Missing means the starting order. */

@@ -21,6 +21,6 @@ export function Figure({ figure, size, alive = true, wave, gift, happy, mood }: 
   return figure.kind === 'person' ? (
     <PersonFigure look={figure.look} size={size} dressed={figure.dressed} gift={gift} alive={alive} wave={wave} happy={happy} mood={mood} />
   ) : (
-    <BuddyFigure value={figure.emoji} size={size} fur={figure.fur} belly={figure.belly} dressed={figure.dressed} gift={gift} wave={wave} />
+    <BuddyFigure value={figure.emoji} size={size} fur={figure.fur} belly={figure.belly} dressed={figure.dressed} gift={gift} wave={wave} mood={happy ? 'happy' : mood} />
   );
 }
