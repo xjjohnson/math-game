@@ -29,7 +29,7 @@ which is checked for contrast.
 | G1 | Shared outline, palette, shades, floor shadows at home and in Community | Built (PR #79) |
 | G2 | People and buddy bodies redrawn in SVG; faces take a `mood` | Built |
 | G3 | Drawn furniture, food and toys instead of emoji (`DrawnItem`, 20 so far) | Building |
-| G4 | Rooms with depth: wall trim, windows, a front edge and floor strip | Planned |
+| G4 | Rooms with depth: crown moulding, chair rail and darker lower wall, floorboards, wall shadow on the floor, a front edge | Built |
 | G5 | Round icon buttons, red "new" dots, white panels | Planned |
 | G6 | Drawn menu background patterns | Planned |
 
