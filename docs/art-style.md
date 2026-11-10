@@ -26,9 +26,14 @@ which is checked for contrast.
 
 | Step | What | State |
 | --- | --- | --- |
-| G1 | Shared outline, palette, shades, floor shadows at home and in Community | Built |
-| G2 | People and buddy bodies redrawn in SVG | Planned |
+| G1 | Shared outline, palette, shades, floor shadows at home and in Community | Built (PR #79) |
+| G2 | People and buddy bodies redrawn in SVG; faces take a `mood` | Built |
 | G3 | Drawn furniture, food and toys instead of emoji | Planned |
 | G4 | Rooms with depth: wall trim, windows, a front edge and floor strip | Planned |
 | G5 | Round icon buttons, red "new" dots, white panels | Planned |
 | G6 | Drawn menu background patterns | Planned |
+
+## Faces
+
+`PersonFigure` takes `mood`: `smile` (everyday), `happy` (open grin, used while carried),
+`sad`, `surprised`, `cross` and `silly`. `Figure` passes it through. Sleeping is still `asleep`.

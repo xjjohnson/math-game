@@ -30,12 +30,12 @@ export function Sticker({ value, size, style }: Props) {
   }
   const person = PERSON_AVATARS[value] ?? (PERSON_STICKERS[value] && PEOPLE[PERSON_STICKERS[value].buddyId]);
   if (person) {
-    // Head and shoulders: the figure drawn full height, cut off below the chest.
+    // Head and shoulders: the figure drawn full height, cut off below the chest (head starts near the top).
     const figure = side / 0.7;
     const { shirt, legs } = person.outfit;
     return (
       <View style={[{ width: side, height: side, overflow: 'hidden' }, style]}>
-        <View style={{ position: 'absolute', top: -figure * 0.03, left: (side - figure) / 2 }}>
+        <View style={{ position: 'absolute', top: figure * 0.01, left: (side - figure) / 2 }}>
           <PersonFigure
             look={{ ...person.look, height: 1 }}
             size={figure}
