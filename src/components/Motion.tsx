@@ -52,7 +52,7 @@ export function useTimesOn(on: boolean): number {
 /** A quick wobble back to still after a squash. */
 const SETTLE = { damping: 10, stiffness: 260 };
 
-export type BounceKind = 'hop' | 'wiggle' | 'land' | 'shake';
+export type BounceKind = 'hop' | 'wiggle' | 'land' | 'shake' | 'pop';
 
 interface LivelyProps {
   children: ReactNode;
@@ -120,6 +120,9 @@ export function Lively({
       squash.value = withSequence(withDelay(370, withTiming(0.7, { duration: 70 })), withSpring(0, SETTLE));
     } else if (bounceKind === 'land') {
       squash.value = withSequence(withTiming(1, { duration: 80 }), withSpring(0, SETTLE));
+    } else if (bounceKind === 'pop') {
+      // Stretches up tall for a moment, like something just popped on, and wobbles back.
+      squash.value = withSequence(withTiming(-1.2, { duration: 90 }), withSpring(0, SETTLE));
     } else if (bounceKind === 'wiggle') {
       turn.value = withSequence(
         withTiming(-9, quick),
@@ -597,6 +600,83 @@ export function Busy({ children, active, style }: { children: ReactNode; active:
   return <Animated.View style={[{ transformOrigin: 'bottom' }, style, look]}>{children}</Animated.View>;
 }
 
+/** Little clouds that burst out from a spot and fade: the poof of clothes popping on. */
+export function Poof({ size, style }: { size: number; style?: StyleProp<ViewStyle> }) {
+  const { animate } = useMotion();
+  const t = useSharedValue(0);
+  useEffect(() => {
+    if (animate) t.value = withTiming(1, { duration: POOF_MS, easing: Easing.out(Easing.quad) });
+    // Only on mount; a new poof mounts a new one.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+  if (!animate) return null;
+  return (
+    <View pointerEvents="none" style={[{ position: 'absolute', width: 0, height: 0 }, style]}>
+      {Array.from({ length: 7 }, (_, i) => (
+        <Puff key={i} angle={(i / 7) * Math.PI * 2 + 0.3} size={size} t={t} big={i % 2 === 0} />
+      ))}
+      <Puff angle={0} size={size} t={t} big center />
+    </View>
+  );
+}
+
+/** How long a poof lasts. */
+export const POOF_MS = 520;
+
+function Puff({ angle, size, t, big, center = false }: { angle: number; size: number; t: SharedValue<number>; big: boolean; center?: boolean }) {
+  const d = (big ? 0.34 : 0.24) * size * (center ? 1.5 : 1);
+  const reach = center ? 0 : size * 0.42;
+  const look = useAnimatedStyle(() => ({
+    opacity: t.value < 0.05 ? t.value * 20 : 1 - t.value,
+    transform: [
+      { translateX: Math.cos(angle) * reach * t.value - d / 2 },
+      { translateY: Math.sin(angle) * reach * t.value - d / 2 },
+      { scale: 0.3 + t.value * (center ? 0.9 : 0.8) },
+    ],
+  }));
+  return <Animated.View style={[styles.puff, { width: d, height: d, borderRadius: d }, look]} />;
+}
+
+/**
+ * Something knocked off (a hat swapped for a new one): it drops `fall` points, spinning, bounces
+ * where it lands, lies there a moment and fades. Plays once.
+ */
+export function Tumble({ children, fall, side, style }: { children: ReactNode; fall: number; side: 1 | -1; style?: StyleProp<ViewStyle> }) {
+  const { animate } = useMotion();
+  const y = useSharedValue(0);
+  const x = useSharedValue(0);
+  const spin = useSharedValue(0);
+  const fade = useSharedValue(1);
+  useEffect(() => {
+    if (!animate) return;
+    const ms = fallMs(fall);
+    const hop = Math.min(30, fall * 0.12);
+    y.value = withSequence(
+      withTiming(fall, { duration: ms, easing: Easing.in(Easing.quad) }),
+      withTiming(fall - hop, { duration: 140, easing: Easing.out(Easing.quad) }),
+      withTiming(fall, { duration: 140, easing: Easing.in(Easing.quad) }),
+    );
+    x.value = withTiming(side * Math.max(24, fall * 0.3), { duration: ms + 280, easing: Easing.out(Easing.quad) });
+    spin.value = withTiming(side * 200, { duration: ms + 280, easing: Easing.out(Easing.quad) });
+    fade.value = withDelay(TUMBLE_MS - 400, withTiming(0, { duration: 400 }));
+    // Only on mount.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+  const look = useAnimatedStyle(() => ({
+    opacity: fade.value,
+    transform: [{ translateX: x.value }, { translateY: y.value }, { rotate: `${spin.value}deg` }],
+  }));
+  if (!animate) return null;
+  return (
+    <Animated.View pointerEvents="none" style={[style, look]}>
+      {children}
+    </Animated.View>
+  );
+}
+
+/** How long a knocked-off piece is on screen, falling and then lying on the floor. */
+export const TUMBLE_MS = 1900;
+
 const CONFETTI_COLORS =['#FF6B6B', '#FFD93D', '#6BCB77', '#4D96FF', '#C77DFF', '#FF9F45'];
 
 interface ConfettiProps {
@@ -660,5 +740,6 @@ const styles = StyleSheet.create({
   // A held figure hangs from the top, where the finger has it.
   hang: { width: '100%', height: '100%', transformOrigin: 'top', alignItems: 'center', justifyContent: 'flex-end' },
   cover: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, overflow: 'hidden' },
+  puff: { position: 'absolute', left: 0, top: 0, backgroundColor: '#FFFFFF', borderWidth: 2, borderColor: '#E4E0F0' },
   bit: { position: 'absolute', top: 0, width: 8, borderRadius: 2 },
 });

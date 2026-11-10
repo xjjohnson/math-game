@@ -21,7 +21,7 @@ import { PersonFigure, type PersonDressed } from '@/components/PersonFigure';
 import { Furniture } from '@/components/Furniture';
 import { FramedPicture } from '@/components/PaintingView';
 import { Lamp } from '@/components/Lamp';
-import { Bob, Drifting, Flicker, FloatUp, Glide, Lively, Rumble, Spin, Swing, type BounceKind } from '@/components/Motion';
+import { Bob, Drifting, Flicker, FloatUp, Glide, Lively, Poof, Tumble, TUMBLE_MS, Rumble, Spin, Swing, type BounceKind } from '@/components/Motion';
 import { PopIn } from '@/components/PopIn';
 import { Sticker } from '@/components/Sticker';
 import { ApplianceView } from '@/components/Appliance';
@@ -47,8 +47,9 @@ import {
   type Season,
   PICTURE_ITEM,
 } from '@/constants/room';
-import type { PersonLook } from '@/constants/wardrobe';
-import type { BuddySpot, Room } from '@/types';
+import { findWearable, type PersonLook } from '@/constants/wardrobe';
+import type { BuddySpot, Outfit, Room } from '@/types';
+import { outfitChange, SLOT_HEIGHT, type OutfitSlot } from '@/utils/wardrobe';
 import {
   dropBuddy,
   dropThing,
@@ -81,6 +82,8 @@ export interface HomeBuddy {
   dressed: Dressed;
   /** People are drawn from their looks and clothes instead of a face emoji. */
   person?: { look: PersonLook; dressed: PersonDressed };
+  /** What it has on, by spot, so a change can poof on (and the old piece fall off). */
+  outfit?: Outfit;
 }
 
 interface Props {
@@ -186,6 +189,17 @@ interface Track {
   moved: boolean;
 }
 
+/** A dress-up effect over a buddy: a poof where something went on, or an old piece falling off. */
+interface DressFx {
+  id: number;
+  kind: 'poof' | 'drop';
+  /** The buddy's piece. */
+  key: string;
+  slot: OutfitSlot;
+  emoji?: string;
+  side?: 1 | -1;
+}
+
 interface Pop {
   id: number;
   x: number;
@@ -215,6 +229,9 @@ export function BuddyRoom(props: Props) {
   /** How far each piece being dragged (or riding along) has moved, by piece key. */
   const [moving, setMoving] = useState<Record<string, { dx: number; dy: number }>>({});
   const [pops, setPops] = useState<Pop[]>([]);
+  /** Clothes just put on (a poof) or knocked off (falling to the floor). */
+  const [dressFx, setDressFx] = useState<DressFx[]>([]);
+  const lastOutfits = useRef<Record<string, Outfit>>({});
   /** The last one-off animation for each piece, replayed when `n` changes. */
   const [bumps, setBumps] = useState<Record<string, { n: number; kind: BounceKind }>>({});
   /** Up in the tree house, looking around inside. */
@@ -260,6 +277,29 @@ export function BuddyRoom(props: Props) {
 
   const bump = (key: string, kind: BounceKind) =>
     setBumps((b) => ({ ...b, [key]: { n: (b[key]?.n ?? 0) + 1, kind } }));
+
+  // Dress-up: something new pops on with a poof; what it replaced falls to the floor.
+  useEffect(() => {
+    const fx: DressFx[] = [];
+    for (const b of buddies) {
+      if (!b.outfit) continue;
+      const before = lastOutfits.current[b.id];
+      lastOutfits.current[b.id] = b.outfit;
+      const piece = latestPieces.current.find((p) => p.buddyId === b.id);
+      if (!before || !piece || !animate) continue;
+      const { on, off } = outfitChange(before, b.outfit);
+      on.forEach((w) => fx.push({ id: ++popId.current, kind: 'poof', key: piece.key, slot: w.slot }));
+      off.forEach((w, i) =>
+        fx.push({ id: ++popId.current, kind: 'drop', key: piece.key, slot: w.slot, emoji: findWearable(w.id)?.emoji ?? '👕', side: i % 2 ? -1 : 1 }),
+      );
+      if (on.length) bump(piece.key, 'pop');
+    }
+    if (!fx.length) return;
+    setDressFx((list) => [...list, ...fx]);
+    const ids = new Set(fx.map((f) => f.id));
+    popTimers.current.push(setTimeout(() => setDressFx((list) => list.filter((f) => !ids.has(f.id))), TUMBLE_MS));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [buddies]);
 
   useEffect(() => {
     if (cheer?.n) bump(BUDDY_KEY + cheer.buddyId, 'hop');
@@ -949,6 +989,25 @@ export function BuddyRoom(props: Props) {
             ))}
           </Flicker>
         ))}
+
+        {dressFx.map((f) => {
+          // Drawn from where the buddy is now, so it stays on them if the home resizes.
+          const piece = byKey.get(f.key);
+          if (!piece) return null;
+          const y = piece.y - piece.height + piece.height * SLOT_HEIGHT[f.slot];
+          return f.kind === 'poof' ? (
+            <Poof key={f.id} size={piece.height * 0.45} style={{ left: piece.x, top: y, zIndex: 20 }} />
+          ) : (
+            <Tumble
+              key={f.id}
+              fall={Math.max(0, piece.y - y - piece.height * 0.06)}
+              side={f.side ?? 1}
+              style={[styles.pop, { left: piece.x - piece.height * 0.1, top: y - piece.height * 0.1, zIndex: 20 }]}
+            >
+              <Text style={{ fontSize: Math.round(piece.height * 0.18) }}>{f.emoji}</Text>
+            </Tumble>
+          );
+        })}
 
         {pops.map((p) => (
           <FloatUp
