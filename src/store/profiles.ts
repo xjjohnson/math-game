@@ -7,6 +7,7 @@ import { DEFAULT_EQUIPPED } from '@/constants/shop';
 import { usePaintings } from '@/store/paintings';
 import { useSettings } from '@/store/settings';
 import { migrateProfiles, PROFILES_VERSION } from '@/store/profileMigrations';
+import { noteHelp } from '@/utils/skills/plan';
 import { createSafeStorage, type LoadStatus } from '@/store/safeStorage';
 import { rawStorage } from '@/store/storage';
 import type { Grade, InputStyle, Profile } from '@/types';
@@ -83,6 +84,7 @@ export function createProfile(
     looks: {},
     homeRooms: [],
     town: { date: '', done: [] },
+    skills: {},
   };
 }
 
@@ -133,6 +135,8 @@ interface ProfilesState {
   setMood: (id: string, buddyId: string, mood: Mood) => void;
   /** Finishes a job in the community and returns what it paid. */
   finishShift: (id: string, building: BuildingId, correct: number) => ShiftPay;
+  /** Notes that Help was opened on a skill, so the help can move on from pictures when it's no longer needed. */
+  noteSkillHelp: (id: string, skill: string) => void;
 }
 
 /** Where the profiles are saved: backed up before each upgrade, and never saved over by a failed load. */
@@ -284,6 +288,10 @@ export const useProfiles = create<ProfilesState>()(
         set((s) => ({ profiles: s.profiles.map((p) => (p.id === id ? profile : p)) }));
         return pay;
       },
+      noteSkillHelp: (id, skill) =>
+        set((s) => ({
+          profiles: s.profiles.map((p) => (p.id === id ? { ...p, skills: noteHelp(p.skills ?? {}, skill) } : p)),
+        })),
     }),
     {
       name: 'math-game.profiles',

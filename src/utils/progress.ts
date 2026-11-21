@@ -1,6 +1,7 @@
 import type { AnswerRecord, Difficulty, Profile } from '@/types';
 import { newBadges } from '@/utils/badges';
 import { roundRewards, type RoundRewards } from '@/utils/rewards';
+import { recordSkills } from '@/utils/skills/plan';
 import { updateMissed } from '@/utils/weakSpots';
 import { grantStarRewards, levelsReached, type StarLevel } from '@/utils/starLevels';
 import { recordWeek, WEEKLY_GOAL_BONUS } from '@/utils/weekly';
@@ -24,7 +25,14 @@ export interface RoundOutcome extends RoundRewards {
   newBadges: string[];
   /** Star levels this round reached, each with its free reward. */
   newStarLevels: StarLevel[];
+  /** Skills learned in this round. */
+  newSkills: string[];
+  /** Stars paid for those skills (included in the profile's stars, not in `stars`). */
+  skillStars: number;
 }
+
+/** Stars for each new skill learned. Stars show progress, so learning pays in stars. */
+export const SKILL_STARS = 5;
 
 /**
  * Applies a finished round to a profile: stats, best streak, high score, coins,
@@ -39,6 +47,8 @@ export function applyRound(
 ): { profile: Profile; outcome: RoundOutcome } {
   const stats = { ...profile.stats };
   for (const r of round.history) {
+    // Per-operation accuracy is for sums; picture questions (clocks, shapes...) live in the skill records.
+    if (r.problem.ask) continue;
     const op = r.problem.operation;
     stats[op] = {
       attempted: stats[op].attempted + 1,
@@ -53,6 +63,9 @@ export function applyRound(
     ? profile.playDates
     : [...profile.playDates, today];
 
+  const { skills, learned } = recordSkills(profile.skills ?? {}, round.history, today);
+  const skillStars = learned.length * SKILL_STARS;
+
   const correct = round.history.filter((r) => r.correct).length;
   const { week, justCompleted } = recordWeek(profile.week, today, correct);
   const weeklyBonusCoins = justCompleted ? WEEKLY_GOAL_BONUS : 0;
@@ -63,13 +76,14 @@ export function applyRound(
     bestStreak: Math.max(profile.bestStreak, round.bestStreak),
     highScores: { ...profile.highScores, [round.highScoreKey]: Math.max(previous, round.score) },
     coins: profile.coins + rewards.coins + weeklyBonusCoins,
-    stars: profile.stars + rewards.starsEarned,
+    stars: profile.stars + rewards.starsEarned + skillStars,
     playDates,
     dailyChallengeDate: rewards.dailyBonusCoins > 0 ? today : profile.dailyChallengeDate,
     // The daily challenge shouldn't change what the next one is based on.
     lastDifficulty: isDaily ? profile.lastDifficulty : round.difficulty,
     week,
     missed: updateMissed(profile.missed, round.history, today),
+    skills,
   };
 
   const earned = newBadges(updated, {
@@ -92,6 +106,8 @@ export function applyRound(
       newHighScore: round.score > previous,
       newBadges: earned,
       newStarLevels: levelsReached(profile.stars, updated.stars),
+      newSkills: learned,
+      skillStars,
     },
   };
 }

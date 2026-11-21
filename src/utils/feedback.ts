@@ -15,6 +15,7 @@ const SPOKEN: Record<Problem['operation'], string> = {
 /** How a problem is read out: the story, or e.g. "What is 7 times 8?". */
 export function spokenProblem(problem: Problem): string {
   if (problem.story) return problem.story;
+  if (problem.ask) return problem.prompt ? `${problem.ask} ${spokenLine(problem.prompt)}` : problem.ask;
   const a = problem.a < 0 ? `minus ${-problem.a}` : String(problem.a);
   return `What is ${a} ${SPOKEN[problem.operation]} ${problem.b}?`;
 }
@@ -51,4 +52,24 @@ export function vibrate(kind: 'correct' | 'wrong') {
       ? Haptics.NotificationFeedbackType.Success
       : Haptics.NotificationFeedbackType.Error,
   ).catch(() => {});
+}
+
+/** Reads a written line the way it's said: "6 + ☐ = 11" is "6 plus what number equals 11". */
+export function spokenLine(line: string): string {
+  return line
+    .replace(/☐/g, 'what number')
+    .replace(/ \+ /g, ' plus ')
+    .replace(/ − /g, ' minus ')
+    .replace(/ × /g, ' times ')
+    .replace(/ ÷ /g, ' divided by ')
+    .replace(/ = /g, ' equals ')
+    .replace(/(\d+)\/(\d+)/g, '$1 out of $2');
+}
+
+/** How an answer is shown: its label (a word, sign, time or fraction) or the number with its unit. */
+export function answerText(problem: Problem, value: number): string {
+  const label = problem.labels?.[value];
+  if (label !== undefined) return label;
+  if (!problem.unit) return String(value);
+  return problem.unit === '¢' ? `${value}¢` : `${value} ${problem.unit}`;
 }

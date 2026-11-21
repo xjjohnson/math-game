@@ -26,7 +26,7 @@ import { useSettings } from '@/store/settings';
 import type { GameConfig } from '@/types';
 import { buddyGift } from '@/utils/buddy';
 import { countingModel } from '@/utils/countingAid';
-import { speakProblem, stopSpeaking, vibrate } from '@/utils/feedback';
+import { answerText, speakProblem, stopSpeaking, vibrate } from '@/utils/feedback';
 import {
   highScoreKey,
   lastAnswer,
@@ -36,6 +36,7 @@ import { resolveInputStyle } from '@/utils/inputStyle';
 import type { RoundOutcome } from '@/utils/progress';
 import { coinsForAnswer, SPEEDY_SECONDS, STREAK_MILESTONE } from '@/utils/rewards';
 import { randomSeed } from '@/utils/seededRandom';
+import { freshRound, withPlan } from '@/utils/skills/plan';
 import { cardStyleFor, companionFor } from '@/utils/shop';
 import { playSound } from '@/utils/soundEffects';
 
@@ -56,13 +57,15 @@ export function PlayScreen() {
     <Round
       key={config.seed}
       config={config}
-      onPlayAgain={() => setConfig({ ...config, seed: randomSeed() })}
+      onPlayAgain={() => setConfig(freshRound(config, randomSeed()))}
     />
   );
 }
 
-function Round({ config, onPlayAgain }: { config: GameConfig; onPlayAgain: () => void }) {
+function Round({ config: asked, onPlayAgain }: { config: GameConfig; onPlayAgain: () => void }) {
   const profile = useActiveProfile();
+  // Skill rounds pick their skills from the player once, when the round starts.
+  const [config] = useState(() => withPlan(asked, profile));
   const recordRound = useProfiles((s) => s.recordRound);
   const [state, dispatch] = useGameSession(config);
   const [outcome, setOutcome] = useState<RoundOutcome | null>(null);
@@ -72,7 +75,9 @@ function Round({ config, onPlayAgain }: { config: GameConfig; onPlayAgain: () =>
   const asking = state.phase === 'question';
   const secondsLeft = useTimer(config.timer, asking, state.index, () => dispatch({ type: 'timeout' }));
   const last = lastAnswer(state);
-  const inputStyle = resolveInputStyle(profile?.inputStyle, state.difficulty);
+  const inputStyle = state.problem.choiceOnly
+    ? 'choices'
+    : resolveInputStyle(profile?.inputStyle, state.difficulty, config.grade);
   const companion = companionFor(profile);
   const palette = usePalette();
 
@@ -217,6 +222,7 @@ function Round({ config, onPlayAgain }: { config: GameConfig; onPlayAgain: () =>
           selected={showFeedback ? (last.given ?? Number.NaN) : null}
           answer={state.problem.answer}
           onSelect={answer}
+          label={(c) => answerText(state.problem, c)}
         />
       ) : showFeedback ? null : typingColumns ? (
         <>

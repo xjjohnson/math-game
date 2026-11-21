@@ -52,7 +52,8 @@ function blocks(n: number, part: 'a' | 'b'): CountItem[] {
 /** A picture to count for this problem, or null when the numbers are too big to count by hand. */
 export function countingModel(problem: Problem): CountModel | null {
   const { operation, a, b } = problem;
-  if (a < 0 || b < 0) return null;
+  // Picture questions already have their own picture to count.
+  if (a < 0 || b < 0 || problem.ask) return null;
 
   switch (operation) {
     case 'add':

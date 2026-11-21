@@ -29,7 +29,7 @@ const digit = (d: string | null) => (d === null ? 0 : Number(d));
 
 /** Steps from the ones leftward, or null when the problem has no column method here. */
 export function teachSteps(problem: Problem): TeachStep[] | null {
-  if (problem.story || problem.a < 0 || problem.b < 0) return null;
+  if (problem.story || problem.ask || problem.a < 0 || problem.b < 0) return null;
   const { width, a, b } = columnLayout(problem);
   const steps: TeachStep[] = [];
   const answerDigits = String(problem.answer).length;

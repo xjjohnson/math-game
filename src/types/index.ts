@@ -1,5 +1,8 @@
 import type { Mood } from '@/components/PersonFigure';
 import type { PersonLook } from '@/constants/wardrobe';
+import type { Picture } from '@/types/picture';
+
+export type { Money, Picture, Shape2D, Shape3D } from '@/types/picture';
 
 export type Operation = 'add' | 'subtract' | 'multiply' | 'divide';
 
@@ -35,6 +38,24 @@ export interface Problem {
   choices: number[];
   /** Word problem text, when the round uses word problems. */
   story?: string;
+  /** The skill this question practises (see src/utils/skills/catalog.ts). */
+  skill?: SkillId;
+  /**
+   * The question in words, for questions that aren't a plain sum, e.g.
+   * "How many dots?" or "What time is it?". `prompt` is then the big line under
+   * the picture (it may be empty), with ☐ where the answer goes.
+   */
+  ask?: string;
+  /** A picture drawn on the card: dots, blocks, a clock, coins, a shape, a fraction... */
+  picture?: Picture;
+  /** Words for answers that aren't plain numbers, keyed by the answer value, e.g. { 0: '<', 1: '=', 2: '>' }. */
+  labels?: Record<number, string>;
+  /** Only answered by tapping a choice (the answers are words or signs, not numbers to type). */
+  choiceOnly?: boolean;
+  /** Unit after a typed answer, e.g. "¢" or "inches". */
+  unit?: string;
+  /** Hide the picture after this many milliseconds (quick looks, like dice dots). */
+  flashMs?: number;
 }
 
 /** The parts of a problem needed to ask it again later. */
@@ -107,11 +128,13 @@ export interface Profile {
   lastGame?: GameChoices;
   /** Community buildings whose daily job is done, for today only. */
   town: TownVisits;
+  /** How the player is doing on each skill, keyed by skill id. */
+  skills: Record<SkillId, SkillProgress>;
 }
 
 /** New game screen picks (grade and difficulty are kept on the profile itself). */
 export interface GameChoices {
-  choice: Operation | 'tables';
+  choice: Operation | 'tables' | 'mix' | Strand;
   tables: number[];
   includeDivision: boolean;
   timer: TimerSetting;
@@ -204,7 +227,45 @@ export type GameMode =
   | { kind: 'operation'; operation: Operation }
   | { kind: 'tables'; tables: number[]; includeDivision: boolean }
   /** Practice facts the player got wrong before. */
-  | { kind: 'review'; facts: Fact[] };
+  | { kind: 'review'; facts: Fact[] }
+  /**
+   * Skill practice: the app picks each question's skill from what the player is
+   * learning. `strands` limits it to some areas (all when missing); `focus`
+   * practises one skill; `plan` is the skill for each question, filled in when
+   * the round starts so every device asks the same things.
+   */
+  | { kind: 'skills'; strands?: Strand[]; focus?: SkillId; plan?: SkillId[] };
+
+/** An area of maths, like a strand in a school curriculum. */
+export type Strand =
+  | 'count'
+  | 'add'
+  | 'subtract'
+  | 'place'
+  | 'multiply'
+  | 'divide'
+  | 'story'
+  | 'time'
+  | 'money'
+  | 'measure'
+  | 'shapes'
+  | 'fractions';
+
+export type SkillId = string;
+
+/** How a player is doing on one skill. */
+export interface SkillProgress {
+  /** Last answers, oldest first, as '1' (right) and '0' (wrong); at most 10. */
+  recent: string;
+  tries: number;
+  right: number;
+  /** True once learned (see isLearned); can be lost again if it gets shaky. */
+  learned: boolean;
+  /** Local date the skill was first learned. */
+  learnedOn?: string;
+  /** Times the Help button was opened on this skill. */
+  helped?: number;
+}
 
 export interface GameConfig {
   mode: GameMode;
