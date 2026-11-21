@@ -635,7 +635,7 @@ function Ruler({ length, unit, thing, width }: Extract<Picture, { kind: 'ruler' 
     );
   const ry = top + 36;
   return (
-    <Svg width={width} height={ry + 52}>
+    <Svg width={width} height={ry + 66}>
       {object}
       <Line x1={tx} y1={top} x2={tx} y2={ry} stroke="#90A4AE" strokeWidth={1} strokeDasharray="3,3" />
       <Line x1={tx + tw} y1={top} x2={tx + tw} y2={ry} stroke="#90A4AE" strokeWidth={1} strokeDasharray="3,3" />
@@ -654,8 +654,8 @@ function Ruler({ length, unit, thing, width }: Extract<Picture, { kind: 'ruler' 
           </G>
         );
       })}
-      <SvgText x={width - pad} y={ry + 32} fontSize={10} fill={INK} textAnchor="end">
-        {unit}
+      <SvgText x={width / 2} y={ry + 60} fontSize={13} fontWeight="700" fill={INK} textAnchor="middle">
+        {unit === 'in' ? 'inches' : 'centimeters'}
       </SvgText>
     </Svg>
   );

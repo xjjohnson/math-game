@@ -157,7 +157,16 @@ function SkillFace({
         </View>
       ) : null}
       {problem.prompt ? (
-        <Text style={[styles.skillPrompt, big && styles.skillPromptBig, { color: ink }]} adjustsFontSizeToFit numberOfLines={2}>
+        <Text
+          style={[
+            styles.skillPrompt,
+            big && styles.skillPromptBig,
+            problem.prompt.length > 12 && (big ? styles.skillPromptLongBig : styles.skillPromptLong),
+            { color: ink },
+          ]}
+          adjustsFontSizeToFit
+          numberOfLines={2}
+        >
           {reveal && problem.prompt.includes('☐') ? (
             <>
               {problem.prompt.split('☐')[0]}
@@ -218,4 +227,7 @@ const styles = StyleSheet.create({
   picture: { marginVertical: spacing.sm, alignItems: 'center' },
   skillPrompt: { fontSize: 44, fontWeight: '900', textAlign: 'center' },
   skillPromptBig: { fontSize: 64 },
+  // Long lines like "669 = 600 + ☐ + 9" shrink so they stay on one line on a phone.
+  skillPromptLong: { fontSize: 32 },
+  skillPromptLongBig: { fontSize: 48 },
 });

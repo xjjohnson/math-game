@@ -97,7 +97,7 @@ export function subWithin20(id: SkillId, rng: Rng): Problem {
 /** 2-digit minus 2-digit where every top digit is big enough (58 − 23): no trade needed. */
 export function sub2dNoTrade(id: SkillId, rng: Rng): Problem {
   const aT = randInt(rng, 2, 9);
-  const bT = randInt(rng, 1, aT);
+  const bT = randInt(rng, 1, aT - 1);
   const aO = randInt(rng, 1, 9);
   const bO = randInt(rng, 0, aO);
   return sum(id, 'subtract', fromDigits(aT, aO), fromDigits(bT, bO), rng);

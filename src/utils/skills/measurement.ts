@@ -28,7 +28,7 @@ export function tellTime(id: SkillId, rng: Rng, stepMinutes: 30 | 5 | 1): Proble
   add(hour + 1, minute);
   add(hour - 1, minute);
   if (minute % 5 === 0 && minute > 0) add(minute / 5, hour * 5);
-  if (minute > 0) add(hour, minute / 5);
+  if (minute > 0 && minute % 5 === 0) add(hour, minute / 5);
   add(hour, minute + (stepMinutes === 30 ? 30 : stepMinutes === 5 ? 15 : 5));
   add(hour, minute - (stepMinutes === 30 ? 30 : 5));
   const options = shuffle(rng, [answer, ...shuffle(rng, [...near]).slice(0, 3)]);

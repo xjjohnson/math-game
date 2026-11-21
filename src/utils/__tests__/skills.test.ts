@@ -21,7 +21,10 @@ describe('every skill makes sound questions', () => {
       expect(new Set(p.choices).size).toBe(p.choices.length);
       expect(p.choices.length).toBeGreaterThanOrEqual(2);
       if (p.choiceOnly) {
-        for (const c of p.choices) expect(p.labels?.[c]).toBeTruthy();
+        for (const c of p.choices) {
+          expect(p.labels?.[c]).toBeTruthy();
+          expect(Number.isInteger(c)).toBe(true);
+        }
       } else {
         expect(Number.isInteger(p.answer)).toBe(true);
         // Negative answers only come in from 4th grade up (they're allowed there on the hardest level).

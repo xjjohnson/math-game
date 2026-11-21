@@ -47,8 +47,8 @@ export function ModePickerScreen() {
   const [choice, setChoice] = useState<Choice>(last?.choice ?? 'mix');
   const [level, setLevel] = useState<Level>({
     grade: profile?.grade ?? DEFAULT_GRADE,
-    // Rounds that pick skills start on "Just right".
-    difficulty: profile?.lastDifficulty ?? 'medium',
+    // A first round starts on "Just right"; after that, whatever was played last.
+    difficulty: last && profile ? profile.lastDifficulty : 'medium',
   });
   const { difficulty } = level;
   const [timer, setTimer] = useState<TimerSetting>(last?.timer ?? null);
