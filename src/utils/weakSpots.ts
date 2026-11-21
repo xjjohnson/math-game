@@ -21,6 +21,8 @@ export function updateMissed(
 ): Record<string, MissedFact> {
   const next = { ...missed };
   for (const r of history) {
+    // Only plain sums can be asked again from their numbers; the skill records keep track of the rest.
+    if (r.problem.ask) continue;
     const { operation, a, b, answer, prompt } = r.problem;
     const key = factKey(r.problem);
     const existing = next[key];

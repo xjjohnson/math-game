@@ -15,6 +15,8 @@ interface Props {
   grade: Grade;
   /** The egg sizes on offer: 1, 10, 100, 1000. */
   units: number[];
+  /** Take-away jobs: the basket starts with these (boxes of 10 and loose eggs) and eggs are taken out. */
+  start?: number[];
   /** Called once: with true if the first try was right, false after the answer was shown. */
   onDone: (rightFirstTry: boolean) => void;
 }
@@ -56,14 +58,15 @@ function Eggs({ value, small = false }: { value: number; small?: boolean }) {
  * say you're done. Ones line up in fives so they are easy to count. A wrong count
  * gets a hint and a second try before the answer is shown.
  */
-export function EggCollecting({ answer, grade, units, onDone }: Props) {
-  const [basket, setBasket] = useState<number[]>([]);
+export function EggCollecting({ answer, grade, units, start, onDone }: Props) {
+  const takeAway = !!start;
+  const [basket, setBasket] = useState<number[]>(start ?? []);
   const [tries, setTries] = useState(0);
   const [hint, setHint] = useState<string | null>(null);
   const [finished, setFinished] = useState<'right' | 'shown' | null>(null);
   // Each thing put in the basket gets its own key, so only the new one pops in.
-  const nextKey = useRef(0);
-  const [keys, setKeys] = useState<number[]>([]);
+  const nextKey = useRef(start?.length ?? 0);
+  const [keys, setKeys] = useState<number[]>(() => (start ?? []).map((_, i) => i));
   const total = eggsIn(basket);
 
   const finish = (how: 'right' | 'shown') => {
@@ -85,6 +88,12 @@ export function EggCollecting({ answer, grade, units, onDone }: Props) {
     setKeys((k) => [...k, nextKey.current++]);
     setHint(null);
   };
+  // Opening a box of 10 puts its 10 eggs loose in the basket: a ten traded for 10 ones.
+  const open = (i: number) => {
+    setBasket((b) => [...b.filter((_, n) => n !== i), ...Array(10).fill(1)]);
+    setKeys((k) => [...k.filter((_, n) => n !== i), ...Array.from({ length: 10 }, () => nextKey.current++)]);
+    setHint(null);
+  };
   const remove = (i: number) => {
     setBasket((b) => b.filter((_, n) => n !== i));
     setKeys((k) => k.filter((_, n) => n !== i));
@@ -100,9 +109,9 @@ export function EggCollecting({ answer, grade, units, onDone }: Props) {
     <Pressable
       key={e.key}
       disabled={finished !== null}
-      onPress={() => remove(e.i)}
+      onPress={() => (takeAway && e.v === 10 ? open(e.i) : remove(e.i))}
       accessibilityRole="button"
-      accessibilityLabel={`Put back ${SAY[e.v]}`}
+      accessibilityLabel={takeAway ? (e.v === 10 ? 'Open this box of 10' : 'Take out one egg') : `Put back ${SAY[e.v]}`}
     >
       <PopIn damping={10}>
         <Eggs value={e.v} small />
@@ -127,14 +136,18 @@ export function EggCollecting({ answer, grade, units, onDone }: Props) {
               ))}
             </>
           ) : (
-            <Text style={styles.empty}>Tap the hen house below to collect eggs</Text>
+            <Text style={styles.empty}>{takeAway ? 'The basket is empty' : 'Tap the hen house below to collect eggs'}</Text>
           )}
         </View>
-        {total > answer && finished === null && !hint ? <Text style={styles.nudge}>That's a lot of eggs! Tap one in the basket to put it back.</Text> : null}
+        {takeAway && finished === null ? (
+          <Text style={styles.small}>Tap a loose egg to take it out. Tap a box to open it into 10 loose eggs.</Text>
+        ) : null}
+        {!takeAway && total > answer && finished === null && !hint ? <Text style={styles.nudge}>That's a lot of eggs! Tap one in the basket to put it back.</Text> : null}
       </View>
 
       {finished === null ? (
         <>
+          {takeAway ? null : (
           <View style={styles.coop}>
             <Text style={styles.coopTitle}>🐔 Hen house 🐔</Text>
             <View style={styles.nests}>
@@ -152,6 +165,7 @@ export function EggCollecting({ answer, grade, units, onDone }: Props) {
               ))}
             </View>
           </View>
+          )}
           {hint ? (
             <Text style={styles.hint} accessibilityLiveRegion="polite">
               {hint}
@@ -163,8 +177,8 @@ export function EggCollecting({ answer, grade, units, onDone }: Props) {
               outline
               color={colors.textMuted}
               onPress={() => {
-                setBasket([]);
-                setKeys([]);
+                setBasket(start ?? []);
+                setKeys((start ?? []).map(() => nextKey.current++));
                 setHint(null);
               }}
               style={{ flex: 1, paddingHorizontal: 8 }}

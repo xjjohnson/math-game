@@ -1,6 +1,7 @@
 import { makeProfile } from '@/test/fixtures';
 import { createRng } from '@/utils/seededRandom';
-import { BUILDINGS, changeBills, paymentBills, changeHint, customerPays, sensiblePayments, FIRST_BONUS_COINS, FIRST_BONUS_HEARTS, finishShift, handedBack, REPLAY_COINS_PER_RIGHT, shiftDone, shiftQuestions, SHIFT_QUESTIONS } from '@/utils/town';
+import { findSkill } from '@/utils/skills/catalog';
+import { BUILDINGS, changeBills, paymentBills, changeHint, customerPays, eggTakeAway, sensiblePayments, FIRST_BONUS_COINS, FIRST_BONUS_HEARTS, finishShift, handedBack, REPLAY_COINS_PER_RIGHT, shiftDone, shiftQuestions, SHIFT_QUESTIONS } from '@/utils/town';
 
 const today = '2026-11-07';
 const withPup = makeProfile({ unlocks: ['buddy-pup'], equipped: { background: 'bg-cream', cardStyle: 'card-classic', companion: 'buddy-pup' } });
@@ -16,16 +17,16 @@ describe('community shifts', () => {
     }
   });
 
-  it('makes the shop and bakery hand back change from grade 1 up, with coins that can make the answer', () => {
+  it('makes the shop hand back change from grade 1 up, with coins that can make the answer', () => {
     for (const grade of [1, 3, 6] as const) {
-      for (const id of ['shop', 'bakery'] as const) {
-        const qs = shiftQuestions(id, grade, createRng(11));
-        qs.forEach((q) => {
-          expect(q.change).toBeDefined();
-          expect(q.answer).toBeGreaterThan(0);
-          expect(changeBills(grade)).toContain(1); // any amount can be made
-        });
-      }
+      const qs = shiftQuestions('shop', grade, createRng(11));
+      const change = qs.filter((q) => q.change);
+      // 1st grade has no money skills yet, so every customer wants change; later, two of five do.
+      expect(change.length).toBe(grade === 1 ? 5 : 2);
+      change.forEach((q) => {
+        expect(q.answer).toBeGreaterThan(0);
+        expect(changeBills(grade)).toContain(1); // any amount can be made
+      });
     }
     expect(shiftQuestions('shop', 0, createRng(3)).every((q) => !q.change)).toBe(true);
     expect(handedBack([5, 2, 1])).toBe(8);
@@ -95,10 +96,10 @@ describe('community shifts', () => {
     for (let grade = 1; grade <= 6; grade++) {
       const bills = changeBills(grade as 1);
       for (let seed = 0; seed < 150; seed++) {
-        for (const building of ['shop', 'bakery'] as const) {
+        for (const building of ['shop'] as const) {
           for (const q of shiftQuestions(building, grade as 1, createRng(seed * 7 + grade))) {
-            expect(q.change).toBeDefined();
-            const c = q.change!;
+            if (!q.change) continue;
+            const c = q.change;
             realistic(c.price, c.bills, bills);
             expect(handedBack(c.bills)).toBe(c.paid);
             expect(q.answer).toBe(c.paid - c.price);
@@ -116,5 +117,35 @@ describe('community shifts', () => {
     for (let seed = 0; seed < 50; seed++) realistic(12, customerPays(12, [1, 5, 10, 20], createRng(seed)), [1, 5, 10, 20]);
     // A $10 item is paid with a $20, not a $10 and some $1s.
     for (let seed = 0; seed < 50; seed++) expect(customerPays(10, [1, 5, 10, 20], createRng(seed))).toEqual([20]);
+  });
+
+  it('asks from the skill list: bakery measures, times and cuts; school follows the child', () => {
+    const second = makeProfile({ grade: 2 });
+    const bakery = shiftQuestions('bakery', second, createRng(5));
+    expect(bakery).toHaveLength(SHIFT_QUESTIONS);
+    for (const q of bakery) expect(['measure', 'time', 'fractions']).toContain(findSkill(q.problem?.skill)?.strand);
+    const school = shiftQuestions('school', second, createRng(5));
+    expect(school.every((q) => q.problem && q.problem.choices.includes(q.answer))).toBe(true);
+    // Kindergarten keeps the simple adding jobs.
+    expect(shiftQuestions('school', 0, createRng(5)).every((q) => !q.problem)).toBe(true);
+  });
+
+  it('opens a box of eggs when there are not enough loose ones', () => {
+    for (let seed = 0; seed < 100; seed++) {
+      const q = eggTakeAway(createRng(seed));
+      const start = q.eggs!.start!;
+      const have = start.reduce((a, b) => a + b, 0);
+      expect(q.answer).toBeGreaterThan(0);
+      expect(q.answer).toBeLessThan(have);
+      expect(q.prompt).toContain(`${have} eggs`);
+    }
+  });
+
+  it('counts skill answers from a shift toward learning, with stars for a new skill', () => {
+    const p = makeProfile({ grade: 2 });
+    const right = (skill: string) => ({ problem: findSkill(skill)!.make(createRng(1)), difficulty: 'medium' as const, given: 0, correct: true, points: 0 });
+    const done = finishShift(p, 'bakery', 5, today, Array.from({ length: 5 }, () => right('g2-measure')));
+    expect(done.learned).toEqual(['g2-measure']);
+    expect(done.profile.stars).toBe(p.stars + 5);
   });
 });

@@ -7,11 +7,13 @@ import { BigButton } from '@/components/BigButton';
 import { ChangeGiving } from '@/components/ChangeGiving';
 import { ChoiceButtons } from '@/components/ChoiceButtons';
 import { EggCollecting } from '@/components/EggCollecting';
+import { SkillQuestionCard } from '@/components/SkillQuestionCard';
 import { Screen } from '@/components/Screen';
 import { colors, fontSizes, spacing } from '@/constants/theme';
 import { usePlace } from '@/hooks/usePlace';
 import { useActiveProfile, useProfiles } from '@/store/profiles';
 import { dateKey } from '@/utils/dates';
+import type { AnswerRecord } from '@/types';
 import { createRng, randomSeed } from '@/utils/seededRandom';
 import { BUILDINGS, changeBills, shiftDone, shiftPay, shiftQuestions, SHIFT_QUESTIONS, type BuildingId, type ShiftPay } from '@/utils/town';
 
@@ -22,7 +24,7 @@ export function ShiftScreen() {
   const profile = useActiveProfile();
   const finishShift = useProfiles((s) => s.finishShift);
   const questions = useMemo(
-    () => (building && profile ? shiftQuestions(building.id as BuildingId, profile.grade, createRng(randomSeed())) : []),
+    () => (building && profile ? shiftQuestions(building.id as BuildingId, profile, createRng(randomSeed())) : []),
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [building?.id, profile?.id],
   );
@@ -30,6 +32,8 @@ export function ShiftScreen() {
   const [selected, setSelected] = useState<number | null>(null);
   const [correct, setCorrect] = useState(0);
   const [paid, setPaid] = useState<ShiftPay | null>(null);
+  // Answers to skill-list questions, saved to the skill record when the shift ends.
+  const [history, setHistory] = useState<AnswerRecord[]>([]);
   // Worked here already today when the job was opened: this play is a replay.
   const [replay] = useState(() => (building && profile ? shiftDone(profile, building.id, dateKey()) : false));
   usePlace(building ? building.id : null);
@@ -58,8 +62,22 @@ export function ShiftScreen() {
         <Text style={styles.text}>You already worked here today, so this is practice: 1 coin for each right answer.</Text>
       ) : null}
       <Text style={styles.text}>Question {index + 1} of {SHIFT_QUESTIONS}</Text>
-      {q.change ? null : <Text style={styles.prompt}>{q.prompt}</Text>}
-      {q.change ? (
+      {q.change || q.problem ? null : <Text style={styles.prompt}>{q.prompt}</Text>}
+      {q.problem ? (
+        <SkillQuestionCard
+          key={index}
+          problem={q.problem}
+          progress={q.problem.skill ? profile.skills?.[q.problem.skill] : undefined}
+          onAnswered={(given, right, helped) => {
+            setSelected(given);
+            if (right) setCorrect((n) => n + 1);
+            setHistory((h) => [
+              ...h,
+              { problem: q.problem!, difficulty: 'medium', grade: profile.grade, given, correct: right, points: 0, ...(helped ? { helped } : {}) },
+            ]);
+          }}
+        />
+      ) : q.change ? (
         <ChangeGiving
           key={index}
           item={q.change.item}
@@ -79,6 +97,7 @@ export function ShiftScreen() {
           answer={q.answer}
           grade={profile.grade}
           units={q.eggs.units}
+          start={q.eggs.start}
           onDone={(rightFirstTry) => {
             setSelected(q.answer);
             if (rightFirstTry) setCorrect((n) => n + 1);
@@ -101,7 +120,7 @@ export function ShiftScreen() {
           color={colors.correct}
           onPress={() => {
             const last = index + 1 >= SHIFT_QUESTIONS;
-            if (last) setPaid(finishShift(profile.id, building.id, correct));
+            if (last) setPaid(finishShift(profile.id, building.id, correct, history));
             setSelected(null);
             setIndex(index + 1);
           }}

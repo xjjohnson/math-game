@@ -44,7 +44,8 @@ export function HomeScreen() {
     ? dailyChallengeConfig(today, { grade: profile.grade, difficulty: profile.lastDifficulty })
     : null;
   const dailyDone = profile?.dailyChallengeDate === today;
-  const dailyOperation = daily?.mode.kind === 'operation' ? daily.mode.operation : undefined;
+  const dailyOperation =
+    daily?.mode.kind === 'operation' ? daily.mode.operation : daily?.mode.kind === 'skills' ? daily.mode.strands?.[0] : undefined;
   const dailyOp = OPERATIONS.find((o) => o.value === dailyOperation);
   const days = profile ? dayStreak(profile.playDates, today) : 0;
   const companion = companionFor(profile);

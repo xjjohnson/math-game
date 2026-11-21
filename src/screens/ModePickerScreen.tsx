@@ -9,11 +9,24 @@ import { OPERATIONS, TIMER_OPTIONS } from '@/constants/difficulty';
 import { DEFAULT_GRADE, GRADE_LIST, GRADES } from '@/constants/grades';
 import { colors, fontSizes, radius, spacing, TAP_TARGET } from '@/constants/theme';
 import { useActiveProfile, useProfiles } from '@/store/profiles';
-import type { Difficulty, GameChoices, GameConfig, InputStyle, Level, Operation, TimerSetting } from '@/types';
+import type { Difficulty, GameChoices, GameConfig, InputStyle, Level, Operation, Strand, TimerSetting } from '@/types';
 import { QUESTIONS_PER_ROUND } from '@/utils/gameSession';
 import { randomSeed } from '@/utils/seededRandom';
+import { STRANDS, strandsForGrade } from '@/utils/skills/catalog';
+import { frontier } from '@/utils/skills/plan';
 
-type Choice = Operation | 'tables';
+type Choice = GameChoices['choice'];
+
+const OPERATION_VALUES: string[] = OPERATIONS.map((o) => o.value);
+/** The extra areas shown as tiles under + − × ÷ (those four are skills too). */
+const MORE_STRANDS = STRANDS.filter((s) => !OPERATION_VALUES.includes(s.value));
+
+/** In skill rounds the three levels say how much is new rather than how big the numbers are. */
+const SKILL_LEVELS: Record<Difficulty, { label: string; description: string }> = {
+  easy: { label: 'Warm up', description: 'Mostly things you know, with a little that is new.' },
+  medium: { label: 'Just right', description: 'Mostly what you are learning now.' },
+  hard: { label: 'Challenge', description: 'What you are learning now, plus a peek at what comes next.' },
+};
 
 const DIFFICULTY_ORDER: Difficulty[] = ['easy', 'medium', 'hard'];
 
@@ -31,10 +44,11 @@ export function ModePickerScreen() {
 
   // Starts with whatever was picked last time, so "same again" is one tap on Start.
   const last = profile?.lastGame;
-  const [choice, setChoice] = useState<Choice>(last?.choice ?? 'add');
+  const [choice, setChoice] = useState<Choice>(last?.choice ?? 'mix');
   const [level, setLevel] = useState<Level>({
     grade: profile?.grade ?? DEFAULT_GRADE,
-    difficulty: profile?.lastDifficulty ?? 'easy',
+    // A first round starts on "Just right"; after that, whatever was played last.
+    difficulty: last && profile ? profile.lastDifficulty : 'medium',
   });
   const { difficulty } = level;
   const [timer, setTimer] = useState<TimerSetting>(last?.timer ?? null);
@@ -47,6 +61,10 @@ export function ModePickerScreen() {
   const [more, setMore] = useState(false);
 
   const isTables = choice === 'tables';
+  // Everything but times tables picks its questions from the player's skills.
+  const strands: Strand[] | undefined = isTables || choice === 'mix' ? undefined : [choice as Strand];
+  const learningNow = isTables ? [] : frontier({ grade: level.grade, skills: profile?.skills ?? {} }, strands).slice(0, 3);
+  const moreStrands = MORE_STRANDS.filter((s) => strandsForGrade(level.grade).includes(s.value));
 
   const toggleTable = (n: number) =>
     setTables((current) =>
@@ -68,15 +86,14 @@ export function ModePickerScreen() {
       updateProfile(profile.id, { lastGame });
     }
     const config: GameConfig = {
-      mode: isTables
-        ? { kind: 'tables', tables, includeDivision }
-        : { kind: 'operation', operation: choice },
+      mode: isTables ? { kind: 'tables', tables, includeDivision } : { kind: 'skills', ...(strands ? { strands } : {}) },
       // Times tables score like Medium; the tables themselves set the challenge.
       difficulty: isTables ? 'medium' : difficulty,
       grade: isTables ? undefined : level.grade,
       // A worksheet is answered at the player's own pace, in any order.
       timer: worksheet ? null : timer,
-      adaptive: !isTables && !worksheet && adaptive,
+      // Skill rounds already pick the right level; "change difficulty" is for times tables only now.
+      adaptive: false,
       wordProblems: !isTables && wordProblems,
       showWork: !isTables && !worksheet && showWork,
       worksheet,
@@ -87,13 +104,11 @@ export function ModePickerScreen() {
   };
 
   const grade = GRADES[level.grade];
-  const taught = isTables || GRADES[level.grade].taught.includes(choice as Operation);
 
   // A one-line summary so the closed "More options" row still says what's on.
   const summary = [
     worksheet && 'Worksheet',
     !worksheet && timer && `${timer}s timer`,
-    !isTables && adaptive && !worksheet && 'Adapts',
     !isTables && wordProblems && 'Stories',
     !isTables && showWork && !worksheet && 'Show my work',
   ].filter(Boolean) as string[];
@@ -111,6 +126,14 @@ export function ModePickerScreen() {
       }
     >
       <View style={styles.tiles}>
+        <Tile
+          symbol="✨"
+          label="Just for me (a bit of everything)"
+          color={colors.correct}
+          on={choice === 'mix'}
+          onPress={() => setChoice('mix')}
+          wide
+        />
         {OPERATIONS.map((o) => (
           <Tile
             key={o.value}
@@ -122,6 +145,16 @@ export function ModePickerScreen() {
           />
         ))}
         <Tile symbol="🔢" label="Times tables" color={colors.text} on={isTables} onPress={() => setChoice('tables')} wide />
+        {moreStrands.map((s) => (
+          <Tile
+            key={s.value}
+            symbol={s.emoji}
+            label={s.label}
+            color={colors.text}
+            on={choice === s.value}
+            onPress={() => setChoice(s.value)}
+          />
+        ))}
       </View>
 
       {isTables ? (
@@ -169,16 +202,19 @@ export function ModePickerScreen() {
             {DIFFICULTY_ORDER.map((d) => (
               <Chip
                 key={d}
-                label={grade.levels[d].label}
+                label={SKILL_LEVELS[d].label}
                 on={difficulty === d}
                 wide
                 onPress={() => setLevel({ ...level, difficulty: d })}
               />
             ))}
           </View>
-          <Text style={styles.note}>{grade.levels[difficulty].description}</Text>
-          {!taught ? (
-            <Text style={styles.note}>{grade.name} doesn't usually do this yet, so the numbers stay small.</Text>
+          <Text style={styles.note}>{SKILL_LEVELS[difficulty].description}</Text>
+          {learningNow.length ? (
+            <Text style={styles.note}>
+              {'Learning now: '}
+              {learningNow.map((s) => `${s.title}${s.example ? ` (${s.example})` : ''}`).join(' · ')}
+            </Text>
           ) : null}
         </View>
       )}
@@ -206,14 +242,11 @@ export function ModePickerScreen() {
           />
           {!isTables ? (
             <>
-              {worksheet ? null : (
-                <ToggleRow label="Change difficulty as I play" value={adaptive} onChange={setAdaptive} />
-              )}
               <ToggleRow label="Word problems (little stories)" value={wordProblems} onChange={setWordProblems} />
               {choice !== 'divide' && !worksheet ? (
                 <>
                   <ToggleRow
-                    label="✏️ Show my work (carry and borrow)"
+                    label="✏️ Show my work (trade and regroup)"
                     value={showWork}
                     onChange={(on) => {
                       setShowWork(on);

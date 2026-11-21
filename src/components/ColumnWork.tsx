@@ -88,7 +88,7 @@ export function ColumnWork({
     <View style={styles.wrap}>
       {entry ? (
         <View style={styles.row}>
-          <Text style={[styles.carryHint, { width: cell }]} numberOfLines={1} adjustsFontSizeToFit>{subtract ? 'borrow' : 'carry'}</Text>
+          <Text style={[styles.carryHint, { width: cell }]} numberOfLines={1} adjustsFontSizeToFit>{subtract ? 'trade' : 'regroup'}</Text>
           {cols.map((i) => {
             const selected = typing && selectable && entry.cursor.row === 'carry' && entry.cursor.col === i;
             const mark = entry.carries[i];

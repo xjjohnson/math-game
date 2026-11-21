@@ -7,9 +7,10 @@ import { DEFAULT_EQUIPPED } from '@/constants/shop';
 import { usePaintings } from '@/store/paintings';
 import { useSettings } from '@/store/settings';
 import { migrateProfiles, PROFILES_VERSION } from '@/store/profileMigrations';
+import { noteHelp } from '@/utils/skills/plan';
 import { createSafeStorage, type LoadStatus } from '@/store/safeStorage';
 import { rawStorage } from '@/store/storage';
-import type { Grade, InputStyle, Profile } from '@/types';
+import type { AnswerRecord, Grade, InputStyle, Profile } from '@/types';
 import { dateKey } from '@/utils/dates';
 import { applyRound, type RoundOutcome, type RoundResult } from '@/utils/progress';
 import { careForBuddy as applyCare, heartForRound, type CareAction, type CareResult } from '@/utils/buddy';
@@ -83,6 +84,7 @@ export function createProfile(
     looks: {},
     homeRooms: [],
     town: { date: '', done: [] },
+    skills: {},
   };
 }
 
@@ -132,7 +134,9 @@ interface ProfilesState {
   /** Sets the face a buddy shows (Feelings). */
   setMood: (id: string, buddyId: string, mood: Mood) => void;
   /** Finishes a job in the community and returns what it paid. */
-  finishShift: (id: string, building: BuildingId, correct: number) => ShiftPay;
+  finishShift: (id: string, building: BuildingId, correct: number, history?: AnswerRecord[]) => ShiftPay;
+  /** Notes that Help was opened on a skill, so the help can move on from pictures when it's no longer needed. */
+  noteSkillHelp: (id: string, skill: string) => void;
 }
 
 /** Where the profiles are saved: backed up before each upgrade, and never saved over by a failed load. */
@@ -277,13 +281,17 @@ export const useProfiles = create<ProfilesState>()(
         set((s) => ({ profiles: s.profiles.map((p) => (p.id === id ? setLook(p, buddyId, change) : p)) })),
       setMood: (id, buddyId, mood) =>
         set((s) => ({ profiles: s.profiles.map((p) => (p.id === id ? setMood(p, buddyId, mood) : p)) })),
-      finishShift: (id, building, correct) => {
+      finishShift: (id, building, correct, history = []) => {
         const current = get().profiles.find((p) => p.id === id);
         if (!current) return { coins: 0, hearts: 0, bonus: 0 };
-        const { profile, pay } = finishShift(current, building, correct, dateKey());
+        const { profile, pay } = finishShift(current, building, correct, dateKey(), history);
         set((s) => ({ profiles: s.profiles.map((p) => (p.id === id ? profile : p)) }));
         return pay;
       },
+      noteSkillHelp: (id, skill) =>
+        set((s) => ({
+          profiles: s.profiles.map((p) => (p.id === id ? { ...p, skills: noteHelp(p.skills ?? {}, skill) } : p)),
+        })),
     }),
     {
       name: 'math-game.profiles',

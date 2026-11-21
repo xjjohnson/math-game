@@ -11,7 +11,10 @@ import { colors, fontSizes, radius, spacing, TAP_TARGET } from '@/constants/them
 import { usePalette } from '@/hooks/useAccessibility';
 import { useActiveProfile, useProfiles } from '@/store/profiles';
 import type { AnswerRecord, GameConfig, Problem } from '@/types';
+import { answerText } from '@/utils/feedback';
 import { highScoreKey, parseConfig } from '@/utils/gameSession';
+import { QuestionPicture } from '@/components/QuestionPicture';
+import { freshRound, withPlan } from '@/utils/skills/plan';
 import type { RoundOutcome } from '@/utils/progress';
 import { randomSeed } from '@/utils/seededRandom';
 import { backgroundColor } from '@/utils/shop';
@@ -30,12 +33,13 @@ export function WorksheetScreen() {
   const params = useLocalSearchParams<{ config?: string }>();
   const [config, setConfig] = useState(() => parseConfig(params.config));
   return (
-    <Sheet key={config.seed} config={config} onPlayAgain={() => setConfig({ ...config, seed: randomSeed() })} />
+    <Sheet key={config.seed} config={config} onPlayAgain={() => setConfig(freshRound(config, randomSeed()))} />
   );
 }
 
-function Sheet({ config, onPlayAgain }: { config: GameConfig; onPlayAgain: () => void }) {
+function Sheet({ config: asked, onPlayAgain }: { config: GameConfig; onPlayAgain: () => void }) {
   const profile = useActiveProfile();
+  const [config] = useState(() => withPlan(asked, profile));
   const recordRound = useProfiles((s) => s.recordRound);
   const background = backgroundColor(profile);
   const problems = useMemo(() => worksheetProblems(config), [config]);
@@ -148,15 +152,21 @@ function SheetRow({
     <Pressable
       onPress={onPress}
       accessibilityRole="button"
-      accessibilityLabel={`Question ${number}: ${problem.story ?? problem.prompt}. Your answer: ${entry || 'empty'}`}
+      accessibilityLabel={`Question ${number}: ${problem.story ?? problem.ask ?? problem.prompt}. Your answer: ${entry || 'empty'}`}
       accessibilityState={{ selected }}
       style={[styles.row, { borderColor: selected ? color : colors.disabled }, selected && styles.rowOn]}
     >
       <Text style={[styles.number, { color }]}>{number}.</Text>
       <View style={styles.question}>
         {problem.story ? <Text style={styles.story}>{problem.story}</Text> : null}
+        {problem.ask ? <Text style={styles.story}>{problem.ask}</Text> : null}
+        {problem.picture ? <QuestionPicture picture={problem.picture} width={260} color={color} /> : null}
         <View style={styles.equation}>
-          {problem.story ? null : <Text style={styles.prompt}>{problem.prompt} =</Text>}
+          {problem.story || problem.ask ? (
+            problem.prompt ? <Text style={styles.prompt}>{problem.prompt}</Text> : null
+          ) : (
+            <Text style={styles.prompt}>{problem.prompt} =</Text>
+          )}
           <View style={[styles.box, { borderColor: selected ? color : colors.border }]}>
             <Text style={styles.boxText}>{entry || (selected ? '_' : ' ')}</Text>
           </View>
@@ -177,10 +187,10 @@ function MarkedSheet({ history }: { history: AnswerRecord[] }) {
             {r.correct ? '✓' : '✗'}
           </Text>
           <Text style={styles.markedText}>
-            {r.problem.prompt} = {r.given ?? '?'}
+            {r.problem.ask ? `${r.problem.prompt || r.problem.ask} → ${r.given === null ? '?' : answerText(r.problem, r.given)}` : `${r.problem.prompt} = ${r.given ?? '?'}`}
           </Text>
           {r.correct ? null : (
-            <Text style={[styles.markedFix, { color: palette.correct }]}>→ {r.problem.answer}</Text>
+            <Text style={[styles.markedFix, { color: palette.correct }]}>→ {answerText(r.problem, r.problem.answer)}</Text>
           )}
         </View>
       ))}

@@ -118,8 +118,8 @@ describe('rewards', () => {
     for (let day = 1; day <= 28; day++) {
       const date = `2026-02-${String(day).padStart(2, '0')}`;
       const config = dailyChallengeConfig(date, { grade: 0, difficulty: 'easy' });
-      expect(config.mode).toMatchObject({ kind: 'operation' });
-      expect((config.mode as { operation: string }).operation).toBe('add');
+      // The day's area is picked here; the skills inside it are picked for each player.
+      expect(config.mode).toEqual({ kind: 'skills', strands: ['add'] });
     }
   });
 
@@ -127,7 +127,7 @@ describe('rewards', () => {
     const ops = new Set<string>();
     for (let day = 1; day <= 28; day++) {
       const config = dailyChallengeConfig(`2026-02-${String(day).padStart(2, '0')}`, { grade: 1, difficulty: 'easy' });
-      ops.add((config.mode as { operation: string }).operation);
+      ops.add((config.mode as { strands: string[] }).strands[0]);
     }
     expect([...ops].sort()).toEqual(['add', 'subtract']);
   });

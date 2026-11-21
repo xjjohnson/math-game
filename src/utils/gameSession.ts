@@ -4,6 +4,7 @@ import type { AnswerRecord, Difficulty, GameConfig, Problem } from '@/types';
 import { adjustDifficulty } from '@/utils/adaptive';
 import { buildProblem, generate, generateTimesTable } from '@/utils/mathEngine';
 import { pointsFor } from '@/utils/scoring';
+import { plannedSkill } from '@/utils/skills/plan';
 import { createRng, randomSeed } from '@/utils/seededRandom';
 import { toWordProblem } from '@/utils/wordProblems';
 
@@ -25,7 +26,7 @@ export interface SessionState {
 }
 
 export type SessionAction =
-  | { type: 'answer'; given: number; secondsLeft: number | null }
+  | { type: 'answer'; given: number; secondsLeft: number | null; helped?: boolean }
   | { type: 'timeout' }
   | { type: 'next' };
 
@@ -43,6 +44,11 @@ export function problemAt(config: GameConfig, index: number, difficulty: Difficu
     const fact = mode.facts[index % mode.facts.length];
     return buildProblem(fact.operation, fact.a, fact.b, fact.answer, rng);
   }
+  if (mode.kind === 'skills') {
+    const problem = plannedSkill(config, index).make(rng);
+    // Plain sums can still come as stories; questions with pictures already say what to do.
+    return config.wordProblems && !problem.ask ? { ...toWordProblem(problem, rng), skill: problem.skill } : problem;
+  }
   const problem = generate(mode.operation, difficulty, rng, config.grade);
   return config.wordProblems ? toWordProblem(problem, rng) : problem;
 }
@@ -52,6 +58,11 @@ export function highScoreKey(config: GameConfig): string {
   if (config.dailyDate) return `daily:${config.dailyDate}`;
   const { mode } = config;
   if (mode.kind === 'review') return 'review';
+  if (mode.kind === 'skills') {
+    const what = mode.focus ?? (mode.strands?.length ? [...mode.strands].sort().join('-') : 'mix');
+    const grade = config.grade === undefined ? '' : `g${config.grade}:`;
+    return `skills-${what}:${grade}${config.difficulty}:${config.timer ?? 'none'}${config.worksheet ? ':sheet' : ''}`;
+  }
   const name =
     mode.kind === 'operation'
       ? `${mode.operation}${config.wordProblems ? '-words' : ''}`
@@ -95,7 +106,7 @@ export function startSession(config: GameConfig): SessionState {
   };
 }
 
-function record(state: SessionState, given: number | null, secondsLeft: number | null): SessionState {
+function record(state: SessionState, given: number | null, secondsLeft: number | null, helped?: boolean): SessionState {
   const correct = given === state.problem.answer;
   const streak = correct ? state.streak + 1 : 0;
   const question = { operation: state.problem.operation, difficulty: state.difficulty, grade: state.config.grade };
@@ -118,6 +129,7 @@ function record(state: SessionState, given: number | null, secondsLeft: number |
         correct,
         points,
         ...(seconds === undefined ? {} : { seconds }),
+        ...(helped ? { helped } : {}),
       },
     ],
   };
@@ -126,7 +138,7 @@ function record(state: SessionState, given: number | null, secondsLeft: number |
 export function sessionReducer(state: SessionState, action: SessionAction): SessionState {
   switch (action.type) {
     case 'answer':
-      return state.phase === 'question' ? record(state, action.given, action.secondsLeft) : state;
+      return state.phase === 'question' ? record(state, action.given, action.secondsLeft, action.helped) : state;
     case 'timeout':
       return state.phase === 'question' ? record(state, null, 0) : state;
     case 'next': {

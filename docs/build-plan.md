@@ -60,6 +60,17 @@ Cross-platform interactive math learning game for kids (ages 5-15), React Native
 - Times-tables mode: pick specific tables
 - Unit tests, including "every division result is an integer" over thousands of seeds
 
+## Skill Engine (src/utils/skills/)
+
+- K-3 is filled in skill by skill (67 skills, from the K-12 Math Fundamentals guide); grades 4-6 wrap the old engine levels, and the catalog takes grades up to 12
+- Each skill has a grade, a strand (counting, adding, taking away, place value, times, sharing, story problems, time, money, measuring, shapes, fractions), a maker and an optional coin bonus
+- Subtraction ladder for 2nd grade: no trade, trade a ten (1-digit), trade a ten (2-digit), 3-digit trade once, trade twice, trade across a zero; adding has the matching bundle ladder
+- Picture questions (ten-frames, number bonds, base-ten blocks, number lines, arrays, groups, bar models, clocks, coins and bills, rulers, shapes, area grids, fraction bars and number lines) are plain data so every phone draws the same question from the seed
+- No settings: grade is the starting point, earlier grades count as known unless they keep going wrong, a skill is learned at 8 of the last 10 right (or the first 5 right) and comes back if it gets shaky
+- Each round (Just for me, or one area) is mostly the skill being learned, plus the trickiest known skill and review; Warm up / Just right / Challenge set the mix (4 / 7 / 8 of 10 new)
+- +5 stars for each new skill learned (once per skill)
+- Profile store v14 adds `skills`
+
 ---
 
 ## Single Player
@@ -112,7 +123,11 @@ Cross-platform interactive math learning game for kids (ages 5-15), React Native
 - Weak-spots review (resurfaces missed facts)
 - Word problems for the older range
 - Count it out: tap-to-count picture of the problem during a round (dots, ten-frames, rows, shared groups, hundreds/tens/ones blocks)
-- Learn how: step-by-step lessons on school methods, grouped by operation with rough ages (count on, make a ten, carrying, count back, count up, borrowing, equal groups, skip counting, times table tricks, break it apart, sharing, think times, long division), each ending in a matching practice round
+- Learn how: step-by-step lessons on school methods, grouped by area (counting, adding, taking away, place value, times, sharing, story problems, time, money, measuring, shapes, fractions) with a grade on each; 37 lessons, including tens and ones blocks, friendly numbers, break it apart, back to ten, trading across a zero, bar models, tell the time, count coins, make change, area, perimeter and fractions; each ends in a practice round on that skill
+- Smart help: a 💡 Help button during play and "Show me how" after a miss. It picks the way that fits the child on that skill: pictures first (blocks, ten-frames, counters), then tricks (number line, count up, break apart, friendly numbers), then the stacked paper method. During the question it leaves the last step for the child (and that answer doesn't count toward learning the skill); after a miss it shows everything and names the slip when it spots one (smaller-from-bigger, forgot the traded ten, no bundle, added instead of times)
+- School words throughout: trade, unbundle, bundle and regroup (no borrow or carry)
+- Hands-on answers in Play and town jobs: drag the clock hands, fill a coin purse (count up for change); worksheets and two-player games ask the same questions with choices
+- Skill map: Progress shows each area's skills as got it / learning now / coming up, tap one to practise it; the Parent area shows the same with tries, right answers, help opened and date learned
 - Worksheet mode: all 10 questions on one page, answered in any order with a short pad, marked together at the end (untimed; same coins, stars and high scores, kept separately)
 
 ## Motivation
@@ -222,6 +237,14 @@ Phases 1-6 deliver a complete single-player game before any native Bluetooth wor
 - [x] Counting aid during play (kid-test feedback)
 - [x] Learn how lessons on school methods (kid-test feedback)
 - [x] Worksheet mode: many questions per page, check at the end (kid-test feedback)
+- [x] K-3 skill engine with automatic next skill (no parent settings)
+- [x] Smart help that picks the strategy (pictures, tricks, paper) and spots common slips
+- [x] School words: trade, unbundle, bundle, regroup
+- [x] Skill map on Progress and in the Parent area
+- [ ] Fill in grades 4-12 skill by skill (catalog and engine are ready)
+- [x] Set the clock by dragging the hands (snaps to 30 / 5 / 1 minutes by grade) and time passing for 3rd grade
+- [x] Coin purse: make an amount, and make change by counting up
+- [x] Town jobs ask from the skill list (school: what they're learning; shop: money; bakery: measuring, time, fractions; library: stories; park: counting and shapes; farm: open a box of 10 eggs to take some out). Kindergarten keeps the adding jobs. Town answers count toward learning skills.
 
 ### Motivation and retention
 - [ ] Daily challenge with bonus reward (Phase 4)

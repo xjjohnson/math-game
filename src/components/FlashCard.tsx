@@ -1,8 +1,9 @@
-import { StyleSheet } from 'react-native';
+import { StyleSheet, useWindowDimensions, View } from 'react-native';
 
 import { Text } from '@/components/AppText';
 import { ColumnWork } from '@/components/ColumnWork';
 import { PopIn } from '@/components/PopIn';
+import { QuestionPicture } from '@/components/QuestionPicture';
 import { OPERATIONS } from '@/constants/difficulty';
 import type { CardStyle } from '@/constants/shop';
 import { colors, fontSizes, radius, spacing } from '@/constants/theme';
@@ -10,7 +11,7 @@ import { usePalette } from '@/hooks/useAccessibility';
 import { useBigScreen } from '@/hooks/useBigScreen';
 import type { Problem } from '@/types';
 import { columnLayout, type ColumnEntry, type ColumnLayout, type ColumnRow } from '@/utils/columnEntry';
-import { spokenProblem } from '@/utils/feedback';
+import { answerText, spokenProblem } from '@/utils/feedback';
 
 interface Props {
   problem: Problem;
@@ -34,6 +35,7 @@ const SYMBOLS = Object.fromEntries(OPERATIONS.map((o) => [o.value, o.symbol])) a
 export function isStacked(problem: Problem): boolean {
   return (
     !problem.story &&
+    !problem.ask &&
     problem.operation !== 'divide' &&
     Math.max(Math.abs(problem.a), Math.abs(problem.b)) >= 10
   );
@@ -76,7 +78,9 @@ export function FlashCard({ problem, reveal = false, column, cardStyle }: Props)
       accessibilityLabel={spokenProblem(problem)}
     >
       {look.corners ? <Corners pair={look.corners} /> : null}
-      {problem.story ? (
+      {problem.ask ? (
+        <SkillFace problem={problem} reveal={reveal} ink={look.text} correctColor={palette.correct} color={palette.operations[problem.operation]} big={big} />
+      ) : problem.story ? (
         <>
           <Text style={[styles.story, big && styles.storyBig, ink]}>{problem.story}</Text>
           {/* Only put on the page once shown, so it can't be found early (working out the sum is part of a story). */}
@@ -116,6 +120,72 @@ export function FlashCard({ problem, reveal = false, column, cardStyle }: Props)
   );
 }
 
+/**
+ * A question that isn't a plain sum: what to do, its picture, and a line with
+ * a box for the answer (the box fills in once the answer is shown).
+ */
+function SkillFace({
+  problem,
+  reveal,
+  ink,
+  correctColor,
+  color,
+  big,
+}: {
+  problem: Problem;
+  reveal: boolean;
+  ink: string;
+  correctColor: string;
+  color: string;
+  big: boolean;
+}) {
+  const { width } = useWindowDimensions();
+  const pictureWidth = Math.min(width - 80, big ? 520 : 360);
+  const shown = answerText(problem, problem.answer);
+  return (
+    <>
+      <Text style={[styles.ask, big && styles.askBig, { color: ink }]}>{problem.ask}</Text>
+      {problem.picture ? (
+        <View style={styles.picture}>
+          <QuestionPicture
+            key={problem.prompt + problem.ask}
+            picture={problem.picture}
+            width={pictureWidth}
+            flashMs={reveal ? undefined : problem.flashMs}
+            color={color}
+          />
+        </View>
+      ) : null}
+      {problem.prompt ? (
+        <Text
+          style={[
+            styles.skillPrompt,
+            big && styles.skillPromptBig,
+            problem.prompt.length > 12 && (big ? styles.skillPromptLongBig : styles.skillPromptLong),
+            { color: ink },
+          ]}
+          adjustsFontSizeToFit
+          numberOfLines={2}
+        >
+          {reveal && problem.prompt.includes('☐') ? (
+            <>
+              {problem.prompt.split('☐')[0]}
+              <Text style={{ color: correctColor }}>{shown}</Text>
+              {problem.prompt.split('☐').slice(1).join('☐')}
+            </>
+          ) : (
+            problem.prompt
+          )}
+        </Text>
+      ) : null}
+      {/* Only on the page once shown, so it can't be found early. */}
+      {reveal && (!problem.prompt || !problem.prompt.includes('☐')) ? (
+        <Text style={[styles.storyAnswer, { color: correctColor }]}>{shown}</Text>
+      ) : null}
+    </>
+  );
+}
+
 /** Two little pictures drawn in the card's four corners. */
 function Corners({ pair }: { pair: [string, string] }) {
   const [first, second] = pair;
@@ -152,4 +222,12 @@ const styles = StyleSheet.create({
     paddingHorizontal: 36,
   },
   storyAnswer: { fontSize: fontSizes.button, fontWeight: '800', marginTop: spacing.sm },
+  ask: { fontSize: 22, fontWeight: '800', lineHeight: 30, textAlign: 'center', paddingHorizontal: 30 },
+  askBig: { fontSize: 30, lineHeight: 40 },
+  picture: { marginVertical: spacing.sm, alignItems: 'center' },
+  skillPrompt: { fontSize: 44, fontWeight: '900', textAlign: 'center' },
+  skillPromptBig: { fontSize: 64 },
+  // Long lines like "669 = 600 + ☐ + 9" shrink so they stay on one line on a phone.
+  skillPromptLong: { fontSize: 32 },
+  skillPromptLongBig: { fontSize: 48 },
 });

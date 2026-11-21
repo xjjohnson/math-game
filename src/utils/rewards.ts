@@ -1,3 +1,4 @@
+import { findSkill } from '@/utils/skills/catalog';
 import { GRADES } from '@/constants/grades';
 import type { AnswerRecord, Difficulty, GameConfig, Grade, Level, TimerSetting } from '@/types';
 import { dateSeed } from '@/utils/dates';
@@ -41,7 +42,7 @@ export interface RoundRewards {
 
 /** Coins one right answer pays: harder operations, levels and grades pay more. */
 export function coinsForAnswer(record: Pick<AnswerRecord, 'problem' | 'difficulty' | 'grade'>): number {
-  return answerValue(record.problem.operation, record.difficulty, record.grade);
+  return answerValue(record.problem.operation, record.difficulty, record.grade) + (findSkill(record.problem.skill)?.bonus ?? 0);
 }
 
 export function starsFor(correct: number, total: number): number {
@@ -123,7 +124,8 @@ export function dailySeconds(grade: Grade): TimerSetting {
 export function dailyChallengeConfig(today: string, level: Level): GameConfig {
   const seed = dateSeed(today);
   return {
-    mode: { kind: 'operation', operation: pick(createRng(seed), GRADES[level.grade].daily ?? GRADES[level.grade].taught) },
+    // The day's area is the same for everyone in a grade; the skills inside it are picked per player.
+    mode: { kind: 'skills', strands: [pick(createRng(seed), GRADES[level.grade].daily ?? GRADES[level.grade].taught)] },
     difficulty: level.difficulty,
     grade: level.grade,
     timer: dailySeconds(level.grade),

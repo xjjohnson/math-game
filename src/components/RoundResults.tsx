@@ -11,7 +11,8 @@ import { Screen } from '@/components/Screen';
 import { findBadge } from '@/constants/badges';
 import { colors, fontSizes, radius, spacing } from '@/constants/theme';
 import type { AnswerRecord } from '@/types';
-import type { RoundOutcome } from '@/utils/progress';
+import { findSkill } from '@/utils/skills/catalog';
+import { SKILL_STARS, type RoundOutcome } from '@/utils/progress';
 import { DAILY_PASS, SPEEDY_COINS, SPEEDY_SECONDS, STREAK_MILESTONE } from '@/utils/rewards';
 
 export interface RoundSummary {
@@ -27,6 +28,7 @@ export function isNotable(outcome: RoundOutcome): boolean {
     outcome.speedBonusStars > 0 ||
     outcome.weeklyBonusCoins > 0 ||
     outcome.newBadges.length > 0 ||
+    outcome.newSkills.length > 0 ||
     outcome.newStarLevels.length > 0 ||
     outcome.newHighScore ||
     outcome.stars === 3
@@ -80,6 +82,11 @@ export function RoundResults({
           {outcome.streakBonusCoins > 0 ? (
             <Text style={styles.bonus}>Includes +{outcome.streakBonusCoins} for streaks of {STREAK_MILESTONE}</Text>
           ) : null}
+          {outcome.newSkills.map((id) => (
+            <Text key={id} style={styles.bonus}>
+              🌟 You learned {findSkill(id)?.title ?? 'a new skill'}! +{SKILL_STARS} ⭐
+            </Text>
+          ))}
           {outcome.dailyBonusCoins > 0 ? (
             <Text style={styles.bonus}>🎉 Daily challenge complete! +{outcome.dailyBonusCoins} bonus</Text>
           ) : daily ? (

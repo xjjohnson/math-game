@@ -2,7 +2,11 @@ import { generate, generateChoices } from '@/utils/mathEngine';
 import { randInt, pick } from '@/utils/seededRandom';
 import { toWordProblem } from '@/utils/wordProblems';
 import { buddyCompanion } from '@/utils/buddy';
-import type { Grade, Operation, Profile, Rng, TownVisits } from '@/types';
+import type { AnswerRecord, Grade, Operation, Problem, Profile, Rng, Strand, TownVisits } from '@/types';
+import { findSkill, SKILLS } from '@/utils/skills/catalog';
+import { planRound, recordSkills } from '@/utils/skills/plan';
+import { SKILL_STARS } from '@/utils/progress';
+import { shuffle } from '@/utils/seededRandom';
 
 /** Places in the community the kids can visit. Each has one little job a day. */
 export type BuildingId = 'school' | 'shop' | 'bakery' | 'library' | 'park' | 'farm';
@@ -19,12 +23,12 @@ export interface Building {
 }
 
 export const BUILDINGS: Building[] = [
-  { id: 'school', name: 'School', emoji: '🏫', color: '#1E88E5', job: 'Answer the questions on the board.', reward: 'coins' },
-  { id: 'shop', name: 'Corner shop', emoji: '🏪', color: '#E53935', job: 'Add up what the customers buy.', reward: 'coins' },
-  { id: 'bakery', name: 'Bakery', emoji: '🥐', color: '#F9A825', job: 'Give the right change.', reward: 'coins' },
+  { id: 'school', name: 'School', emoji: '🏫', color: '#1E88E5', job: 'Practise what you are learning on the board.', reward: 'coins' },
+  { id: 'shop', name: 'Corner shop', emoji: '🏪', color: '#E53935', job: 'Count the money and give change.', reward: 'coins' },
+  { id: 'bakery', name: 'Bakery', emoji: '🥐', color: '#F9A825', job: 'Measure, time the oven and cut fair shares.', reward: 'coins' },
   { id: 'library', name: 'Library', emoji: '📚', color: '#5E35B1', job: 'Read number stories out loud.', reward: 'hearts' },
   { id: 'park', name: 'Park', emoji: '🌳', color: '#2E7D32', job: 'Count and share with your buddy.', reward: 'hearts' },
-  { id: 'farm', name: 'Farm', emoji: '🐄', color: '#8D4A2B', job: 'Collect the right number of eggs.', reward: 'coins' },
+  { id: 'farm', name: 'Farm', emoji: '🐄', color: '#8D4A2B', job: 'Collect eggs, or open a box to take some out.', reward: 'coins' },
 ];
 
 export const SHIFT_QUESTIONS = 5;
@@ -42,8 +46,44 @@ export interface TownQuestion {
   choices: number[];
   /** Money jobs: the player hands back change with coins and bills instead of picking an answer. */
   change?: { price: number; paid: number; item: string; bills: number[] };
-  /** Farm: the player collects eggs into a basket (one at a time, or by the box) until it holds the answer. */
-  eggs?: { units: number[] };
+  /**
+   * Farm: the player collects eggs into a basket (one at a time, or by the box) until it holds the answer.
+   * With `start`, the basket begins full and eggs are taken out instead, opening a box of 10 when
+   * there aren't enough loose eggs (trading a ten for ones).
+   */
+  eggs?: { units: number[]; start?: number[] };
+  /** A question from the skill list (the child's own level), answered like in Play. */
+  problem?: Problem;
+}
+
+/** Who is working the job: a grade, or a player with their skill record. */
+export type Worker = Grade | { grade: Grade; skills?: Profile['skills'] };
+
+/** The math each building practises from the skill list. Kindergarten keeps the simple adding jobs. */
+const BUILDING_AREAS: Partial<Record<BuildingId, Strand[] | 'all'>> = {
+  school: 'all',
+  shop: ['money'],
+  bakery: ['measure', 'time', 'fractions'],
+  library: ['story'],
+  park: ['count', 'shapes'],
+};
+
+/**
+ * Questions from the child's skill record for a building: mostly what they're
+ * learning now in its area, plus one they know. Null when the area has nothing
+ * at their grade yet (then the building's own job runs as before).
+ */
+export function skillQuestions(building: BuildingId, worker: Worker, count: number, rng: Rng): TownQuestion[] | null {
+  const player = typeof worker === 'number' ? { grade: worker, skills: {} } : { grade: worker.grade, skills: worker.skills ?? {} };
+  const area = BUILDING_AREAS[building];
+  if (!area || player.grade === 0) return null;
+  const strands = area === 'all' ? undefined : area.filter((st) => SKILLS.some((k) => k.strand === st && k.grade <= player.grade));
+  if (strands && strands.length === 0) return null;
+  const plan = planRound(player, { strands, difficulty: 'easy', count, seed: Math.floor(rng() * 2 ** 31) });
+  return plan.map((id) => {
+    const p = findSkill(id)!.make(rng);
+    return { prompt: p.interact?.ask ?? p.ask ?? p.prompt, answer: p.answer, choices: p.choices, problem: p };
+  });
 }
 
 /** How eggs come on the farm: one at a time, a box of 10, a crate of 100 (ten boxes), a truck of 1000. */
@@ -213,10 +253,15 @@ function question(prompt: string, answer: number, rng: Rng): TownQuestion {
 }
 
 /** Five questions for one shift. Kindergarten only ever adds, within 10; harder grades add bigger numbers. */
-export function shiftQuestions(building: BuildingId, grade: Grade, rng: Rng): TownQuestion[] {
+export function shiftQuestions(building: BuildingId, worker: Worker, rng: Rng): TownQuestion[] {
+  const grade: Grade = typeof worker === 'number' ? worker : worker.grade;
   const max = townMax(grade);
+  // Most buildings now ask from the child's skill list. The shop keeps two counter customers too.
+  const fromSkills = skillQuestions(building, worker, building === 'shop' ? SHIFT_QUESTIONS - 2 : SHIFT_QUESTIONS, rng);
+  if (fromSkills && building !== 'shop') return fromSkills;
   const out: TownQuestion[] = [];
-  for (let i = 0; i < SHIFT_QUESTIONS; i++) {
+  const own = fromSkills ? 2 : SHIFT_QUESTIONS;
+  for (let i = 0; i < own; i++) {
     switch (building) {
       case 'school': {
         // The board at school: plain sums at the player's grade. Kindergarten only adds.
@@ -273,11 +318,32 @@ export function shiftQuestions(building: BuildingId, grade: Grade, rng: Rng): To
         break;
       }
       case 'farm':
-        out.push(eggQuestion(grade, rng));
+        out.push(grade >= 2 && rng() < 0.5 ? eggTakeAway(rng) : eggQuestion(grade, rng));
         break;
     }
   }
-  return out;
+  return fromSkills ? shuffle(rng, [...out, ...fromSkills]) : out;
+}
+
+/**
+ * Take eggs out of a full basket. Often there aren't enough loose eggs, so a box
+ * of 10 has to be opened first: trading a ten for 10 ones, with real eggs.
+ */
+export function eggTakeAway(rng: Rng): TownQuestion {
+  const tens = randInt(rng, 2, 9);
+  const ones = randInt(rng, 0, 6);
+  const have = tens * 10 + ones;
+  // Usually more ones are needed than are loose, so a box gets opened.
+  const takeOnes = rng() < 0.75 ? randInt(rng, ones + 1, 9) : randInt(rng, 0, ones);
+  const take = randInt(rng, 0, tens - 1) * 10 + takeOnes;
+  const want = take === 0 ? 7 : take;
+  const answer = have - want;
+  return {
+    prompt: `The basket has ${have} eggs. The bakery needs ${want}. Take ${want} eggs out! Not enough loose eggs? Tap a box to open it.`,
+    answer,
+    choices: generateChoices(answer, rng),
+    eggs: { units: [1, 10], start: [...Array(tens).fill(10), ...Array(ones).fill(1)] },
+  };
 }
 
 export function visitsToday(profile: Profile, today: string): TownVisits {
@@ -312,7 +378,13 @@ export function shiftPay(profile: Profile, building: BuildingId, correct: number
 }
 
 /** Finishes a shift and pays out. Only the first play of the day marks the building done and earns the bonus; replays pay a little. */
-export function finishShift(profile: Profile, building: BuildingId, correct: number, today: string): { profile: Profile; pay: ShiftPay } {
+export function finishShift(
+  profile: Profile,
+  building: BuildingId,
+  correct: number,
+  today: string,
+  history: readonly AnswerRecord[] = [],
+): { profile: Profile; pay: ShiftPay; learned: string[] } {
   const first = !shiftDone(profile, building, today);
   const pay = shiftPay(profile, building, correct, first);
   const buddyId = profile.equipped.companion;
@@ -321,10 +393,15 @@ export function finishShift(profile: Profile, building: BuildingId, correct: num
       ? { ...profile.buddyHearts, [buddyId]: (profile.buddyHearts[buddyId] ?? 0) + pay.hearts }
       : profile.buddyHearts;
   const visits = visitsToday(profile, today);
+  // Skill-list answers count toward learning skills, the same as in Play (+5 stars for a new one).
+  const { skills, learned } = recordSkills(profile.skills ?? {}, history, today);
   return {
     pay,
+    learned,
     profile: {
       ...profile,
+      skills,
+      stars: profile.stars + learned.length * SKILL_STARS,
       coins: profile.coins + pay.coins,
       buddyHearts,
       town: first ? { date: today, done: [...visits.done, building] } : visits,

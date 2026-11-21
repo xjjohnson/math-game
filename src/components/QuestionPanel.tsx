@@ -11,7 +11,7 @@ import { fontSizes } from '@/constants/theme';
 import { usePalette } from '@/hooks/useAccessibility';
 import { useColumnAnswer } from '@/hooks/useColumnAnswer';
 import type { Difficulty, Grade, InputStyle, Problem } from '@/types';
-import { speakProblem, stopSpeaking, vibrate } from '@/utils/feedback';
+import { answerText, speakProblem, stopSpeaking, vibrate } from '@/utils/feedback';
 import { playSound } from '@/utils/soundEffects';
 
 const RIGHT_PAUSE_MS = 700;
@@ -46,6 +46,7 @@ export function QuestionPanel({ problem, difficulty, grade, inputStyle, onAnswer
   const allowNegative =
     difficultyConfigFor(difficulty, grade).allowNegatives && problem.operation === 'subtract' && !problem.story;
   const typingColumns = isStacked(problem) && inputStyle !== 'choices';
+  const tap = inputStyle === 'choices' || !!problem.choiceOnly;
   const column = useColumnAnswer(problem, { allowNegative });
 
   useEffect(() => {
@@ -95,15 +96,16 @@ export function QuestionPanel({ problem, difficulty, grade, inputStyle, onAnswer
       />
       {answered ? (
         <Text style={[styles.feedback, { color: correct ? palette.correct : palette.wrong }]}>
-          {correct ? '✓ Right!' : `✗ It's ${problem.answer}`}
+          {correct ? '✓ Right!' : `✗ It's ${answerText(problem, problem.answer)}`}
         </Text>
       ) : null}
-      {inputStyle === 'choices' ? (
+      {tap ? (
         <ChoiceButtons
           choices={problem.choices}
           selected={given}
           answer={problem.answer}
           onSelect={answer}
+          label={(c) => answerText(problem, c)}
         />
       ) : answered ? null : typingColumns ? (
         <ColumnPad

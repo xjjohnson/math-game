@@ -10,26 +10,28 @@ interface Props {
   selected: number | null;
   answer: number;
   onSelect: (choice: number) => void;
+  /** How to show each choice (a word, sign, time or fraction), when it isn't the number itself. */
+  label?: (choice: number) => string;
 }
 
 /**
  * 2x2 grid of multiple-choice answers. After answering, the right one gets a ✓
  * and a wrong pick an ✗, so the result never depends on color alone.
  */
-export function ChoiceButtons({ choices, selected, answer, onSelect }: Props) {
+export function ChoiceButtons({ choices, selected, answer, onSelect, label: show = String }: Props) {
   const palette = usePalette();
   const answered = selected !== null;
   return (
     <View style={styles.grid}>
       {choices.map((choice) => {
         let color: string = colors.primary;
-        let label = String(choice);
+        let label = show(choice);
         if (answered && choice === answer) {
           color = palette.correct;
-          label = `✓ ${choice}`;
+          label = `✓ ${show(choice)}`;
         } else if (answered && choice === selected) {
           color = palette.wrong;
-          label = `✗ ${choice}`;
+          label = `✗ ${show(choice)}`;
         } else if (answered) color = colors.disabled;
         return (
           <BigButton
