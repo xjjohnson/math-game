@@ -126,6 +126,7 @@ Cross-platform interactive math learning game for kids (ages 5-15), React Native
 - Learn how: step-by-step lessons on school methods, grouped by area (counting, adding, taking away, place value, times, sharing, story problems, time, money, measuring, shapes, fractions) with a grade on each; 37 lessons, including tens and ones blocks, friendly numbers, break it apart, back to ten, trading across a zero, bar models, tell the time, count coins, make change, area, perimeter and fractions; each ends in a practice round on that skill
 - Smart help: a 💡 Help button during play and "Show me how" after a miss. It picks the way that fits the child on that skill: pictures first (blocks, ten-frames, counters), then tricks (number line, count up, break apart, friendly numbers), then the stacked paper method. During the question it leaves the last step for the child (and that answer doesn't count toward learning the skill); after a miss it shows everything and names the slip when it spots one (smaller-from-bigger, forgot the traded ten, no bundle, added instead of times)
 - School words throughout: trade, unbundle, bundle and regroup (no borrow or carry)
+- Hands-on answers in Play and town jobs: drag the clock hands, fill a coin purse (count up for change); worksheets and two-player games ask the same questions with choices
 - Skill map: Progress shows each area's skills as got it / learning now / coming up, tap one to practise it; the Parent area shows the same with tries, right answers, help opened and date learned
 - Worksheet mode: all 10 questions on one page, answered in any order with a short pad, marked together at the end (untimed; same coins, stars and high scores, kept separately)
 
@@ -241,8 +242,9 @@ Phases 1-6 deliver a complete single-player game before any native Bluetooth wor
 - [x] School words: trade, unbundle, bundle, regroup
 - [x] Skill map on Progress and in the Parent area
 - [ ] Fill in grades 4-12 skill by skill (catalog and engine are ready)
-- [ ] Hands-on versions of set-the-clock and drag-the-coins (now multiple choice and number pad)
-- [ ] Use the skills in town jobs (shop change, bakery measuring, park shapes)
+- [x] Set the clock by dragging the hands (snaps to 30 / 5 / 1 minutes by grade) and time passing for 3rd grade
+- [x] Coin purse: make an amount, and make change by counting up
+- [x] Town jobs ask from the skill list (school: what they're learning; shop: money; bakery: measuring, time, fractions; library: stories; park: counting and shapes; farm: open a box of 10 eggs to take some out). Kindergarten keeps the adding jobs. Town answers count toward learning skills.
 
 ### Motivation and retention
 - [ ] Daily challenge with bonus reward (Phase 4)

@@ -9,6 +9,9 @@
 - School words everywhere: trade, unbundle, bundle and regroup. Show my work says "trade" and "regroup" above the boxes.
 - Learn how is grouped by area with a grade on each lesson, and has 24 new lessons.
 - "My skills" map on My progress and in the Parent area. Learning a new skill gives 5 ⭐.
+- Set the clock: drag the long hand (the short hand follows like a real clock) or use the buttons. 3rd grade also moves the clock on for baking times.
+- Coin purse: tap coins in to make an amount, or count up from the price to make change.
+- Town jobs practise the child's own skills: School follows what they're learning, the Corner shop does money, the Bakery measures, sets the oven clock and cuts fair shares, the Library tells stories at their level, the Park counts and finds shapes, and the Farm has you open a box of 10 eggs when there aren't enough loose ones. Answers there count toward learning skills. Kindergarten keeps the simple adding jobs.
 
 ## 2026-11-21 (Community: tap to join)
 

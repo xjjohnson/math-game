@@ -110,6 +110,8 @@ export const fromDigits = (...digits: number[]) => digits.reduce((n, d) => n * 1
 export function answerText(problem: Problem, value: number): string {
   const label = problem.labels?.[value];
   if (label !== undefined) return label;
+  // A clock set by hand can land on any time, not just the choices.
+  if (problem.interact?.kind === 'setClock') return `${Math.floor(value / 60) % 12 || 12}:${String(value % 60).padStart(2, '0')}`;
   if (!problem.unit) return String(value);
   return problem.unit === '¢' ? `${value}¢` : `${value} ${problem.unit}`;
 }
