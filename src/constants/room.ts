@@ -1,3 +1,5 @@
+import { PRINTER_ITEM, printedItem } from '@/constants/printer';
+
 /** The parts of the buddy's home, left to right. The home scrolls sideways through them. */
 export type AreaId = 'living' | 'kitchen' | 'bedroom' | 'bathroom' | 'playroom' | 'backyard' | 'study' | 'garage' | 'bedroom2' | 'bedroom3';
 
@@ -259,6 +261,8 @@ export const ROOM_ITEMS: RoomItem[] = [
   { id: 'printer', name: 'Printer', emoji: '🖨️', price: 35, size: 0.11, group: 'appliances', fx: '📄', says: 'prints a picture' },
   { id: 'microphone', name: 'Microphone', emoji: '🎤', price: 25, size: 0.11, group: 'appliances', fx: '🎶', says: 'sings a song' },
   { id: 'flashlight', name: 'Flashlight', emoji: '🔦', price: 15, size: 0.11, group: 'appliances', light: true },
+  // Tap it to print small toys from filament (constants/printer.ts).
+  { id: PRINTER_ITEM, name: '3D printer', emoji: '🖨️', price: 150, size: 0.3, wide: 0.9, group: 'appliances' },
   // Toys and fun
   { id: 'ball', name: 'Ball', emoji: '⚽', price: 10, size: 0.1, group: 'toys', fx: '💫', says: 'kicks the ball' },
   { id: 'duck', name: 'Rubber duck', emoji: '🦆', price: 10, size: 0.1, group: 'toys', fx: '💦', says: 'hears quack, quack' },
@@ -325,7 +329,7 @@ export const MAX_ROOM_THINGS = 80;
 export const BUDDY_SIZE = 0.38;
 
 export function findRoomItem(id: string): RoomItem | undefined {
-  return ROOM_ITEMS.find((item) => item.id === id);
+  return ROOM_ITEMS.find((item) => item.id === id) ?? printedItem(id);
 }
 
 /** True when the shop sells the item in this month (0 = January). */

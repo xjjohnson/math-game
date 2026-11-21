@@ -11,6 +11,9 @@ import { INK } from '@/constants/artStyle';
 import { GridPaper, NewDot, panelFace, pillFace, roundFace, TAB_TINTS } from '@/components/Chrome';
 import { DrawnItem, hasDrawing } from '@/components/DrawnItem';
 import { Furniture } from '@/components/Furniture';
+import { PrintedToy, Printer3D, type PrintJob } from '@/components/Printer3D';
+import { PrinterPanel } from '@/components/PrinterPanel';
+import { parsePrintId, printId, PRINT_MS, PRINTER_ITEM, SPOOL_PRICE, findFilament, type FilamentId, type PrintToyId } from '@/constants/printer';
 import { Confetti, Picked, SlideIn } from '@/components/Motion';
 import { PopIn } from '@/components/PopIn';
 import { Screen } from '@/components/Screen';
@@ -138,6 +141,12 @@ export function BuddyScreen() {
   }, [savedPictures]);
   const { careForBuddy, equip, buyRoomItem, buyHomeRoom, moveInRoom, moveHomeRoom, setPlaced, paintRoom, setBuddyHome, wear, undress, setLook, setMood, takeOff, moveWearable } =
     useProfiles();
+  const { buyFilament, printToy, recordPrinterCheck } = useProfiles();
+  /** The 3D printer whose panel is open (its thing key). */
+  const [printerKey, setPrinterKey] = useState<string | null>(null);
+  /** A print in progress: the toy is already in the room, hidden until the printer finishes it. */
+  const [printing, setPrinting] = useState<{ printerKey: string; toyKey: string; job: PrintJob } | null>(null);
+  const printTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const insets = useSafeAreaInsets();
   const [line, setLine] = useState<string | null>(
     'Tap doors to open them. Drag small things onto shelves, tables or a buddy to hold!',
@@ -166,6 +175,7 @@ export function BuddyScreen() {
     () => () => {
       if (timer.current) clearTimeout(timer.current);
       if (momentTimer.current) clearTimeout(momentTimer.current);
+      if (printTimer.current) clearTimeout(printTimer.current);
     },
     [],
   );
@@ -303,6 +313,14 @@ export function BuddyScreen() {
       say(`The ${what} went in the toy box.`);
       return;
     }
+    if (item.id === PRINTER_ITEM) {
+      if (game) return;
+      setTab(null);
+      setPrinterKey(key);
+      if (printing?.printerKey === key) say('Whirr, whirr! The printer is still printing. Watch it build!');
+      else say(`${name} looks at the 3D printer. What should we print?`);
+      return;
+    }
     const holder = thing.on?.startsWith(BUDDY_KEY) ? nameOf(thing.on.slice(BUDDY_KEY.length)) : null;
     if (holder && FOOD_GROUPS.includes(item.group) && !item.says) {
       say(`${holder} takes a bite of the ${what}. Yum! 😋`);
@@ -334,6 +352,34 @@ export function BuddyScreen() {
     } else if (result.reason === 'season' && item?.month !== undefined) {
       say(`That one is only in the shop in ${MONTH_NAMES[item.month]}.`);
     }
+  };
+
+  const startPrint = (toy: PrintToyId, filament: FilamentId, history: Parameters<typeof recordPrinterCheck>[1]) => {
+    if (!printerKey) return;
+    const learned = recordPrinterCheck(profile.id, history);
+    const result = printToy(profile.id, printerKey, toy, filament);
+    if (!result.ok) {
+      if (result.reason === 'full') say('The house is full! Put something in the toy box first.');
+      else if (result.reason === 'noPrinter') say('Take the printer out of the toy box first.');
+      else if (result.reason === 'filament') say(`You need more filament. A spool is ${SPOOL_PRICE} coins.`);
+      return;
+    }
+    const what = findRoomItem(printId(toy, filament))?.name.toLowerCase() ?? 'toy';
+    setPrinterKey(null);
+    setPrinting({ printerKey, toyKey: result.key, job: { toy, filament, startedAt: Date.now() } });
+    playSound('correct');
+    say(`Whirr, whirr! The printer is making a ${what}, one layer at a time...`);
+    // The buddy watches, amazed, then happy.
+    if (buddyId) feel(buddyId, ['surprised', 1500], ['happy', PRINT_MS - 1500]);
+    if (printTimer.current) clearTimeout(printTimer.current);
+    printTimer.current = setTimeout(() => {
+      printTimer.current = null;
+      setPrinting(null);
+      setParty((n) => n + 1);
+      playSound('reward');
+      const stars = learned > 0 ? ` You learned a new skill too: +${learned * 5} ⭐!` : '';
+      say(`Ding! Your ${what} is ready! Drag it anywhere.${stars}`);
+    }, PRINT_MS);
   };
 
   const careNow = careToday(profile, dateKey());
@@ -397,6 +443,7 @@ export function BuddyScreen() {
             else if (what !== 'curtains') say(`Drag small things into the ${what}.`);
           }}
           cheer={buddyId ? { buddyId, n: cheers } : undefined}
+          printing={printing}
           onTapGadget={(g, on) => {
             if (g.lightSwitch) say(on ? 'Lights on! 💡' : g.fx ? `Party time! ${g.fx}` : 'Lights off. Night night! 🌙');
             else if (g.glow) say(on ? `${name} turns on the ${g.name}. ✨` : `${name} turns off the ${g.name}.`);
@@ -527,8 +574,8 @@ export function BuddyScreen() {
           ) : null}
         </View>
 
-        {game || tab ? (
-          <SlideIn key={game ? 'game' : tab ?? ''} style={styles.drawer}>
+        {game || tab || printerKey ? (
+          <SlideIn key={game ? 'game' : printerKey ? 'printer' : tab ?? ''} style={styles.drawer}>
             <GridPaper />
             {game ? (
               <View style={styles.game}>
@@ -544,7 +591,24 @@ export function BuddyScreen() {
                 />
               </View>
             ) : null}
-            {!game && tab === 'care' ? (
+            {!game && printerKey ? (
+              <PrinterPanel
+                profile={profile}
+                busy={!!printing}
+                say={say}
+                onClose={() => setPrinterKey(null)}
+                onBuySpool={(filament) => {
+                  const r = buyFilament(profile.id, filament);
+                  const f = findFilament(filament);
+                  if (r.ok) {
+                    playSound('reward');
+                    say(`🧵 New ${f?.name.toLowerCase()} spool! That's 3 more toys.`);
+                  } else if (r.reason === 'coins') say(`A spool costs ${SPOOL_PRICE} coins. Play a round to earn more!`);
+                }}
+                onPrint={startPrint}
+              />
+            ) : null}
+            {!game && !printerKey && tab === 'care' ? (
               <CareDrawer
                 profile={profile}
                 name={name}
@@ -564,7 +628,7 @@ export function BuddyScreen() {
                 }}
               />
             ) : null}
-            {!game && tab === 'dress' ? (
+            {!game && !printerKey && tab === 'dress' ? (
               <DressDrawer
                 profile={profile}
                 name={name}
@@ -616,7 +680,7 @@ export function BuddyScreen() {
                 }}
               />
             ) : null}
-            {!game && tab === 'shop' ? (
+            {!game && !printerKey && tab === 'shop' ? (
               <ShopDrawer
                 coins={profile.coins}
                 month={month}
@@ -625,14 +689,14 @@ export function BuddyScreen() {
                 onBuy={buy}
               />
             ) : null}
-            {!game && tab === 'toys' ? (
+            {!game && !printerKey && tab === 'toys' ? (
               <ToyDrawer
                 stored={profile.room.things.filter((t) => !t.placed)}
                 areaName={areaName}
                 onTakeOut={(key) => setPlaced(profile.id, key, true, area, viewAt.current)}
               />
             ) : null}
-            {!game && tab === 'buddies' ? (
+            {!game && !printerKey && tab === 'buddies' ? (
               <BuddiesDrawer
                 profile={profile}
                 buddies={owned}
@@ -645,7 +709,7 @@ export function BuddyScreen() {
                 }}
               />
             ) : null}
-            {!game && tab === 'paint' ? (
+            {!game && !printerKey && tab === 'paint' ? (
               <PaintDrawer
                 paint={profile.room.paint[area] ?? { wall: 0, floor: 0 }}
                 areaName={areaName}
@@ -672,6 +736,7 @@ export function BuddyScreen() {
               key={t.id}
               onPress={() => {
                 if (game) return;
+                setPrinterKey(null);
                 setTab(on ? null : t.id);
               }}
               accessibilityRole="tab"
@@ -1084,6 +1149,9 @@ function ShopDrawer({ coins, month, areaId, full, onBuy }: ShopDrawerProps) {
 
 /** An emoji, or a small drawing for furniture without one. */
 function ItemPicture({ item }: { item: RoomItem }) {
+  if (item.id === PRINTER_ITEM) return <Printer3D width={40} height={44} job={null} />;
+  const print = parsePrintId(item.id);
+  if (print) return <PrintedToy toy={print.toy.id} filament={print.filament.id} width={40} height={40} />;
   if (hasDrawing(item.id)) return <DrawnItem id={item.id} width={40} height={40} />;
   if (!item.draw) return <Sticker value={item.emoji} size={32} />;
   const height = 30;

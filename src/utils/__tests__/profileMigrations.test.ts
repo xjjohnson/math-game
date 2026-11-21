@@ -63,6 +63,8 @@ function savedAt(version: number): Record<string, unknown> {
     };
     p.homeRooms = [];
   }
+  if (version >= 14) p.skills = {};
+  if (version >= 15) p.filament = { red: 2 };
   return p;
 }
 
@@ -85,6 +87,8 @@ const FIELDS = [
   'looks',
   'town',
   'homeRooms',
+  'skills',
+  'filament',
 ];
 
 describe('upgrading saved profiles', () => {

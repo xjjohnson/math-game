@@ -1,5 +1,15 @@
 # Change log
 
+## 2026-11-21 (3D printer)
+
+- **3D printer** on the Appliances shelf of the buddy home's Shop, 150 coins. Tap it to open the printer panel.
+- **Filament** by the spool: 10 coins makes 3 toys. Red, blue, green, yellow, purple and white to start.
+- **Pick a toy and a color, then Print.** Each print starts with one quick **printer check** question from the child's own skill list. A wrong answer shows how it works and gives another question, and no filament is lost. Answers count toward learning skills (+5 ⭐ for a newly learned one).
+- **The print** takes about 8 seconds: the head zig-zags along its rail and climbs as the toy grows up from the bed layer by layer, the spool turns, a light blinks, and the buddy watches amazed. Then a ding, confetti, and the toy pops out onto the floor next to the printer. Leaving early keeps the toy.
+- **12 toys**, all drawn in code: star, heart, boat, cat (from the start), dinosaur and race car (25 ⭐), rocket and robot (50 ⭐), octopus and castle (100 ⭐), dragon (175 ⭐), trophy (275 ⭐). **Glow in the dark** filament at 100 ⭐ (glows when the room's lights are off) and **rainbow** at 275 ⭐. Stars are never spent.
+- Printed toys work like other toys: drag, shelves, toy box, buddies hold them, and they show when a friend visits your home on a phone with this update.
+- Save data version 15 (filament). No Nearby protocol change: older phones visiting just don't show printed toys.
+
 ## 2026-11-21 (K-3 skills and smart help)
 
 - New "✨ Just for me" game: the app works out what each child should practise next from their grade and their answers. No settings. Warm up / Just right / Challenge change how much is new.
