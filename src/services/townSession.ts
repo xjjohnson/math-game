@@ -7,7 +7,7 @@ import { easelBoard, type EaselBoard } from '@/services/easel';
 import { createNearbyTransport } from '@/services/nearbyTransport';
 import type { NumberLevel, PaintAction } from '@/utils/easel';
 import type { HomeSnapshot } from '@/utils/homeVisit';
-import { advertName, newToken, shouldYield, tokenOf } from '@/utils/multiplayer/autoHost';
+import { advertName, newToken, shownName, tokenOf } from '@/utils/multiplayer/autoHost';
 import { isSharedPiece } from '@/utils/multiplayer/placeProps';
 import {
   HOST_ID,
@@ -42,6 +42,34 @@ export interface TownState {
   look: { buddies: string[]; acc?: string; chosen: boolean };
   /** A friend's buddy home this player asked to see: loading, shown, or not available. */
   home: HomeVisit | null;
+  /** The friend's visit this phone is joining right now (their shown name), after a tap on Join. */
+  joining: string | null;
+  /** Joined, the link dropped, and this phone is quietly getting back in. Friends stay on screen meanwhile. */
+  reconnecting: boolean;
+  /** Visits nearby the player said "Not now" to (advertised names), so they aren't asked again. */
+  skipped: string[];
+}
+
+/** A visit nearby that this player can join. */
+export interface NearbyVisit {
+  /** The advertised name, used to join it. */
+  name: string;
+  /** What to show: the host's sticker and name. */
+  shown: string;
+}
+
+/** Visits hosted nearby that this phone could join: only while it is on its own. */
+export function joinableVisits(state: TownState): NearbyVisit[] {
+  if (state.status !== 'hosting' || state.joining) return [];
+  if (state.people.some((p) => p.id !== state.myId)) return [];
+  const seen = new Set<string>();
+  const out: NearbyVisit[] = [];
+  for (const p of state.found) {
+    if (!p.name.startsWith(TOWN_MARK) || seen.has(p.name)) continue;
+    seen.add(p.name);
+    out.push({ name: p.name, shown: shownName(p.name, TOWN_MARK) });
+  }
+  return out;
 }
 
 export interface HomeVisit {
@@ -51,13 +79,32 @@ export interface HomeVisit {
   snap: HomeSnapshot | null;
 }
 
-/** A guest that just connected says hello within this long; a host doesn't give way meanwhile. */
-const HELLO_MS = 5000;
+/** How long to look for a friend's visit after tapping Join, and to wait for it to say welcome. */
+export const JOIN_WAIT_MS = 8000;
+
+/** A dropped link gets this long to come back before the friend is gone. */
+export const RECONNECT_MS = 15000;
+
+/** Joining: if the host sends no picture for the easel within this long, it has none, so this phone shares its own. */
+const EASEL_WAIT_MS = 1500;
 
 /** How long to wait for a friend's phone to send its home. */
 export const HOME_WAIT_MS = 8000;
 
-const OFF: TownState = { status: 'off', found: [], myId: HOST_ID, people: [], waves: {}, spots: {}, notice: null, look: { buddies: [], chosen: false }, home: null };
+const OFF: TownState = {
+  status: 'off',
+  found: [],
+  myId: HOST_ID,
+  people: [],
+  waves: {},
+  spots: {},
+  notice: null,
+  look: { buddies: [], chosen: false },
+  home: null,
+  joining: null,
+  reconnecting: false,
+  skipped: [],
+};
 
 /** How long a wave stays on screen. */
 export const WAVE_MS = 3000;
@@ -87,12 +134,8 @@ export class TownSession {
   private homeSource: (() => HomeSnapshot | null) | null = null;
   private homeTimer: ReturnType<typeof setTimeout> | null = null;
 
-  /** The tag this phone advertises when it hosts, so two hosts can agree which one gives way. */
+  /** The tag this phone advertises when it hosts, so two phones that tap Join on each other agree who goes. */
   private readonly token = newToken();
-  /** When each phone found nearby was first seen, by its id. */
-  private seenAt = new Map<string, number>();
-  /** When a guest last connected, while its hello is on the way. */
-  private lastConnect = 0;
 
   constructor(
     private readonly makeTransport: () => Transport | null,
@@ -118,6 +161,7 @@ export class TownSession {
   }
 
   // --- starting and stopping ---
+  /** Starts fresh as a host (the screens use `open`, which also looks for friends). */
   async host(me: Omit<PlayerInfo, 'id'>) {
     if (!this.begin(me, true)) return;
     try {
@@ -131,6 +175,7 @@ export class TownSession {
     this.publish();
   }
 
+  /** Starts fresh, looking for a visit to join by its id with `join`. */
   async discover(me: Omit<PlayerInfo, 'id'>) {
     if (!this.begin(me, false)) return;
     try {
@@ -143,6 +188,9 @@ export class TownSession {
   }
 
   async join(peerId: string) {
+    this.role = 'guest';
+    this.hostPeer = peerId;
+    this.hostName = this.state.found.find((p) => p.id === peerId)?.name ?? null;
     try {
       await this.transport?.connect(`${stickerText(this.me.avatar)} ${this.me.name}`, peerId);
     } catch (e) {
@@ -150,6 +198,7 @@ export class TownSession {
     }
   }
 
+  /** Hangs up and clears the visit. Only for really leaving: switching or reconnecting never calls it. */
   leave(notice: string | null = null) {
     const t = this.transport;
     this.transport = null;
@@ -160,10 +209,17 @@ export class TownSession {
       t.disconnect();
     }
     this.roster = [];
-    this.seenAt.clear();
+    this.clearAway();
+    if (this.easelTimer) clearTimeout(this.easelTimer);
+    this.easelTimer = null;
+    this.role = 'host';
+    this.hostName = null;
+    this.hostPeer = null;
+    this.welcomed = false;
+    this.looking = false;
     this.places.clear();
     this.spots.clear();
-    this.set({ ...OFF, look: this.state.look, notice });
+    this.set({ ...OFF, look: this.state.look, skipped: this.state.skipped, notice });
   }
 
   /** Change the buddies and accessory this player shows in the community. */
@@ -178,119 +234,194 @@ export class TownSession {
     }
   }
 
-  // --- connecting by itself ---
-  private autoRun = 0;
+  // --- connecting with one tap ---
+  /** Which side of the link this phone is on right now. */
+  private role: 'host' | 'guest' = 'host';
+  /** Guest: the advertised name and link id of the host this phone is with. */
+  private hostName: string | null = null;
+  private hostPeer: string | null = null;
+  /** Bumped by every new join, reconnect, re-host or stop, so an older one that is still waiting gives up. */
+  private flow = 0;
+  /** Host: friends whose link dropped, kept on screen while they get back in. */
+  private away = new Map<string, ReturnType<typeof setTimeout>>();
+  /** Host: searching for other visits (only while nobody has joined). */
+  private looking = false;
+  /** Guest: when the host last sent an easel picture. */
+  private easelAt = 0;
+  private easelTimer: ReturnType<typeof setTimeout> | null = null;
 
   /**
-   * Opens the community with no choices to make. It looks once for a visit
-   * someone is already hosting and joins it; if there is none, it hosts and
-   * stays the host. While nobody has joined it, it keeps an eye out for
-   * another host (two phones that opened at the same moment) and the two
-   * become one: see `shouldYield`.
+   * Opens the community. The phone offers a visit of its own straight away and
+   * keeps an eye out for friends' visits; it never joins or switches by itself.
+   * A friend's visit shows up in `joinableVisits` and is joined with `joinVisit`.
    */
-  async auto(me: Omit<PlayerInfo, 'id'>) {
-    const run = ++this.autoRun;
+  async open(me: Omit<PlayerInfo, 'id'>) {
+    if (this.active) return;
     const { buddies, acc } = this.state.look;
     this.me = { id: HOST_ID, ...me, buddies: buddies.length ? buddies : undefined, acc };
-    const alive = () => this.autoRun === run;
-    /** The host to join, once this phone has given way to it. */
-    let joinName: string | null = null;
-    while (alive()) {
-      if (!(await this.discoverOnce(alive))) return;
-      // Give hosts a moment to be found; the wait differs per phone so two phones don't decide together.
-      await sleep(joinName ? 1500 : 3000 + Math.random() * 3000);
-      if (!alive()) return;
-      if (await this.joinFound(alive, joinName)) return this.watchGuest(run);
-      joinName = null;
-      if (!(await this.hostOnce(alive))) return;
-      // Host and stay. Only a host nobody has joined gives way to another host.
-      const other = await this.watchForHosts(alive);
-      if (!other) {
-        if (alive() && this.state.status !== 'hosting') continue;
-        return;
-      }
-      joinName = other;
+    const t = this.makeTransport();
+    if (!t) {
+      this.set({ notice: 'Visiting needs the Math Game app on Android.' });
+      return;
     }
+    this.transport = t;
+    this.listen(t);
+    this.set({ ...OFF, look: this.state.look, skipped: this.state.skipped });
+    await this.hostAlone(++this.flow, null);
   }
 
-  /** Stops looking for or hosting a visit and leaves; it stays off until `auto` is called again. */
+  /** Stops the visit and leaves; it stays off until `open` is called again. */
   stop() {
-    this.autoRun++;
+    this.flow++;
     this.leave();
   }
 
-  /** Joins a community host that was found (the one named `name`, if given). True once joined. */
-  private async joinFound(alive: () => boolean, name: string | null): Promise<boolean> {
-    const hosts = this.state.found.filter((p) => p.name.startsWith(TOWN_MARK));
-    const host = (name ? hosts.find((p) => p.name === name) : undefined) ?? hosts[0];
-    if (!host) return false;
-    await this.join(host.id);
-    for (let i = 0; i < 12 && alive() && this.state.status !== 'joined'; i++) await sleep(500);
-    return alive() && this.state.status === 'joined';
+  /** "Not now": stop asking about this visit. */
+  skip(name: string) {
+    if (!this.state.skipped.includes(name)) this.set({ skipped: [...this.state.skipped, name] });
   }
 
-  private async watchGuest(run: number) {
-    // If the host goes away, try again from the top.
-    while (this.autoRun === run && this.state.status === 'joined') await sleep(1000);
-    if (this.autoRun === run) void this.auto(this.me);
+  /** Joins the visit a friend is hosting nearby (by its advertised name), after a tap on Join. */
+  async joinVisit(name: string, retry = true): Promise<void> {
+    const t = this.transport;
+    if (!t || this.state.status === 'joined' || this.roster.length > 1) return;
+    const run = ++this.flow;
+    const alive = () => this.flow === run && this.transport === t;
+    const shown = shownName(name, TOWN_MARK);
+    this.set({ joining: shown, notice: null });
+    if (await this.connectTo(name, alive, JOIN_WAIT_MS)) {
+      this.set({ joining: null });
+      return;
+    }
+    if (!alive()) return;
+    // Couldn't get in. Most often both friends tapped Join on each other at once; then the
+    // phone with the smaller tag tries once more and the other one waits to be joined.
+    const mine = this.token;
+    const theirs = tokenOf(name, TOWN_MARK);
+    await this.hostAlone(run, null);
+    if (!alive()) return;
+    if (retry && theirs && mine < theirs) {
+      await sleep(1500 + Math.random() * 1000);
+      if (alive() && this.roster.length <= 1) return this.joinVisit(name, false);
+    }
+    if (alive() && this.roster.length <= 1) this.set({ joining: null, notice: `Couldn't reach ${shown}. Try again.` });
   }
 
   /**
-   * While hosting: keep looking for other community hosts nearby. Returns the
-   * advertised name of a host to give way to, or null when hosting ended.
+   * Looks for the visit called `name` and connects to it. True once the host has said welcome.
+   * Everything on screen stays as it is meanwhile.
    */
-  private async watchForHosts(alive: () => boolean): Promise<string | null> {
-    await this.transport?.lookAround?.().catch(() => undefined);
-    let looking = true;
-    while (alive() && this.state.status === 'hosting') {
-      await sleep(1000);
-      if (!alive() || this.state.status !== 'hosting') break;
-      // Friends are here: stay the host, and stop searching, which makes their connections flaky.
-      // If they all leave, start looking for other lonely hosts again.
-      const friends = this.roster.length > 1;
-      if (friends && looking) {
-        this.transport?.stopLooking?.();
-        looking = false;
-      } else if (!friends && !looking) {
-        await this.transport?.lookAround?.().catch(() => undefined);
-        looking = true;
-        continue;
-      }
-      // Friends are here, or one is saying hello: stay the host.
-      if (friends || Date.now() - this.lastConnect < HELLO_MS) continue;
-      const now = Date.now();
-      for (const peer of this.state.found) {
-        if (!peer.name.startsWith(TOWN_MARK)) continue;
-        const seen = now - (this.seenAt.get(peer.id) ?? now);
-        if (shouldYield(this.token, tokenOf(peer.name, TOWN_MARK), seen)) return peer.name;
-      }
-    }
-    return null;
-  }
-
-  private async discoverOnce(alive: () => boolean): Promise<boolean> {
-    this.begin(this.me, false);
-    if (!this.transport) return false;
+  private async connectTo(name: string, alive: () => boolean, waitMs: number): Promise<boolean> {
+    const t = this.transport!;
+    this.role = 'guest';
+    this.hostName = name;
+    this.hostPeer = null;
+    this.looking = false;
+    this.set({ status: this.state.status === 'joined' ? 'joined' : 'finding', found: [] });
     try {
-      await this.transport.discover();
-    } catch (e) {
-      this.leave(errorText(e));
+      await t.discover();
+    } catch {
       return false;
     }
-    if (!alive()) return false;
-    this.set({ status: 'finding' });
-    return true;
+    const until = Date.now() + waitMs;
+    let asked: string | null = null;
+    while (alive() && Date.now() < until) {
+      if (this.welcomed) return true;
+      const host = this.state.found.find((p) => p.name === name);
+      if (host && host.id !== asked) {
+        asked = host.id;
+        this.hostPeer = host.id;
+        await t.connect(`${stickerText(this.me.avatar)} ${this.me.name}`, host.id).catch(() => {
+          asked = null;
+        });
+      }
+      await sleep(250);
+    }
+    return alive() && this.welcomed;
+  }
+  /** Guest: the host has said welcome on the current link. */
+  private welcomed = false;
+
+  /** The link to the host dropped: keep everyone on screen and quietly get back in. */
+  private async reconnect() {
+    const name = this.hostName;
+    const run = ++this.flow;
+    if (!name) return this.hostAlone(run, 'The visit ended.');
+    const alive = () => this.flow === run && this.transport !== null;
+    this.welcomed = false;
+    this.set({ reconnecting: true });
+    if (await this.connectTo(name, alive, RECONNECT_MS)) {
+      this.set({ reconnecting: false });
+      return;
+    }
+    if (alive()) await this.hostAlone(run, `Lost the visit with ${shownName(name, TOWN_MARK)}.`);
   }
 
-  private async hostOnce(alive: () => boolean): Promise<boolean> {
-    await this.host(this.me);
-    return alive() && this.state.status === 'hosting';
+  /**
+   * Back to this phone's own visit, with nobody else in it yet. Your own person, buddies
+   * and the things in the rooms stay where they are; only friends leave the screen.
+   */
+  private async hostAlone(run: number, notice: string | null) {
+    const t = this.transport;
+    if (!t) return;
+    this.role = 'host';
+    this.hostName = null;
+    this.hostPeer = null;
+    this.welcomed = false;
+    this.clearAway();
+    this.places.clear();
+    // Keep this player's own pieces (moved over to the host id) and the shared things.
+    const kept = new Map<string, { x: number; y: number }>();
+    for (const [id, spot] of Object.entries(this.state.spots)) {
+      if (isSharedPiece(id)) kept.set(id, spot);
+      else if (ownerOf(id) === this.state.myId) kept.set(HOST_ID + id.slice(this.state.myId.length), spot);
+    }
+    this.spots = kept;
+    this.roster = [this.me];
+    this.looking = false;
+    this.set({ myId: HOST_ID, found: [], reconnecting: false, joining: null, ...(notice ? { notice } : {}) });
+    try {
+      await t.host(advertName(TOWN_MARK, this.token, `${stickerText(this.me.avatar)} ${this.me.name}`));
+    } catch (e) {
+      if (this.flow === run) this.leave(errorText(e));
+      return;
+    }
+    if (this.flow !== run || this.transport !== t) return;
+    this.set({ status: 'hosting' });
+    this.publish();
+    await this.updateLooking();
+  }
+
+  /** Host: look for friends' visits only while nobody has joined; searching makes links slow and flaky. */
+  private async updateLooking() {
+    if (this.role !== 'host' || !this.transport) return;
+    const alone = this.roster.length <= 1;
+    if (alone && !this.looking) {
+      this.looking = true;
+      await this.transport.lookAround?.().catch(() => undefined);
+    } else if (!alone && this.looking) {
+      this.looking = false;
+      this.transport.stopLooking?.();
+      this.set({ found: [] });
+    }
+  }
+
+  private clearAway() {
+    this.away.forEach((timer) => clearTimeout(timer));
+    this.away.clear();
   }
 
   // --- where this phone is ---
   /** Call when this player walks to the street or into a building. */
   setPlace(place: TownPlace | null) {
+    const moved = this.place !== place;
     this.place = place;
+    if (moved && this.state.status !== 'hosting') {
+      // People and buddies start fresh in each place (the host does the same with its copy).
+      const me = this.state.myId;
+      const spots = Object.fromEntries(Object.entries(this.state.spots).filter(([id]) => isSharedPiece(id) || ownerOf(id) !== me));
+      this.set({ spots });
+    }
     if (this.state.status === 'hosting') {
       this.setHostPlace();
       this.publish();
@@ -418,28 +549,31 @@ export class TownSession {
     this.transport = t;
     const { buddies, acc } = this.state.look;
     this.me = { id: HOST_ID, ...me, buddies: buddies.length ? buddies : undefined, acc };
-    this.set({ ...OFF, look: this.state.look, myId: HOST_ID });
-    this.listen(t, asHost);
+    this.role = asHost ? 'host' : 'guest';
+    this.set({ ...OFF, look: this.state.look, skipped: this.state.skipped, myId: HOST_ID });
+    this.listen(t);
     return true;
   }
 
-  private listen(t: Transport, asHost: boolean) {
+  private listen(t: Transport) {
     this.offs = [
       t.on('peerFound', (peer) => {
-        if (!this.seenAt.has(peer.id)) this.seenAt.set(peer.id, Date.now());
         this.set({ found: [...this.state.found.filter((p) => p.id !== peer.id), peer] });
       }),
       t.on('peerLost', ({ id }) => {
-        this.seenAt.delete(id);
         this.set({ found: this.state.found.filter((p) => p.id !== id) });
       }),
-      t.on('error', (text) => this.set({ notice: text })),
+      // Joining and reconnecting say for themselves when they can't get in; other errors are shown.
+      t.on('error', (text) => {
+        if (!this.state.joining && !this.state.reconnecting) this.set({ notice: text });
+      }),
       t.on('connected', ({ id }) => {
-        if (asHost) {
-          this.lastConnect = Date.now();
+        if (this.role === 'host') {
           if (this.roster.length >= MAX_PLAYERS) this.send({ type: 'bye' }, id);
           return; // otherwise wait for its hello
         }
+        this.hostPeer = id;
+        this.welcomed = false;
         this.set({ status: 'joined' });
         // Joined: stop searching, which makes the connection slow and flaky.
         t.stopLooking?.();
@@ -453,25 +587,57 @@ export class TownSession {
         });
       }),
       t.on('disconnected', ({ id }) => {
-        if (!asHost) {
-          this.leave('The host phone left.');
+        if (this.role === 'host') {
+          this.dropLater(id);
           return;
         }
-        this.drop(id);
+        // An old link going away while switching is nothing to worry about.
+        if (id !== this.hostPeer || this.state.status !== 'joined' || this.state.reconnecting) return;
+        void this.reconnect();
       }),
-      t.on('message', ({ id, message }) => (asHost ? this.hostHears(id, message) : this.guestHears(message))),
+      t.on('message', ({ id, message }) => {
+        if (this.role === 'host') this.hostHears(id, message);
+        else if (id === this.hostPeer) this.guestHears(message);
+      }),
     ];
+  }
+
+  /** Host: a friend's link dropped. Keep them on screen for a little while in case they get back in. */
+  private dropLater(id: string) {
+    if (!this.roster.some((p) => p.id === id) || this.away.has(id)) return this.drop(id);
+    this.away.set(
+      id,
+      setTimeout(() => {
+        this.away.delete(id);
+        this.drop(id);
+      }, RECONNECT_MS),
+    );
   }
 
   private hostHears(id: string, message: GameMessage) {
     switch (message.type) {
       case 'hello':
-        this.send({ type: 'welcome', version: PROTOCOL_VERSION, you: id }, id);
         if (message.version < FARM_VERSION) {
+          this.send({ type: 'welcome', version: PROTOCOL_VERSION, you: id }, id);
           // An older phone can play matches but doesn't know this community (it has no farm yet).
           this.send({ type: 'bye' }, id);
           this.set({ notice: `${message.name}'s phone needs the newest Math Game to visit the community.` });
           return;
+        }
+        if (this.away.has(id)) {
+          clearTimeout(this.away.get(id));
+          this.away.delete(id);
+        }
+        {
+          // A friend getting back in after a dropped link: their old place in the list goes.
+          const back = this.roster.find((p) => p.id !== id && this.away.has(p.id) && p.name === message.name && p.avatar === message.avatar);
+          if (back) {
+            clearTimeout(this.away.get(back.id));
+            this.away.delete(back.id);
+            this.roster = this.roster.filter((p) => p.id !== back.id);
+            this.places.delete(back.id);
+            this.clearSpots(back.id);
+          }
         }
         if (this.roster.length >= MAX_PLAYERS) return;
         this.roster = [
@@ -484,12 +650,15 @@ export class TownSession {
             ...(message.acc ? { acc: message.acc } : {}),
           },
         ];
+        // In the list first, so whatever the newcomer says straight after the welcome counts.
+        this.send({ type: 'welcome', version: PROTOCOL_VERSION, you: id }, id);
         this.publish();
-        // The newcomer's chalkboard shows what is on this one.
-        this.send({ type: 'chalk-wipe' }, id);
+        void this.updateLooking();
+        // The newcomer's chalkboard gets what is on this one, added to what it already has
+        // (it sends its own lines over too).
         for (const stroke of this.board.getStrokes()) this.send({ type: 'chalk', stroke }, id);
-        // And its easel shows the picture on this one.
-        this.sendEasel(id);
+        // And its easel shows the picture on this one, if there is one; otherwise it shares its own.
+        if (!isBlank(this.easel.getPicture())) this.sendEasel(id);
         break;
       case 'visit':
         if (!this.roster.some((p) => p.id === id)) return;
@@ -545,6 +714,10 @@ export class TownSession {
         this.send({ type: 'hi', playerId: id });
         break;
       case 'bye':
+        if (this.away.has(id)) {
+          clearTimeout(this.away.get(id));
+          this.away.delete(id);
+        }
         this.drop(id);
         break;
     }
@@ -552,15 +725,44 @@ export class TownSession {
 
   private guestHears(message: GameMessage) {
     switch (message.type) {
-      case 'welcome':
-        this.set({ myId: message.you });
-        // Tell the host where we are as soon as we're in.
+      case 'welcome': {
+        // My person and buddies keep where they were, under the id the host gave this phone.
+        const before = this.state.myId;
+        const mine: [string, { x: number; y: number }][] = [];
+        const spots: TownState['spots'] = {};
+        for (const [id, spot] of Object.entries(this.state.spots)) {
+          if (!isSharedPiece(id) && ownerOf(id) === before) mine.push([message.you + id.slice(before.length), spot]);
+          else spots[id] = spot;
+        }
+        for (const [id, spot] of mine) spots[id] = spot;
+        this.welcomed = true;
+        this.set({ myId: message.you, spots });
+        // Tell the host where we are as soon as we're in, then where my pieces are.
         if (this.place) this.send({ type: 'visit', place: this.place });
+        for (const [id, spot] of mine) this.send({ type: 'move', id, ...spot });
+        // My chalk lines join the host's board.
+        for (const stroke of this.board.getStrokes()) this.send({ type: 'chalk', stroke });
+        // If the host has no picture on its easel, mine goes up for everyone.
+        this.easelAt = 0;
+        const welcomedAt = Date.now();
+        if (this.easelTimer) clearTimeout(this.easelTimer);
+        this.easelTimer = setTimeout(() => {
+          this.easelTimer = null;
+          if (this.easelAt >= welcomedAt || this.role !== 'guest') return;
+          const pic = this.easel.getPicture();
+          if (isBlank(pic)) return;
+          this.send({ type: 'paint-page', page: pic.page, lv: pic.lv });
+          for (const a of paintBatches(pic.actions)) this.send({ type: 'paint', a });
+        }, EASEL_WAIT_MS);
         break;
+      }
       case 'town': {
         const spots: TownState['spots'] = {};
         for (const p of message.people) if (p.x !== undefined && p.y !== undefined) spots[p.id] = { x: p.x, y: p.y };
         for (const e of message.spots ?? []) spots[e.id] = { x: e.x, y: e.y };
+        // Only this phone moves its own pieces, so its copy wins until the host has caught up.
+        const me = this.state.myId;
+        for (const [id, spot] of Object.entries(this.state.spots)) if (!isSharedPiece(id) && ownerOf(id) === me && !spots[id]) spots[id] = spot;
         this.set({ people: message.people, spots });
         break;
       }
@@ -591,10 +793,13 @@ export class TownSession {
         this.easel.remove(message.id);
         break;
       case 'paint-page':
+        this.easelAt = Date.now();
         this.easel.reset(message.page, message.lv);
         break;
       case 'bye':
-        this.leave('The host closed the visit.');
+        // The host closed its visit: carry on alone, with your own visit open for friends.
+        if (this.transport) void this.hostAlone(++this.flow, `${this.hostName ? shownName(this.hostName, TOWN_MARK) : 'The host'} closed the visit.`);
+        else this.leave('The host closed the visit.');
         break;
     }
   }
@@ -604,6 +809,8 @@ export class TownSession {
     this.places.delete(id);
     this.clearSpots(id);
     this.publish();
+    // Everyone left: look for friends' visits again.
+    void this.updateLooking();
   }
 
   /** Forget where a player's person and buddies were put. */
@@ -663,6 +870,7 @@ export class TownSession {
   }
 }
 
+const isBlank = (p: { page: string; actions: unknown[] }) => p.page === 'blank' && p.actions.length === 0;
 const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
 const errorText = (e: unknown) => (e instanceof Error ? e.message : String(e));
 
