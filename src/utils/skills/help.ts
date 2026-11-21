@@ -4,6 +4,7 @@ import { columnLayout } from '@/utils/columnEntry';
 import { teachSteps } from '@/utils/columnTeach';
 import { answerText } from '@/utils/skills/build';
 import { findSkill } from '@/utils/skills/catalog';
+import { handsOnSlip } from '@/utils/skills/handsOn';
 
 /**
  * Help for the question on screen, picked the way a teacher would:
@@ -562,6 +563,17 @@ function tipVisual(p: Problem, step: number): LessonVisual | undefined {
 function tipFor(p: Problem): string[] {
   const id = p.skill ?? '';
   const pc = p.picture;
+  const it = p.interact;
+  if (it?.kind === 'setClock') {
+    return it.from !== undefined
+      ? ['The clock starts at the time they go in.', 'Move the long hand forward, counting by 5s, until you have counted the baking time. Every time it passes the 12, the hour goes up 1.']
+      : ['Put the long hand on the minutes first. Count by 5s from the 12: at the 3 it is 15, at the 6 it is 30, at the 9 it is 45.', 'Then check the short hand points at the hour (just past it when the minutes are big).'];
+  }
+  if (it?.kind === 'purse') {
+    return it.from !== undefined
+      ? ['Start at the price and count up with coins to what was paid.', 'Pennies to get to a 5 or 10, then dimes and quarters to the dollar. The coins you added are the change.']
+      : ['Start with the biggest coin that fits, then add smaller ones.', 'Count as you go: 25, 35, 45, 50, 51...'];
+  }
   switch (pc?.kind) {
     case 'things':
       return id.includes('quick')
@@ -640,12 +652,14 @@ function tipFor(p: Problem): string[] {
 
 /** Every way that fits this question, in school order (pictures, tricks, paper). */
 export function waysFor(problem: Problem, reveal: boolean): HelpWay[] {
+  // A hands-on question's picture is the answer (the clock to set), so help talks about it without showing it.
+  if (problem.interact && !reveal) problem = { ...problem, ask: problem.interact.ask, picture: undefined };
   const ctx: Ctx = { p: problem, reveal };
   const { a, b, answer, operation } = problem;
   if (problem.ask || problem.story) {
     // A picture or story question that is really a sum (a bar model, change, an array) also gets the sum's ways.
     const sum = { add: a + b, subtract: a - b, multiply: a * b, divide: b ? a / b : NaN }[operation];
-    const bare: Problem = { ...problem, ask: undefined, story: undefined, picture: undefined, labels: undefined };
+    const bare: Problem = { ...problem, ask: undefined, story: undefined, picture: undefined, labels: undefined, interact: undefined };
     const more = !problem.labels && sum === answer && a > 0 && b > 0 ? waysFor(bare, reveal) : [];
     return [askWay(ctx), ...more];
   }
@@ -724,6 +738,7 @@ const digitsOf = (n: number, width: number) => String(n).padStart(width, '0').sp
  */
 export function diagnose(problem: Problem, given: number | null): string | null {
   if (given === null || given === problem.answer) return null;
+  if (problem.interact) return handsOnSlip(problem, given);
   const { a, b, answer, operation } = problem;
   if (problem.ask || problem.story) {
     if (problem.picture?.kind === 'clock' && problem.choiceOnly) {

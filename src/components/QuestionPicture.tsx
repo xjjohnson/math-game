@@ -533,8 +533,21 @@ function Tape({ whole, parts, label, width, color }: Extract<Picture, { kind: 't
 
 // ---------- time, money, measuring ----------
 
-function Clock({ hour, minute, width }: { hour: number; minute: number; width: number }) {
-  const s = Math.min(width * 0.7, 230);
+/** A clock face. `size` sets it exactly; `ghost` adds faded hands at another time (to compare with a miss). */
+export function Clock({
+  hour,
+  minute,
+  width,
+  size,
+  ghost,
+}: {
+  hour: number;
+  minute: number;
+  width: number;
+  size?: number;
+  ghost?: { hour: number; minute: number };
+}) {
+  const s = size ?? Math.min(width * 0.7, 230);
   const c = 50;
   const minuteAngle = (minute / 60) * 2 * Math.PI;
   const hourAngle = (((hour % 12) + minute / 60) / 12) * 2 * Math.PI;
@@ -559,6 +572,18 @@ function Clock({ hour, minute, width }: { hour: number; minute: number; width: n
           </SvgText>
         );
       })}
+      {ghost
+        ? (() => {
+            const [gmx, gmy] = hand((ghost.minute / 60) * 2 * Math.PI, 36);
+            const [ghx, ghy] = hand((((ghost.hour % 12) + ghost.minute / 60) / 12) * 2 * Math.PI, 23);
+            return (
+              <G opacity={0.35}>
+                <Line x1={c} y1={c} x2={ghx} y2={ghy} stroke="#757575" strokeWidth={4.5} strokeLinecap="round" />
+                <Line x1={c} y1={c} x2={gmx} y2={gmy} stroke="#757575" strokeWidth={2.8} strokeLinecap="round" />
+              </G>
+            );
+          })()
+        : null}
       <Line x1={c} y1={c} x2={hx} y2={hy} stroke="#1565C0" strokeWidth={4.5} strokeLinecap="round" />
       <Line x1={c} y1={c} x2={mx} y2={my} stroke="#D32F2F" strokeWidth={2.8} strokeLinecap="round" />
       <Circle cx={c} cy={c} r={3} fill={INK} />
@@ -566,7 +591,7 @@ function Clock({ hour, minute, width }: { hour: number; minute: number; width: n
   );
 }
 
-const COIN: Partial<Record<Money, { r: number; fill: string; text: string }>> = {
+export const COIN: Partial<Record<Money, { r: number; fill: string; text: string }>> = {
   1: { r: 17, fill: '#C77B3C', text: '1¢' },
   5: { r: 19.5, fill: '#B0B6BC', text: '5¢' },
   10: { r: 16, fill: '#C9CED3', text: '10¢' },

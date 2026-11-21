@@ -1,6 +1,6 @@
 import type { Mood } from '@/components/PersonFigure';
 import type { PersonLook } from '@/constants/wardrobe';
-import type { Picture } from '@/types/picture';
+import type { Money, Picture } from '@/types/picture';
 
 export type { Money, Picture, Shape2D, Shape3D } from '@/types/picture';
 
@@ -56,6 +56,12 @@ export interface Problem {
   unit?: string;
   /** Hide the picture after this many milliseconds (quick looks, like dice dots). */
   flashMs?: number;
+  /**
+   * Play answers it by doing instead of picking: setting the clock hands, or
+   * filling a purse with coins. Screens without that (worksheets, two-player
+   * games) use `ask`, `picture` and the choices as a normal question.
+   */
+  interact?: Interact;
 }
 
 /** The parts of a problem needed to ask it again later. */
@@ -286,6 +292,12 @@ export interface GameConfig {
   /** Show every question on one page and mark them all at the end. */
   worksheet?: boolean;
 }
+
+export type Interact =
+  /** Drag the hands to the answer (minutes after 12:00). `from` starts the clock at a time, for time passing. */
+  | { kind: 'setClock'; ask: string; step: number; from?: number }
+  /** Put coins in a purse to make the answer (cents). `from` counts up from a price, for change. */
+  | { kind: 'purse'; ask: string; coins: Money[]; from?: number };
 
 export interface AnswerRecord {
   problem: Problem;

@@ -8,6 +8,7 @@ import { ChoiceButtons } from '@/components/ChoiceButtons';
 import { CompanionBubble } from '@/components/CompanionBubble';
 import { CountingAid } from '@/components/CountingAid';
 import { FlashCard, isStacked } from '@/components/FlashCard';
+import { ClockSetter, CoinPurse } from '@/components/HandsOn';
 import { HelpPanel } from '@/components/HelpPanel';
 import { ColumnHint } from '@/components/ColumnHint';
 import { ColumnPad, NumberPad } from '@/components/NumberPad';
@@ -37,6 +38,7 @@ import { resolveInputStyle } from '@/utils/inputStyle';
 import type { RoundOutcome } from '@/utils/progress';
 import { coinsForAnswer, SPEEDY_SECONDS, STREAK_MILESTONE } from '@/utils/rewards';
 import { randomSeed } from '@/utils/seededRandom';
+import { handsOnCard } from '@/utils/skills/handsOn';
 import { diagnose, waysFor } from '@/utils/skills/help';
 import { freshRound, withPlan } from '@/utils/skills/plan';
 import { cardStyleFor, companionFor } from '@/utils/shop';
@@ -162,6 +164,9 @@ function Round({ config: asked, onPlayAgain }: { config: GameConfig; onPlayAgain
   const showFeedback = state.phase === 'feedback' && last;
   // Show-my-work needs the boxes, so it types even when the player usually taps choices.
   const typingColumns = isStacked(state.problem) && (inputStyle !== 'choices' || !!config.showWork);
+  // Set-the-clock and fill-the-purse questions are answered on the clock or purse itself.
+  const handsOn = state.problem.interact;
+  const card = handsOnCard(state.problem, !!showFeedback);
 
   return (
     <Screen compact center>
@@ -185,7 +190,7 @@ function Round({ config: asked, onPlayAgain }: { config: GameConfig; onPlayAgain
 
       <FlashCard
         key={`card-${state.index}`}
-        problem={state.problem}
+        problem={card}
         reveal={!!showFeedback}
         column={
           typingColumns && !showFeedback
@@ -257,7 +262,19 @@ function Round({ config: asked, onPlayAgain }: { config: GameConfig; onPlayAgain
         </PopIn>
       ) : null}
 
-      {inputStyle === 'choices' && !typingColumns ? (
+      {handsOn ? (
+        showFeedback ? (
+          !last.correct && last.given !== null ? (
+            <Text style={styles.slip}>
+              The right answer is {answerText(state.problem, state.problem.answer)}. You {handsOn.kind === 'setClock' ? 'showed' : 'put in'} {answerText(state.problem, last.given)}.
+            </Text>
+          ) : null
+        ) : handsOn.kind === 'setClock' ? (
+          <ClockSetter key={`clock-${state.index}`} step={handsOn.step} from={handsOn.from} onCheck={answer} />
+        ) : (
+          <CoinPurse key={`purse-${state.index}`} coins={handsOn.coins} from={handsOn.from} onCheck={answer} />
+        )
+      ) : inputStyle === 'choices' && !typingColumns ? (
         <ChoiceButtons
           choices={state.problem.choices}
           selected={showFeedback ? (last.given ?? Number.NaN) : null}

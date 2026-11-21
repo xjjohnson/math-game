@@ -138,3 +138,74 @@ export function measureLength(id: SkillId, rng: Rng, units: ('in' | 'cm')[]): Pr
     rng,
   );
 }
+
+// ---------- hands-on versions ----------
+
+/**
+ * Set the clock: the same question as reading one, but Play has the child drag
+ * the hands to the time instead. Other screens still show the clock and choices.
+ */
+export function setTheClock(id: SkillId, rng: Rng, stepMinutes: 30 | 5 | 1): Problem {
+  const p = tellTime(id, rng, stepMinutes);
+  return { ...p, interact: { kind: 'setClock', ask: `Show ${timeLabel(p.answer)} on the clock.`, step: stepMinutes } };
+}
+
+const BAKES = ['cookies', 'muffins', 'bread', 'a pie', 'cupcakes'];
+
+/** Time passing (3rd grade): start at one time, move the clock on, say when it ends. */
+export function timePassing(id: SkillId, rng: Rng): Problem {
+  const hour = randInt(rng, 1, 11);
+  const minute = randInt(rng, 0, 11) * 5;
+  const start = hour * 60 + minute;
+  const wait = randInt(rng, 3, 11) * 5 + (rng() < 0.3 ? 60 : 0);
+  const answer = (start + wait) % 720;
+  const what = pick(rng, BAKES);
+  const waitText = wait >= 60 ? `1 hour and ${wait - 60} minutes` : `${wait} minutes`;
+  const options = [answer, (answer + 60) % 720, (start + wait - 10 + 720) % 720, (start - wait + 720) % 720].filter(
+    (v, i, all) => all.indexOf(v) === i,
+  );
+  while (options.length < 4) options.push((answer + 5 * options.length) % 720);
+  const Bake = `${what[0].toUpperCase()}${what.slice(1)}`;
+  const p = pickQuestion(
+    id,
+    {
+      operation: 'add',
+      ask: `${Bake} go in the oven at this time and bake for ${waitText}. When are they done?`,
+      answer,
+      options: shuffle(rng, options).map((v) => ({ value: v, label: timeLabel(v) })),
+      picture: { kind: 'clock', hour: Math.floor(start / 60) % 12 || 12, minute },
+      a: start,
+      b: wait,
+    },
+    rng,
+  );
+  return {
+    ...p,
+    interact: {
+      kind: 'setClock',
+      ask: `${Bake} go in the oven at ${timeLabel(start)} and bake for ${waitText}. Move the clock to when they're done.`,
+      step: 5,
+      from: start,
+    },
+  };
+}
+
+/** Make an amount (cents) with coins in a purse. Other screens count a set of coins instead. */
+export function makeAmount(id: SkillId, rng: Rng): Problem {
+  const p = countCoins(id, rng);
+  return { ...p, interact: { kind: 'purse', ask: `Put ${p.answer}¢ in the purse.`, coins: [1, 5, 10, 25] } };
+}
+
+/** Make change by counting up from the price to what was paid, with coins. */
+export function countUpChange(id: SkillId, rng: Rng): Problem {
+  const p = makeChange(id, rng);
+  return {
+    ...p,
+    interact: {
+      kind: 'purse',
+      ask: `A toy costs ${p.b}¢. You paid ${p.a}¢. Count up the change: add coins until you get to ${p.a}¢.`,
+      coins: [1, 5, 10, 25],
+      from: p.b,
+    },
+  };
+}
