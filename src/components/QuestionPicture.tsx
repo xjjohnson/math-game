@@ -578,8 +578,12 @@ function MoneyRow({ items, width }: { items: Money[]; width: number }) {
   let x = 4;
   let y = 4;
   let rowH = 0;
+  let used = 0;
+  // Coins keep their real size order (the dime is smallest) but are drawn big enough to read.
+  const scale = 1.5;
   items.forEach((m, i) => {
-    const coin = COIN[m];
+    const base = COIN[m];
+    const coin = base ? { ...base, r: base.r * scale } : undefined;
     const w = coin ? coin.r * 2 : 92;
     const h = coin ? coin.r * 2 : 44;
     if (x + w > width - 4) {
@@ -612,10 +616,12 @@ function MoneyRow({ items, width }: { items: Money[]; width: number }) {
       );
     }
     x += w + 8;
+    used = Math.max(used, x);
     rowH = Math.max(rowH, h);
   });
+  // Only as wide as the coins, so the card centres them.
   return (
-    <Svg width={width} height={y + rowH + 6}>
+    <Svg width={Math.min(width, used)} height={y + rowH + 6}>
       {nodes}
     </Svg>
   );

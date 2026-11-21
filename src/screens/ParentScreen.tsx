@@ -4,6 +4,7 @@ import { Pressable, StyleSheet, View } from 'react-native';
 import { Text } from '@/components/AppText';
 import { BigButton } from '@/components/BigButton';
 import { LevelPicker } from '@/components/LevelPicker';
+import { SkillMap } from '@/components/SkillMap';
 import { OptionGroup } from '@/components/OptionGroup';
 import { Screen } from '@/components/Screen';
 import { stickerText } from '@/constants/art';
@@ -277,6 +278,13 @@ function PlayerReport({ profile }: { profile: Profile }) {
       </Text>
       <Adjust label="Coins" steps={[-50, -10, 10, 50]} onPress={(by) => adjustBalance(profile.id, { coins: by })} />
       <Adjust label="Stars" steps={[-5, -1, 1, 5]} onPress={(by) => adjustBalance(profile.id, { stars: by })} />
+
+      <Text style={styles.heading}>Skills</Text>
+      <Text style={styles.note}>
+        The game picks what to practise from these by itself. A skill counts as learned at 8 of the last 10 right (or the first 5
+        right). Earlier grades count as known unless they keep going wrong.
+      </Text>
+      <SkillMap profile={profile} parent />
 
       <Text style={styles.heading}>Accuracy</Text>
       {OPERATIONS.map((op) => {

@@ -4,6 +4,7 @@ import { StyleSheet, View } from 'react-native';
 import { Text } from '@/components/AppText';
 import { BigButton } from '@/components/BigButton';
 import { Screen } from '@/components/Screen';
+import { SkillMap } from '@/components/SkillMap';
 import { StarLevelCard } from '@/components/StarLevelCard';
 import { StreakCalendar } from '@/components/StreakCalendar';
 import { stickerText } from '@/constants/art';
@@ -39,6 +40,9 @@ export function ProgressScreen() {
         <Tile value={String(profile.bestStreak)} label="🔥 Best streak" />
         <Tile value={String(days)} label={days === 1 ? '📅 Day in a row' : '📅 Days in a row'} />
       </View>
+
+      <Text style={styles.heading}>My skills</Text>
+      <SkillMap profile={profile} />
 
       <Text style={styles.heading}>How you're doing</Text>
       {OPERATIONS.map((op) => {
