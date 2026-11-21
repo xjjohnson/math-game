@@ -1,5 +1,15 @@
 # Change log
 
+## 2026-11-21 (Community: tap to join)
+
+- **Joining a friend is one tap.** Opening Community never connects or switches by itself any more. Each phone quietly offers its own visit and watches for friends nearby; when one is found, a bubble says "Maya is here. Join the visit?" with **Join** and **Not now**. The Friends panel lists every visit nearby with a Join button too.
+- **Nothing resets while connecting.** Your person, buddies, the things in the rooms and the friends on screen stay put while a phone joins, retries or gets back in. Before, every step cleared the whole visit and hung up.
+- **Joining keeps your things.** Your chalk lines are added to the friend's board instead of being wiped, your easel picture goes up for everyone if the host's easel is blank, things you moved in the rooms stay where you put them, and your person and buddies stay where they were.
+- **Short drops don't end the visit.** If the link drops, friends stay on screen while the phone quietly reconnects for up to 15 seconds ("Reconnecting…"). If the host closes Community, friends carry on with a visit of their own instead of being thrown out.
+- If two friends tap Join on each other at the same moment, one of them quietly joins the other.
+- No more red "No phone is connected yet" while waiting for friends.
+- Works with the current app (in-app update, no new APK, no protocol change).
+
 ## 2026-11-10 (UI review: nice-to-have items)
 
 - The problem card shows "= ?" until you answer, then the answer, so the card never looks half done. The answer is no longer hidden on the page where a browser search could find it.

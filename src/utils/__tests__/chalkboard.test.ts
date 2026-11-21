@@ -46,14 +46,17 @@ describe('school chalkboard', () => {
     for (const board of boards) expect(board.getStrokes()).toEqual([]);
   });
 
-  it("shows a friend who joins later what is already on the host's board", async () => {
+  it("shows a friend who joins later what is already on the host's board, and keeps their own lines", async () => {
     const { sessions, boards } = setup(2);
     const [host, guest] = sessions;
     boards[1].put({ id: 'old', c: 1, p: [1, 1] });
     await host.host({ name: 'H', avatar: '🐼' });
     host.drawChalk({ id: 'h1', c: 2, p: [10, 10, 20, 20] });
     await joinGuest(host, guest, 'G');
-    expect(boards[1].getStrokes().map((s) => s.id)).toEqual(['h1']);
+    await tick();
+    // Joining adds the two boards together instead of wiping the newcomer's.
+    expect(boards[1].getStrokes().map((s) => s.id)).toEqual(['old', 'h1']);
+    expect(boards[0].getStrokes().map((s) => s.id).sort()).toEqual(['h1', 'old']);
   });
 
   it('only accepts sensible chalk messages', () => {
