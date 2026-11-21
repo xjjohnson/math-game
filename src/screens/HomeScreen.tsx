@@ -16,7 +16,7 @@ import { colors, radius, spacing } from '@/constants/theme';
 import { useActiveProfile, useProfiles, useProfilesLoad } from '@/store/profiles';
 import { buddyGift } from '@/utils/buddy';
 import { dateKey, dayStreak } from '@/utils/dates';
-import { DAILY_CHALLENGE_BONUS, DAILY_PASS, dailyChallengeConfig } from '@/utils/rewards';
+import { DAILY_CHALLENGE_BONUS, DAILY_PASS, dailyChallengeConfig, SPEEDY_SECONDS } from '@/utils/rewards';
 import { randomSeed } from '@/utils/seededRandom';
 import { companionFor } from '@/utils/shop';
 import { reviewConfig } from '@/utils/weakSpots';
@@ -117,7 +117,7 @@ export function HomeScreen() {
             color={colors.primary}
             outline={dailyDone}
             style={styles.half}
-            accessibilityHint={`${levelName({ grade: profile.grade, difficulty: daily.difficulty })}, 30 seconds a question. Get ${DAILY_PASS} right for ${DAILY_CHALLENGE_BONUS} bonus coins.`}
+            accessibilityHint={`${levelName({ grade: profile.grade, difficulty: daily.difficulty })}, ${daily.timer} seconds a question. Get ${DAILY_PASS} right for ${DAILY_CHALLENGE_BONUS} bonus coins, and answer in under ${SPEEDY_SECONDS} seconds for extra.`}
             onPress={() => router.push({ pathname: '/play', params: { config: JSON.stringify(daily) } })}
           />
           {tricky > 0 ? (

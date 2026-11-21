@@ -1,5 +1,5 @@
 import { GRADES } from '@/constants/grades';
-import type { AnswerRecord, Difficulty, GameConfig, Level } from '@/types';
+import type { AnswerRecord, Difficulty, GameConfig, Grade, Level, TimerSetting } from '@/types';
 import { dateSeed } from '@/utils/dates';
 import { QUESTIONS_PER_ROUND } from '@/utils/gameSession';
 import { answerValue } from '@/utils/scoring';
@@ -11,6 +11,12 @@ export const STREAK_MILESTONE_COINS = 5;
 export const DAILY_CHALLENGE_BONUS = 25;
 /** Right answers needed (out of 10) to earn the daily challenge bonus. */
 export const DAILY_PASS = 7;
+/** Right daily challenge answers given in under this many seconds pay the speed bonus. */
+export const SPEEDY_SECONDS = 30;
+/** Extra coins for each speedy right answer in the daily challenge. */
+export const SPEEDY_COINS = 2;
+/** Extra star when at least DAILY_PASS right answers were speedy. */
+export const SPEEDY_STARS = 1;
 /** Each star a round earns counts this many times toward the player's stars. */
 export const STAR_MULTIPLIER: Record<Difficulty, number> = { easy: 1, medium: 2, hard: 3 };
 
@@ -19,11 +25,17 @@ export interface RoundRewards {
   coins: number;
   streakBonusCoins: number;
   dailyBonusCoins: number;
+  /** Daily challenge only: right answers given in under SPEEDY_SECONDS. */
+  speedyAnswers: number;
+  /** SPEEDY_COINS for each speedy answer (included in `coins`). */
+  speedBonusCoins: number;
+  /** SPEEDY_STARS when DAILY_PASS or more answers were speedy (included in `starsEarned`). */
+  speedBonusStars: number;
   /** 0 to 3 stars for the round's accuracy. */
   stars: number;
   /** How much each of those stars is worth at this round's difficulty. */
   starMultiplier: number;
-  /** Stars added to the player's total: stars × starMultiplier. */
+  /** Stars added to the player's total: stars × starMultiplier, plus the speed bonus star. */
   starsEarned: number;
 }
 
@@ -75,21 +87,38 @@ export function roundRewards(
   const streakBonusCoins = streakMilestones(history) * STREAK_MILESTONE_COINS;
   const dailyBonusCoins =
     isDaily && !dailyAlreadyEarned && correct.length >= DAILY_PASS ? DAILY_CHALLENGE_BONUS : 0;
+  // The speed bonus pays alongside the daily bonus, so only once a day too.
+  const speedyAnswers =
+    isDaily && !dailyAlreadyEarned ? correct.filter((r) => r.seconds !== undefined && r.seconds < SPEEDY_SECONDS).length : 0;
+  const speedBonusCoins = speedyAnswers * SPEEDY_COINS;
+  const speedBonusStars = speedyAnswers >= DAILY_PASS ? SPEEDY_STARS : 0;
   const stars = starsFor(correct.length, history.length);
   const starMultiplier = roundStarMultiplier(history);
   return {
-    coins: base + streakBonusCoins + dailyBonusCoins,
+    coins: base + streakBonusCoins + dailyBonusCoins + speedBonusCoins,
     streakBonusCoins,
     dailyBonusCoins,
+    speedyAnswers,
+    speedBonusCoins,
+    speedBonusStars,
     stars,
     starMultiplier,
-    starsEarned: stars * starMultiplier,
+    starsEarned: stars * starMultiplier + speedBonusStars,
   };
 }
 
 /**
+ * Seconds per daily challenge question: 90 for Kindergarten to 2nd grade (still
+ * counting on fingers and reading the question), 60 from 3rd grade up.
+ */
+export function dailySeconds(grade: Grade): TimerSetting {
+  return grade <= 2 ? 90 : 60;
+}
+
+/**
  * Today's challenge: the operation is picked from the date out of what the
- * player's grade teaches, at the difficulty they last played. 30 seconds per question.
+ * player's grade teaches, at the difficulty they last played. 60 or 90 seconds
+ * per question (see dailySeconds); answers under SPEEDY_SECONDS pay a speed bonus.
  */
 export function dailyChallengeConfig(today: string, level: Level): GameConfig {
   const seed = dateSeed(today);
@@ -97,7 +126,7 @@ export function dailyChallengeConfig(today: string, level: Level): GameConfig {
     mode: { kind: 'operation', operation: pick(createRng(seed), GRADES[level.grade].daily ?? GRADES[level.grade].taught) },
     difficulty: level.difficulty,
     grade: level.grade,
-    timer: 30,
+    timer: dailySeconds(level.grade),
     adaptive: false,
     questionCount: QUESTIONS_PER_ROUND,
     seed,

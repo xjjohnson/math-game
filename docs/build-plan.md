@@ -120,7 +120,7 @@ Cross-platform interactive math learning game for kids (ages 5-15), React Native
 - **Coins are spending money** (per right answer by operation, level and grade; also Community jobs). **Stars are progress:** each round earns stars, and star levels unlock free rewards. Points are gone from play.
 - **Navigation:** Home is "Buddy Street" (character + buddy scene, big Play) with a bottom tab bar: Home, Buddy, Town, Shop, Me.
 
-- Daily challenge with bonus reward
+- Daily challenge with bonus reward (60 seconds a question, 90 for K-2nd; right answers under 30 seconds pay +2 coins each, and 7+ speedy answers add +1 star)
 - Daily streak calendar (separate from in-session streak)
 - Weekly goals that unlock a special badge
 - Parent report: accuracy by operation (PIN area)

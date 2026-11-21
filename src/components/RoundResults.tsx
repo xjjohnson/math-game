@@ -12,7 +12,7 @@ import { findBadge } from '@/constants/badges';
 import { colors, fontSizes, radius, spacing } from '@/constants/theme';
 import type { AnswerRecord } from '@/types';
 import type { RoundOutcome } from '@/utils/progress';
-import { DAILY_PASS, STREAK_MILESTONE } from '@/utils/rewards';
+import { DAILY_PASS, SPEEDY_COINS, SPEEDY_SECONDS, STREAK_MILESTONE } from '@/utils/rewards';
 
 export interface RoundSummary {
   score: number;
@@ -24,6 +24,7 @@ export interface RoundSummary {
 export function isNotable(outcome: RoundOutcome): boolean {
   return (
     outcome.dailyBonusCoins > 0 ||
+    outcome.speedBonusStars > 0 ||
     outcome.weeklyBonusCoins > 0 ||
     outcome.newBadges.length > 0 ||
     outcome.newStarLevels.length > 0 ||
@@ -83,6 +84,19 @@ export function RoundResults({
             <Text style={styles.bonus}>🎉 Daily challenge complete! +{outcome.dailyBonusCoins} bonus</Text>
           ) : daily ? (
             <Text style={styles.bonus}>Get {DAILY_PASS} right to win the daily bonus.</Text>
+          ) : null}
+          {outcome.speedBonusCoins > 0 ? (
+            <Text style={styles.bonus}>
+              ⚡ Speedy! {outcome.speedyAnswers} right in under {SPEEDY_SECONDS} seconds: +{outcome.speedBonusCoins} coins
+              {outcome.speedBonusStars > 0 ? ` and +${outcome.speedBonusStars} star` : ''}
+            </Text>
+          ) : null}
+          {daily && outcome.speedBonusCoins > 0 && outcome.speedBonusStars === 0 ? (
+            <Text style={styles.bonus}>Get {DAILY_PASS} speedy answers for a bonus star.</Text>
+          ) : daily && outcome.speedBonusCoins === 0 && outcome.dailyBonusCoins === 0 ? (
+            <Text style={styles.bonus}>
+              Answer in under {SPEEDY_SECONDS} seconds for +{SPEEDY_COINS} extra coins each.
+            </Text>
           ) : null}
           {outcome.weeklyBonusCoins > 0 ? (
             <Text style={styles.bonus}>🏆 All weekly goals done! +{outcome.weeklyBonusCoins} bonus</Text>

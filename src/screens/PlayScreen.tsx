@@ -34,7 +34,7 @@ import {
 } from '@/utils/gameSession';
 import { resolveInputStyle } from '@/utils/inputStyle';
 import type { RoundOutcome } from '@/utils/progress';
-import { coinsForAnswer, STREAK_MILESTONE } from '@/utils/rewards';
+import { coinsForAnswer, SPEEDY_SECONDS, STREAK_MILESTONE } from '@/utils/rewards';
 import { randomSeed } from '@/utils/seededRandom';
 import { cardStyleFor, companionFor } from '@/utils/shop';
 import { playSound } from '@/utils/soundEffects';
@@ -150,7 +150,7 @@ function Round({ config, onPlayAgain }: { config: GameConfig; onPlayAgain: () =>
         <Text style={styles.level}>Level: {difficultyConfigFor(state.difficulty, config.grade).label}</Text>
       ) : null}
       {config.timer !== null && secondsLeft !== null ? (
-        <TimerBar total={config.timer} left={secondsLeft} />
+        <TimerBar total={config.timer} left={secondsLeft} speedy={config.dailyDate ? SPEEDY_SECONDS : undefined} />
       ) : null}
 
       <FlashCard

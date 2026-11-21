@@ -100,6 +100,8 @@ function record(state: SessionState, given: number | null, secondsLeft: number |
   const streak = correct ? state.streak + 1 : 0;
   const question = { operation: state.problem.operation, difficulty: state.difficulty, grade: state.config.grade };
   const points = correct ? pointsFor(question, streak, state.config.timer, secondsLeft) : 0;
+  const timer = state.config.timer;
+  const seconds = timer !== null && secondsLeft !== null ? Math.max(0, timer - secondsLeft) : undefined;
   return {
     ...state,
     phase: 'feedback',
@@ -108,7 +110,15 @@ function record(state: SessionState, given: number | null, secondsLeft: number |
     score: state.score + points,
     history: [
       ...state.history,
-      { problem: state.problem, difficulty: state.difficulty, grade: state.config.grade, given, correct, points },
+      {
+        problem: state.problem,
+        difficulty: state.difficulty,
+        grade: state.config.grade,
+        given,
+        correct,
+        points,
+        ...(seconds === undefined ? {} : { seconds }),
+      },
     ],
   };
 }
