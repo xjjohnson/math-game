@@ -15,7 +15,8 @@ export interface Level {
 }
 
 /** Seconds per question, or null for untimed practice. */
-export type TimerSetting = 10 | 30 | null;
+/** Seconds per question; 60 and 90 are only used by the daily challenge. */
+export type TimerSetting = 10 | 30 | 60 | 90 | null;
 
 /** 'auto' picks multiple choice on Easy and the number pad otherwise. */
 export type InputStyle = 'auto' | 'choices' | 'numpad';
@@ -234,4 +235,6 @@ export interface AnswerRecord {
   given: number | null;
   correct: boolean;
   points: number;
+  /** Seconds the player took, on timed rounds only. */
+  seconds?: number;
 }

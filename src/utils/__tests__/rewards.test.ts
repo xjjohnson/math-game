@@ -5,7 +5,9 @@ import { accuracy, applyRound, type RoundResult } from '@/utils/progress';
 import {
   DAILY_CHALLENGE_BONUS,
   dailyChallengeConfig,
+  dailySeconds,
   roundRewards,
+  SPEEDY_COINS,
   starsFor,
   streakMilestones,
 } from '@/utils/rewards';
@@ -55,6 +57,9 @@ describe('rewards', () => {
       coins: 5 * (3 + 2) + 5,
       streakBonusCoins: 5,
       dailyBonusCoins: 0,
+      speedyAnswers: 0,
+      speedBonusCoins: 0,
+      speedBonusStars: 0,
       stars: 1,
       starMultiplier: 3,
       starsEarned: 3,
@@ -68,10 +73,45 @@ describe('rewards', () => {
     expect(roundRewards(results('1111111111'), false, false).dailyBonusCoins).toBe(0);
   });
 
+  it('gives younger grades more time on the daily challenge', () => {
+    expect(dailySeconds(0)).toBe(90);
+    expect(dailySeconds(2)).toBe(90);
+    expect(dailySeconds(3)).toBe(60);
+    expect(dailySeconds(6)).toBe(60);
+    expect(dailyChallengeConfig('2026-10-22', { grade: 1, difficulty: 'easy' }).timer).toBe(90);
+  });
+
+  it('pays a speed bonus for daily answers under 30 seconds', () => {
+    const timed = (pattern: string, seconds: number[]) =>
+      results(pattern).map((r, i) => ({ ...r, seconds: seconds[i] }));
+    const fast = timed('1111111110', [5, 10, 29, 12, 8, 20, 15, 40, 50, 3]);
+    const r = roundRewards(fast, true, false);
+    // 9 right: 7 under 30s, but the 8th and 9th were slow and the 10th was wrong.
+    expect(r.speedyAnswers).toBe(7);
+    expect(r.speedBonusCoins).toBe(7 * SPEEDY_COINS);
+    expect(r.speedBonusStars).toBe(1);
+
+    const someFast = timed('1111111110', [5, 10, 29, 12, 40, 40, 40, 40, 50, 3]);
+    expect(roundRewards(someFast, true, false).speedBonusStars).toBe(0);
+
+    const allFast = timed('1111111111', [5, 5, 5, 5, 5, 5, 5, 5, 5, 31]);
+    const r2 = roundRewards(allFast, true, false);
+    expect(r2.speedyAnswers).toBe(9);
+    expect(r2.speedBonusStars).toBe(1);
+    expect(r2.starsEarned).toBe(3 + 1);
+    expect(r2.coins).toBe(roundRewards(allFast, false, false).coins + DAILY_CHALLENGE_BONUS + 9 * SPEEDY_COINS);
+
+    // Only the daily challenge pays it, and only once a day.
+    expect(roundRewards(allFast, false, false).speedBonusCoins).toBe(0);
+    expect(roundRewards(allFast, true, true).speedBonusCoins).toBe(0);
+    // Untimed answers never count as speedy.
+    expect(roundRewards(results('1111111111'), true, false).speedyAnswers).toBe(0);
+  });
+
   it('gives everyone the same daily challenge on a date', () => {
     const a = dailyChallengeConfig('2026-10-22', { grade: 3, difficulty: 'easy' });
     expect(dailyChallengeConfig('2026-10-22', { grade: 3, difficulty: 'easy' })).toEqual(a);
-    expect(a).toMatchObject({ timer: 30, dailyDate: '2026-10-22', adaptive: false, grade: 3 });
+    expect(a).toMatchObject({ timer: 60, dailyDate: '2026-10-22', adaptive: false, grade: 3 });
   });
 
   it("only picks what the player's grade teaches for the daily challenge", () => {
