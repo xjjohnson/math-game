@@ -71,6 +71,8 @@ import { AREA_COUNT, BUDDY_KEY, FIXTURE_KEY, paintOf, type Placement } from '@/u
 import { INK, shade, SHADOW, tint } from '@/constants/artStyle';
 import { GroundShadow } from '@/components/GroundShadow';
 import { DrawnItem, hasDrawing } from '@/components/DrawnItem';
+import { PrintedToy, Printer3D, type PrintJob } from '@/components/Printer3D';
+import { parsePrintId, PRINTER_ITEM, type FilamentId, type PrintToyId } from '@/constants/printer';
 
 export interface HomeBuddy {
   /** Shop item id. */
@@ -131,6 +133,8 @@ interface Props {
   onTreeHouse?: (e: TreeHouseEvent, inside: string[]) => void;
   /** The backyard's sun (or moon) was tapped: whether it is night there now. */
   onNight?: (night: boolean) => void;
+  /** A 3D print in progress: the printer prints it, and the new toy (already in the room) stays hidden until it's done. */
+  printing?: { printerKey: string; toyKey: string; job: PrintJob } | null;
 }
 
 const TRIM = '#A86B45';
@@ -440,11 +444,13 @@ export function BuddyRoom(props: Props) {
   };
 
   /** Where light shines in a dark room: lit fires, candles and lamps, with how far it reaches. */
+  const inDark = (x: number) => dark.has(areas[Math.min(AREA_COUNT - 1, Math.floor(x / size.areaWidth))]?.id);
   const lightPools = () => {
-    const inDark = (x: number) => dark.has(areas[Math.min(AREA_COUNT - 1, Math.floor(x / size.areaWidth))]?.id);
     const pools: { key: string; x: number; y: number; r: number }[] = [];
     for (const p of pieces) {
       if (p.item?.light && lit.has(p.key)) pools.push({ key: p.key, x: p.x, y: p.y - p.height * 0.6, r: size.unit * 0.3 });
+      // Glow-in-the-dark prints shine softly once the lights are off.
+      else if (p.item && parsePrintId(p.item.id)?.filament.id === 'glow' && inDark(p.x)) pools.push({ key: p.key, x: p.x, y: p.y - p.height * 0.5, r: size.unit * 0.12 });
     }
     for (const g of GADGETS) {
       if (g.glow && lit.has(g.id)) {
@@ -829,6 +835,7 @@ export function BuddyRoom(props: Props) {
           }}
         >
           {pieces.map((piece) => {
+            if (props.printing && piece.key === props.printing.toyKey) return null;
             const offset = moving[piece.key];
             const buddy = piece.buddyId ? buddyById.get(piece.buddyId) : undefined;
             const parent = piece.parent ? byKey.get(piece.parent) : undefined;
@@ -903,6 +910,20 @@ export function BuddyRoom(props: Props) {
                             mood={offset ? 'happy' : buddy.mood}
                           />
                         )
+                      ) : piece.item?.id === PRINTER_ITEM ? (
+                        <Printer3D
+                          width={piece.width}
+                          height={piece.height}
+                          job={props.printing?.printerKey === piece.key ? props.printing.job : null}
+                        />
+                      ) : piece.item && parsePrintId(piece.item.id) ? (
+                        <PrintedToy
+                          toy={parsePrintId(piece.item.id)!.toy.id as PrintToyId}
+                          filament={parsePrintId(piece.item.id)!.filament.id as FilamentId}
+                          width={piece.width}
+                          height={piece.height}
+                          glowing={parsePrintId(piece.item.id)!.filament.id === 'glow' && inDark(piece.x)}
+                        />
                       ) : piece.item?.id === PICTURE_ITEM ? (
                         <FramedPicture picture={props.pictures?.[piece.key]} width={piece.width} height={piece.height} />
                       ) : piece.item?.draw ? (

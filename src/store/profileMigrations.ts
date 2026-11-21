@@ -4,7 +4,7 @@ import type { Difficulty, Grade, Profile } from '@/types';
 import { addExtraRooms, AREAS_BEFORE_EXTRA_ROOMS, emptyRoom, upgradeRoom, widenHome } from '@/utils/room';
 
 /** The version the profiles are saved as. Bump it, and add a step below, whenever Profile gains a field. */
-export const PROFILES_VERSION = 14;
+export const PROFILES_VERSION = 15;
 
 export interface SavedProfiles {
   profiles: Profile[];
@@ -86,6 +86,10 @@ export function migrateProfiles(persisted: unknown, version: number): SavedProfi
     // Version 14 added skills: how each player is doing on every skill. Everyone starts
     // fresh; their grade says where to begin, so nothing earned is lost.
     state.profiles = state.profiles.map((p) => ({ ...p, skills: p.skills ?? {} }));
+  }
+  if (version < 15) {
+    // Version 15 added the 3D printer's filament. Everyone starts with none.
+    state.profiles = state.profiles.map((p) => ({ ...p, filament: p.filament ?? {} }));
   }
   return state;
 }

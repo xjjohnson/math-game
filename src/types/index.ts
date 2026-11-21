@@ -136,6 +136,8 @@ export interface Profile {
   town: TownVisits;
   /** How the player is doing on each skill, keyed by skill id. */
   skills: Record<SkillId, SkillProgress>;
+  /** 3D printer filament: toys left to print, by filament id (constants/printer.ts). */
+  filament: Record<string, number>;
 }
 
 /** New game screen picks (grade and difficulty are kept on the profile itself). */

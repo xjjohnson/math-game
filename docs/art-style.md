@@ -43,6 +43,7 @@ which is checked for contrast.
 `components/DrawnItem.tsx` draws room things in the outlined style instead of their emoji, in the
 room and in the shop list. Each drawing fills a 100 x 100 box standing on its bottom edge, so seats
 line up with the item's `seat` height. Small things use `grow()` to fill their box like an emoji.
-Add more ids to `DRAWINGS` bit by bit, most-seen first. Drawn so far: couch, chair, bed, TV, plant,
+Add more ids to `DRAWINGS` bit by bit, most-seen first. The 3D printer and the 12 toys it prints are drawn in
+`components/Printer3D.tsx` (toys take a filament colour; rainbow colours each part). Drawn so far: couch, chair, bed, TV, plant,
 clock, radio, apples, bread, cookies, cupcake, milk, hot cocoa, teddy bear, ball, rubber duck,
 blocks, books, backpack, balloon.

@@ -29,6 +29,7 @@ import {
   type HomeRoomBuyResult,
   type RoomBuyResult,
 } from '@/utils/room';
+import { buyFilament, printToy, recordPrinterCheck, type FilamentBuyResult, type PrintResult } from '@/utils/printer';
 import { grantStarRewards } from '@/utils/starLevels';
 import { finishShift, type BuildingId, type ShiftPay } from '@/utils/town';
 import { buyItem, equipItem, freeAvatars, type BuyResult } from '@/utils/shop';
@@ -85,6 +86,7 @@ export function createProfile(
     homeRooms: [],
     town: { date: '', done: [] },
     skills: {},
+    filament: {},
   };
 }
 
@@ -137,6 +139,12 @@ interface ProfilesState {
   finishShift: (id: string, building: BuildingId, correct: number, history?: AnswerRecord[]) => ShiftPay;
   /** Notes that Help was opened on a skill, so the help can move on from pictures when it's no longer needed. */
   noteSkillHelp: (id: string, skill: string) => void;
+  /** Buys a spool of 3D printer filament. */
+  buyFilament: (id: string, filament: string) => FilamentBuyResult;
+  /** Prints a toy on a printer in the home, using one print of filament. */
+  printToy: (id: string, printerKey: string, toy: string, filament: string) => PrintResult;
+  /** Saves printer check answers to the skill record; returns how many skills were newly learned. */
+  recordPrinterCheck: (id: string, history: AnswerRecord[]) => number;
 }
 
 /** Where the profiles are saved: backed up before each upgrade, and never saved over by a failed load. */
@@ -287,6 +295,27 @@ export const useProfiles = create<ProfilesState>()(
         const { profile, pay } = finishShift(current, building, correct, dateKey(), history);
         set((s) => ({ profiles: s.profiles.map((p) => (p.id === id ? profile : p)) }));
         return pay;
+      },
+      buyFilament: (id, filament) => {
+        const current = get().profiles.find((p) => p.id === id);
+        if (!current) return { ok: false, reason: 'unknown' };
+        const result = buyFilament(current, filament);
+        if (result.ok) set((s) => ({ profiles: s.profiles.map((p) => (p.id === id ? result.profile : p)) }));
+        return result;
+      },
+      printToy: (id, printerKey, toy, filament) => {
+        const current = get().profiles.find((p) => p.id === id);
+        if (!current) return { ok: false, reason: 'unknown' };
+        const result = printToy(current, printerKey, toy, filament, newId());
+        if (result.ok) set((s) => ({ profiles: s.profiles.map((p) => (p.id === id ? result.profile : p)) }));
+        return result;
+      },
+      recordPrinterCheck: (id, history) => {
+        const current = get().profiles.find((p) => p.id === id);
+        if (!current) return 0;
+        const { profile, learned } = recordPrinterCheck(current, history, dateKey());
+        set((s) => ({ profiles: s.profiles.map((p) => (p.id === id ? profile : p)) }));
+        return learned;
       },
       noteSkillHelp: (id, skill) =>
         set((s) => ({
