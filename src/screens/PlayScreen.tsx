@@ -8,6 +8,7 @@ import { ChoiceButtons } from '@/components/ChoiceButtons';
 import { CompanionBubble } from '@/components/CompanionBubble';
 import { CountingAid } from '@/components/CountingAid';
 import { FlashCard, isStacked } from '@/components/FlashCard';
+import { HelpPanel } from '@/components/HelpPanel';
 import { ColumnHint } from '@/components/ColumnHint';
 import { ColumnPad, NumberPad } from '@/components/NumberPad';
 import { PopIn } from '@/components/PopIn';
@@ -36,6 +37,7 @@ import { resolveInputStyle } from '@/utils/inputStyle';
 import type { RoundOutcome } from '@/utils/progress';
 import { coinsForAnswer, SPEEDY_SECONDS, STREAK_MILESTONE } from '@/utils/rewards';
 import { randomSeed } from '@/utils/seededRandom';
+import { diagnose, waysFor } from '@/utils/skills/help';
 import { freshRound, withPlan } from '@/utils/skills/plan';
 import { cardStyleFor, companionFor } from '@/utils/shop';
 import { playSound } from '@/utils/soundEffects';
@@ -67,9 +69,14 @@ function Round({ config: asked, onPlayAgain }: { config: GameConfig; onPlayAgain
   // Skill rounds pick their skills from the player once, when the round starts.
   const [config] = useState(() => withPlan(asked, profile));
   const recordRound = useProfiles((s) => s.recordRound);
+  const noteSkillHelp = useProfiles((s) => s.noteSkillHelp);
   const [state, dispatch] = useGameSession(config);
   const [outcome, setOutcome] = useState<RoundOutcome | null>(null);
   const [counting, setCounting] = useState(false);
+  // Help is open: 'ask' while the question is open, 'miss' after a wrong answer.
+  const [help, setHelp] = useState<'ask' | 'miss' | null>(null);
+  // The question help was opened on before answering (that answer doesn't count toward learning).
+  const [helpedAt, setHelpedAt] = useState<number | null>(null);
   const saved = useRef(false);
 
   const asking = state.phase === 'question';
@@ -87,7 +94,10 @@ function Round({ config: asked, onPlayAgain }: { config: GameConfig; onPlayAgain
   }, [state.problem, state.phase]);
   useEffect(() => stopSpeaking, []);
   // Each new question starts with the counting picture put away.
-  useEffect(() => setCounting(false), [state.index]);
+  useEffect(() => {
+    setCounting(false);
+    setHelp(null);
+  }, [state.index]);
 
   useEffect(() => {
     if (state.phase !== 'feedback' || !last) return;
@@ -125,6 +135,11 @@ function Round({ config: asked, onPlayAgain }: { config: GameConfig; onPlayAgain
   const roundCoins = state.history.reduce((sum, r) => sum + (r.correct ? coinsPerAnswer(r) : 0), 0);
   const column = useColumnAnswer(state.problem, { allowNegative, teach: !!config.showWork });
   const countModel = useMemo(() => countingModel(state.problem), [state.problem]);
+  const canHelp = useMemo(() => waysFor(state.problem, false).length > 0, [state.problem]);
+  const slip = useMemo(
+    () => (state.phase === 'feedback' && last && !last.correct ? diagnose(last.problem, last.given) : null),
+    [state.phase, last],
+  );
 
   if (state.phase === 'finished') {
     return (
@@ -133,7 +148,17 @@ function Round({ config: asked, onPlayAgain }: { config: GameConfig; onPlayAgain
   }
 
   const answer = (given: number) =>
-    dispatch({ type: 'answer', given, secondsLeft: config.timer === null ? null : secondsLeft });
+    dispatch({
+      type: 'answer',
+      given,
+      secondsLeft: config.timer === null ? null : secondsLeft,
+      helped: helpedAt === state.index,
+    });
+  const openHelp = (kind: 'ask' | 'miss') => {
+    setHelp(kind);
+    if (kind === 'ask') setHelpedAt(state.index);
+    if (profile && state.problem.skill) noteSkillHelp(profile.id, state.problem.skill);
+  };
   const showFeedback = state.phase === 'feedback' && last;
   // Show-my-work needs the boxes, so it types even when the player usually taps choices.
   const typingColumns = isStacked(state.problem) && (inputStyle !== 'choices' || !!config.showWork);
@@ -180,16 +205,31 @@ function Round({ config: asked, onPlayAgain }: { config: GameConfig; onPlayAgain
         cardStyle={cardStyleFor(profile)}
       />
 
-      {countModel && !showFeedback ? (
-        <Pressable
-          onPress={() => setCounting((on) => !on)}
-          accessibilityRole="button"
-          accessibilityState={{ expanded: counting }}
-          style={styles.countToggle}
-          hitSlop={6}
-        >
-          <Text style={styles.countToggleText}>{counting ? 'Hide counting' : '🧮 Count it out'}</Text>
-        </Pressable>
+      {!showFeedback && (countModel || (canHelp && config.timer === null)) ? (
+        <View style={styles.aidRow}>
+          {countModel ? (
+            <Pressable
+              onPress={() => setCounting((on) => !on)}
+              accessibilityRole="button"
+              accessibilityState={{ expanded: counting }}
+              style={styles.countToggle}
+              hitSlop={6}
+            >
+              <Text style={styles.countToggleText}>{counting ? 'Hide counting' : '🧮 Count it out'}</Text>
+            </Pressable>
+          ) : null}
+          {canHelp && config.timer === null ? (
+            <Pressable
+              onPress={() => openHelp('ask')}
+              accessibilityRole="button"
+              accessibilityLabel="Help with this question"
+              style={styles.countToggle}
+              hitSlop={6}
+            >
+              <Text style={styles.countToggleText}>💡 Help</Text>
+            </Pressable>
+          ) : null}
+        </View>
       ) : null}
       {countModel && counting && !showFeedback ? (
         <CountingAid key={`count-${state.index}`} problem={state.problem} model={countModel} />
@@ -213,6 +253,7 @@ function Round({ config: asked, onPlayAgain }: { config: GameConfig; onPlayAgain
                 ? "✗ Time's up!"
                 : '✗ Not quite. Remember this one!'}
           </Text>
+          {slip ? <Text style={styles.slip}>{slip}</Text> : null}
         </PopIn>
       ) : null}
 
@@ -238,7 +279,24 @@ function Round({ config: asked, onPlayAgain }: { config: GameConfig; onPlayAgain
       )}
 
       {showFeedback && !last.correct ? (
-        <BigButton label="Next" onPress={() => dispatch({ type: 'next' })} />
+        <View style={styles.missRow}>
+          {canHelp ? (
+            <BigButton label="💡 Show me how" outline onPress={() => openHelp('miss')} style={styles.missButton} />
+          ) : null}
+          <BigButton label="Next" onPress={() => dispatch({ type: 'next' })} style={styles.missButton} />
+        </View>
+      ) : null}
+
+      {help ? (
+        <HelpPanel
+          key={`help-${state.index}-${help}`}
+          problem={state.problem}
+          progress={state.problem.skill ? profile?.skills?.[state.problem.skill] : undefined}
+          reveal={help === 'miss'}
+          given={help === 'miss' ? last?.given : undefined}
+          color={palette.operations[state.problem.operation]}
+          onClose={() => setHelp(null)}
+        />
       ) : null}
     </Screen>
   );
@@ -258,5 +316,9 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surface,
   },
   countToggleText: { fontSize: 18, fontWeight: '800', color: colors.primary },
+  aidRow: { flexDirection: 'row', justifyContent: 'center', gap: spacing.sm, flexWrap: 'wrap' },
+  slip: { fontSize: 16, fontWeight: '700', color: colors.text, textAlign: 'center', marginTop: spacing.xs },
+  missRow: { flexDirection: 'row', gap: spacing.sm },
+  missButton: { flex: 1 },
   feedback: { fontSize: fontSizes.button, fontWeight: '800', textAlign: 'center' },
 });

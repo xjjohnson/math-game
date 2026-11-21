@@ -44,6 +44,11 @@ export function recordSkills(
     const id = r.problem.skill;
     if (!id || !findSkill(id)) continue;
     const old = next[id] ?? { recent: '', tries: 0, right: 0, learned: false };
+    // A right answer after being walked through it isn't proof yet; a wrong one still counts.
+    if (r.helped && r.correct) {
+      next[id] = { ...old, tries: old.tries + 1 };
+      continue;
+    }
     const recent = (old.recent + (r.correct ? '1' : '0')).slice(-RECENT);
     let isNow = old.learned;
     if (!old.learned && isLearned({ recent })) isNow = true;

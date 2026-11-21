@@ -298,4 +298,6 @@ export interface AnswerRecord {
   points: number;
   /** Seconds the player took, on timed rounds only. */
   seconds?: number;
+  /** Help was opened before answering; it doesn't count toward learning the skill. */
+  helped?: boolean;
 }

@@ -11,7 +11,8 @@ import { usePalette } from '@/hooks/useAccessibility';
 import type { GameConfig } from '@/types';
 import { speakText, stopSpeaking } from '@/utils/feedback';
 import { QUESTIONS_PER_ROUND } from '@/utils/gameSession';
-import { findLesson, type Lesson } from '@/utils/lessons';
+import type { Lesson } from '@/utils/lessons';
+import { findLesson } from '@/utils/skills/skillLessons';
 import { createRng, randomSeed } from '@/utils/seededRandom';
 
 export function LessonScreen() {

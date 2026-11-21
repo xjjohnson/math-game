@@ -23,8 +23,11 @@ export type Picture =
   | { kind: 'blocks'; hundreds: number; tens: number; ones: number; crossed?: { hundreds?: number; tens?: number; ones?: number }; traded?: 'ten' | 'hundred' }
   /** A row of numbers with gaps (null) to fill, e.g. 5, 10, 15, ☐. */
   | { kind: 'sequence'; items: (number | null)[] }
-  /** A number line with a dot on it; `labels` shows numbers at every tick when true, else only the ends. */
-  | { kind: 'numberLine'; min: number; max: number; step: number; dot?: number; hops?: number[]; start?: number; labels?: boolean }
+  /**
+   * A number line with a dot on it; `labels` shows numbers at every tick when true, else only the ends.
+   * With `hops` from `start`, each landing spot is labelled too; `hideEnd` writes ? at the last one.
+   */
+  | { kind: 'numberLine'; min: number; max: number; step: number; dot?: number; hops?: number[]; start?: number; labels?: boolean; hideEnd?: boolean }
   /** Rows of counters, for times. */
   | { kind: 'array'; rows: number; cols: number }
   /** Circles each holding the same number of counters. */

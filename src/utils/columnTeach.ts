@@ -4,8 +4,9 @@ import { columnLayout, startEntry, type ColumnEntry } from '@/utils/columnEntry'
 /**
  * "Show my work" mode walks through a column problem one column at a time,
  * starting at the ones: the player works out each column, and when it comes
- * to 10 or more the 1 is carried for them, the way it's written on paper.
- * Subtraction borrows the same way.
+ * to 10 or more, 10 ones are bundled into a ten (regrouped) for them, the way
+ * it's written on paper. Subtraction trades a ten for 10 ones the same way.
+ * The words match what US schools say now: bundle / trade / regroup, not carry / borrow.
  */
 export interface TeachStep {
   /** Column this step writes (0 is the leftmost). */
@@ -18,7 +19,7 @@ export interface TeachStep {
   write: number;
   /** Notes written in the small boxes above the columns once this step is done. */
   marks: { col: number; text: string }[];
-  /** A line explaining the step, e.g. why we borrow. */
+  /** A line explaining the step, e.g. why we trade. */
   tip: string | null;
 }
 
@@ -40,14 +41,19 @@ export function teachSteps(problem: Problem): TeachStep[] | null {
     for (let col = width - 1; col >= lastCol; col--) {
       const parts = [a[col], b[col]].filter((d) => d !== null).map(Number);
       const total = parts.reduce((s, n) => s + n, 0) + carryIn;
-      const shown = [...parts.map(String), ...(carryIn ? [`${carryIn} carried`] : [])];
+      const shown = [...parts.map(String), ...(carryIn ? [`${carryIn} regrouped`] : [])];
       steps.push({
         col,
         question: shown.length ? shown.join(' + ') : '0',
         total,
         write: total % 10,
         marks: total >= 10 ? [{ col: col - 1, text: String(Math.floor(total / 10)) }] : [],
-        tip: parts.length === 0 && carryIn ? `Bring the carried ${carryIn} down.` : null,
+        tip:
+          parts.length === 0 && carryIn
+            ? `Bring the regrouped ${carryIn} down.`
+            : total >= 10
+              ? `${total} ${placeName(width - 1 - col)} is too many for one box. Bundle 10 of them into 1 ${placeName(width - col).replace(/s$/, '')} and write the ${total % 10}.`
+              : null,
       });
       carryIn = Math.floor(total / 10);
     }
@@ -62,14 +68,14 @@ export function teachSteps(problem: Problem): TeachStep[] | null {
       const top = a[col];
       const total = (top === null ? 0 : Number(top) * problem.b) + carryIn;
       const question =
-        top === null ? `${carryIn} carried` : `${top} × ${problem.b}${carryIn ? ` + ${carryIn} carried` : ''}`;
+        top === null ? `${carryIn} regrouped` : `${top} × ${problem.b}${carryIn ? ` + ${carryIn} regrouped` : ''}`;
       steps.push({
         col,
         question,
         total,
         write: total % 10,
         marks: total >= 10 ? [{ col: col - 1, text: String(Math.floor(total / 10)) }] : [],
-        tip: top === null ? `Bring the carried ${carryIn} down.` : null,
+        tip: top === null ? `Bring the regrouped ${carryIn} down.` : null,
       });
       carryIn = Math.floor(total / 10);
     }
@@ -82,28 +88,28 @@ export function teachSteps(problem: Problem): TeachStep[] | null {
     for (let col = width - 1; col >= lastCol; col--) {
       const top = digit(a[col]) - lent;
       const bottom = digit(b[col]);
-      const borrowed = top < bottom;
-      const total = (borrowed ? top + 10 : top) - bottom;
+      const traded = top < bottom;
+      const total = (traded ? top + 10 : top) - bottom;
       const place = placeName(width - 1 - col);
       const next = placeName(width - col);
-      const worked = borrowed ? top + 10 : top;
+      const worked = traded ? top + 10 : top;
       const marks: TeachStep['marks'] = [];
-      // Cross-out style notes: this column's new top digit, and the smaller digit it borrowed from.
-      if (borrowed || lent) marks.push({ col, text: String(worked) });
-      if (borrowed && digit(a[col - 1]) - 1 >= 0) marks.push({ col: col - 1, text: String(digit(a[col - 1]) - 1) });
+      // Cross-out style notes: this column's new top digit, and the digit it traded from.
+      if (traded || lent) marks.push({ col, text: String(worked) });
+      if (traded && digit(a[col - 1]) - 1 >= 0) marks.push({ col: col - 1, text: String(digit(a[col - 1]) - 1) });
       steps.push({
         col,
         question: `${worked} − ${bottom}`,
         total,
         write: total,
         marks,
-        tip: !borrowed
+        tip: !traded
           ? null
           : top < 0
-            ? `This 0 lent 1 already, so it borrows 1 from the ${next} too and becomes 9.`
-            : `${top} is less than ${bottom}, so borrow 1 from the ${next}. The ${place} become ${worked}.`,
+            ? `This 0 had nothing to give, so it traded 1 of the ${next} for 10 first. It gave 1 away, so now it's 9.`
+            : `${top} is less than ${bottom}, so unbundle: trade 1 of the ${next} for 10 ${place}. Now there are ${worked} ${place}.`,
       });
-      lent = borrowed ? 1 : 0;
+      lent = traded ? 1 : 0;
     }
     return steps;
   }

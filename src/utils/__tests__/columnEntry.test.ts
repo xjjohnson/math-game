@@ -82,7 +82,7 @@ describe('show my work', () => {
   it('27 + 36: 7 + 6 = 13, write 3 and carry the 1, then 2 + 3 + 1 = 6', () => {
     const p = problem('add', 27, 36, 63);
     const steps = teachSteps(p)!;
-    expect(steps.map((x) => x.question)).toEqual(['7 + 6', '2 + 3 + 1 carried']);
+    expect(steps.map((x) => x.question)).toEqual(['7 + 6', '2 + 3 + 1 regrouped']);
     const { s } = run(p, ['13']);
     expect(s.entry.digits).toEqual([null, null, '3']);
     expect(s.entry.carries).toEqual([null, '1', null]);
@@ -93,7 +93,7 @@ describe('show my work', () => {
 
   it('brings a final carry down: 75 + 48 = 123', () => {
     const p = problem('add', 75, 48, 123);
-    expect(teachSteps(p)!.map((x) => x.question)).toEqual(['5 + 8', '7 + 4 + 1 carried', '1 carried']);
+    expect(teachSteps(p)!.map((x) => x.question)).toEqual(['5 + 8', '7 + 4 + 1 regrouped', '1 regrouped']);
     expect(entryValue(run(p, ['13', '12', '1']).s.entry)).toBe(123);
   });
 
@@ -111,7 +111,7 @@ describe('show my work', () => {
     const p = problem('subtract', 72, 48, 24);
     const steps = teachSteps(p)!;
     expect(steps.map((x) => x.question)).toEqual(['12 − 8', '6 − 4']);
-    expect(steps[0].tip).toMatch(/borrow 1 from the tens/);
+    expect(steps[0].tip).toMatch(/trade 1 of the tens for 10 ones/);
     const { s } = run(p, ['4', '2']);
     expect(s.entry.carries).toEqual(['6', '12']);
     expect(entryValue(s.entry)).toBe(24);
@@ -124,7 +124,7 @@ describe('show my work', () => {
 
   it('multiplies with carries: 47 × 3', () => {
     const p = problem('multiply', 47, 3, 141);
-    expect(teachSteps(p)!.map((x) => x.question)).toEqual(['7 × 3', '4 × 3 + 2 carried', '1 carried']);
+    expect(teachSteps(p)!.map((x) => x.question)).toEqual(['7 × 3', '4 × 3 + 2 regrouped', '1 regrouped']);
     expect(entryValue(run(p, ['21', '14', '1']).s.entry)).toBe(141);
   });
 

@@ -1,6 +1,7 @@
 import { Platform, StyleSheet, Text as RNText, View } from 'react-native';
 
 import { Text } from '@/components/AppText';
+import { QuestionPicture } from '@/components/QuestionPicture';
 import { colors, fontSizes, radius, spacing } from '@/constants/theme';
 import { usePalette } from '@/hooks/useAccessibility';
 import type { LessonVisual as Visual, WorkLine } from '@/utils/lessons';
@@ -64,6 +65,19 @@ export function LessonVisual({ visual, color }: { visual: Visual; color: string 
           {visual.numbers.map((n, i) => (
             <View key={i} style={[styles.chip, { borderColor: color }, i === visual.numbers.length - 1 && { backgroundColor: color }]}>
               <Text style={[styles.chipText, i === visual.numbers.length - 1 && styles.chipTextOn]}>{n}</Text>
+            </View>
+          ))}
+        </View>
+      );
+    case 'picture':
+      return <QuestionPicture picture={visual.picture} width={300} color={color} />;
+    case 'pictures':
+      return (
+        <View style={styles.pictures}>
+          {visual.pictures.map((p, i) => (
+            <View key={i} style={styles.pictureItem}>
+              {i > 0 && visual.joiner ? <Text style={styles.joiner}>{visual.joiner}</Text> : null}
+              <QuestionPicture picture={p} width={visual.pictures.length > 1 ? 140 : 300} color={color} />
             </View>
           ))}
         </View>
@@ -156,6 +170,9 @@ function NumberLine({
 const DOT = 22;
 
 const styles = StyleSheet.create({
+  pictures: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', alignItems: 'center', gap: spacing.sm },
+  pictureItem: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
+  joiner: { fontSize: 32, fontWeight: '900', color: colors.text },
   line: { flexDirection: 'row', width: '100%', paddingVertical: spacing.sm },
   axis: { position: 'absolute', left: 0, right: 0, top: spacing.sm + 22 + 7, height: 3, backgroundColor: colors.text },
   tick: { flex: 1, alignItems: 'center' },

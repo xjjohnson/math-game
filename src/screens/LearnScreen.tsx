@@ -3,31 +3,42 @@ import { Pressable, StyleSheet, View } from 'react-native';
 
 import { Text } from '@/components/AppText';
 import { Screen } from '@/components/Screen';
-import { OPERATIONS } from '@/constants/difficulty';
 import { colors, fontSizes, radius, spacing, TAP_TARGET } from '@/constants/theme';
 import { usePalette } from '@/hooks/useAccessibility';
-import { LESSONS } from '@/utils/lessons';
+import { useActiveProfile } from '@/store/profiles';
+import { STRANDS } from '@/utils/skills/catalog';
+import { ALL_LESSONS } from '@/utils/skills/skillLessons';
 
-/** "Learn how": the lessons, grouped by operation, youngest methods first. */
+const gradeName = (grade: number) => (grade === 0 ? 'K' : `Grade ${grade}`);
+
+/**
+ * "Learn how": the lessons, grouped by part of math (counting, adding, time...),
+ * youngest methods first. Lessons above the player's grade wait at the bottom.
+ */
 export function LearnScreen() {
   const palette = usePalette();
+  const grade = useActiveProfile()?.grade ?? 12;
+  const sections = STRANDS.map((s) => ({
+    ...s,
+    lessons: ALL_LESSONS.filter((l) => l.strand === s.value && l.grade <= grade + 1),
+  })).filter((s) => s.lessons.length > 0);
   return (
     <Screen>
       <Text style={styles.intro}>Pick a way to work out answers. These are the ways you learn them at school.</Text>
-      {OPERATIONS.map((o) => (
+      {sections.map((o) => (
         <View key={o.value} style={styles.section}>
-          <Text style={[styles.heading, { color: palette.operations[o.value] }]}>
-            {o.symbol}  {o.label}
+          <Text style={[styles.heading, { color: palette.operations[o.lessons[0].operation] }]}>
+            {o.emoji}  {o.label}
           </Text>
-          {LESSONS.filter((l) => l.operation === o.value).map((lesson) => (
+          {o.lessons.map((lesson) => (
             <Pressable
               key={lesson.id}
               onPress={() => router.push({ pathname: '/lesson', params: { id: lesson.id } })}
               accessibilityRole="button"
-              accessibilityLabel={`${lesson.title}, ages ${lesson.ages}. ${lesson.summary}`}
+              accessibilityLabel={`${lesson.title}, ${gradeName(lesson.grade)}. ${lesson.summary}`}
               style={({ pressed }) => [
                 styles.card,
-                { borderColor: palette.operations[o.value] },
+                { borderColor: palette.operations[lesson.operation] },
                 pressed && styles.pressed,
               ]}
             >
@@ -36,8 +47,8 @@ export function LearnScreen() {
                 <Text style={styles.title}>{lesson.title}</Text>
                 <Text style={styles.summary}>{lesson.summary}</Text>
               </View>
-              <View style={[styles.ages, { backgroundColor: palette.operations[o.value] }]}>
-                <Text style={styles.agesText}>Ages {lesson.ages}</Text>
+              <View style={[styles.ages, { backgroundColor: palette.operations[lesson.operation] }]}>
+                <Text style={styles.agesText}>{gradeName(lesson.grade)}</Text>
               </View>
             </Pressable>
           ))}

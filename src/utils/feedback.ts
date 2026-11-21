@@ -66,10 +66,4 @@ export function spokenLine(line: string): string {
     .replace(/(\d+)\/(\d+)/g, '$1 out of $2');
 }
 
-/** How an answer is shown: its label (a word, sign, time or fraction) or the number with its unit. */
-export function answerText(problem: Problem, value: number): string {
-  const label = problem.labels?.[value];
-  if (label !== undefined) return label;
-  if (!problem.unit) return String(value);
-  return problem.unit === '¢' ? `${value}¢` : `${value} ${problem.unit}`;
-}
+export { answerText } from '@/utils/skills/build';

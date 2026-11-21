@@ -1,9 +1,9 @@
-import type { Difficulty, GameMode, Operation, Rng } from '@/types';
+import type { Difficulty, GameMode, Operation, Picture, Rng, Strand } from '@/types';
 import { randInt } from '@/utils/seededRandom';
 
 /**
  * "Learn how" lessons: short step-by-step walk-throughs of the ways kids are
- * taught at school (counting on, making ten, carrying, borrowing, skip
+ * taught at school (counting on, making ten, bundling, trading, skip
  * counting, sharing, long division). Each lesson builds its steps from fresh
  * numbers, so "New example" shows the same method on a different problem.
  */
@@ -26,7 +26,11 @@ export type LessonVisual =
   | { kind: 'work'; lines: WorkLine[] }
   /** Skip-counting chips, e.g. 3, 6, 9, 12. */
   | { kind: 'skip'; numbers: number[] }
-  | { kind: 'big'; text: string };
+  | { kind: 'big'; text: string }
+  /** Any question picture: tens and ones blocks, ten-frames, a clock, coins and so on. */
+  | { kind: 'picture'; picture: Picture }
+  /** Two or more pictures in a row, e.g. the blocks for both numbers. */
+  | { kind: 'pictures'; pictures: Picture[]; joiner?: string };
 
 export interface LessonStep {
   text: string;
@@ -46,6 +50,10 @@ export interface Lesson {
   operation: Operation;
   /** Rough school ages, e.g. "5-7". */
   ages: string;
+  /** School grade the method is taught in (0 is kindergarten). */
+  grade: number;
+  /** Which part of math it belongs to on the Learn how screen (defaults to the operation). */
+  strand?: Strand;
   summary: string;
   build: (rng: Rng) => LessonStep[];
   practice: LessonPractice;
@@ -137,7 +145,7 @@ function carrying(rng: Rng): LessonStep[] {
       visual: { kind: 'work', lines: text([...columns([top, bottom]), rule(2)], []) },
     },
     {
-      text: `Start with the ones: ${aO} + ${bO} = ${onesSum}. That's more than 9, so write the ${onesSum % 10} and carry the 1 up to the tens.`,
+      text: `Start with the ones: ${aO} + ${bO} = ${onesSum}. That's more than 9, so bundle 10 ones into 1 ten. Write the ${onesSum % 10}, and write the new ten above the tens. That's regrouping.`,
       visual: {
         kind: 'work',
         lines: text(
@@ -147,7 +155,7 @@ function carrying(rng: Rng): LessonStep[] {
       },
     },
     {
-      text: `Now the tens: the carried 1 + ${aT} + ${bT} = ${sT}.`,
+      text: `Now the tens: the bundled 1 + ${aT} + ${bT} = ${sT}.`,
       visual: {
         kind: 'work',
         lines: text(
@@ -220,7 +228,7 @@ function borrowing(rng: Rng): LessonStep[] {
       visual: { kind: 'work', lines: [...columns([top, bottom]), rule(2)].map((t) => ({ text: t })) },
     },
     {
-      text: `Ones: ${aO} − ${bO}? ${aO} is smaller than ${bO}, so we can't take away yet. Borrow 1 ten from the tens: the ${aT} becomes ${aT - 1}, and the ${aO} becomes ${aO + 10}.`,
+      text: `Ones: ${aO} − ${bO}? ${aO} is smaller than ${bO}, so we can't take away yet. Unbundle: trade 1 ten for 10 ones. The ${aT} tens become ${aT - 1}, and the ${aO} ones become ${aO + 10}.`,
       visual: {
         kind: 'work',
         lines: [
@@ -347,7 +355,7 @@ function breakApart(rng: Rng): LessonStep[] {
       visual: { kind: 'big', text: `${whole} × ${b} = ${p1 + p2}` },
     },
     {
-      text: 'On paper, the short way does the same thing: times the ones, carry, then times the tens. "Show my work" walks you through it.',
+      text: 'On paper, the short way does the same thing: times the ones, regroup, then times the tens. "Show my work" walks you through it.',
     },
   ];
 }
@@ -490,7 +498,8 @@ export const LESSONS: Lesson[] = [
     ages: '5-7',
     summary: 'Start at the bigger number and hop forward.',
     build: countOn,
-    practice: { mode: op('add'), difficulty: 'easy' },
+    grade: 0,
+    practice: { mode: { kind: 'skills', focus: 'k-add-10' }, difficulty: 'medium' },
   },
   {
     id: 'make-ten',
@@ -500,17 +509,19 @@ export const LESSONS: Lesson[] = [
     ages: '6-8',
     summary: 'Fill up a 10 first, then add what is left.',
     build: makeTen,
-    practice: { mode: op('add'), difficulty: 'easy' },
+    grade: 1,
+    practice: { mode: { kind: 'skills', focus: 'g1-add-20' }, difficulty: 'medium' },
   },
   {
-    id: 'carrying',
-    title: 'Carrying',
+    id: 'bundling',
+    title: 'Stack and bundle',
     emoji: '🎒',
     operation: 'add',
     ages: '7-9',
-    summary: 'Add big numbers in columns and carry the 1.',
+    summary: 'Add in columns. 10 ones make a ten: bundle it and regroup.',
     build: carrying,
-    practice: { mode: op('add'), difficulty: 'medium', showWork: true },
+    grade: 2,
+    practice: { mode: { kind: 'skills', focus: 'g2-add-bundle' }, difficulty: 'medium', showWork: true },
   },
   {
     id: 'count-back',
@@ -520,7 +531,8 @@ export const LESSONS: Lesson[] = [
     ages: '5-7',
     summary: 'Start at the first number and hop backward.',
     build: countBack,
-    practice: { mode: op('subtract'), difficulty: 'easy' },
+    grade: 0,
+    practice: { mode: { kind: 'skills', focus: 'k-sub-10' }, difficulty: 'medium' },
   },
   {
     id: 'count-up',
@@ -530,17 +542,19 @@ export const LESSONS: Lesson[] = [
     ages: '7-9',
     summary: 'Find how far apart two numbers are.',
     build: countUp,
-    practice: { mode: op('subtract'), difficulty: 'medium' },
+    grade: 1,
+    practice: { mode: { kind: 'skills', focus: 'g1-sub-20' }, difficulty: 'medium' },
   },
   {
-    id: 'borrowing',
-    title: 'Borrowing',
-    emoji: '🤝',
+    id: 'trading',
+    title: 'Stack and trade',
+    emoji: '🔁',
     operation: 'subtract',
     ages: '7-9',
-    summary: 'Subtract in columns and borrow a ten.',
+    summary: 'Take away in columns. Not enough ones? Trade a ten for 10 ones.',
     build: borrowing,
-    practice: { mode: op('subtract'), difficulty: 'medium', showWork: true },
+    grade: 2,
+    practice: { mode: { kind: 'skills', focus: 'g2-sub-trade' }, difficulty: 'medium', showWork: true },
   },
   {
     id: 'groups',
@@ -550,7 +564,8 @@ export const LESSONS: Lesson[] = [
     ages: '6-8',
     summary: 'Times means groups of the same size.',
     build: groupsOf,
-    practice: { mode: op('multiply'), difficulty: 'easy' },
+    grade: 3,
+    practice: { mode: { kind: 'skills', focus: 'g3-groups' }, difficulty: 'medium' },
   },
   {
     id: 'skip-counting',
@@ -560,6 +575,7 @@ export const LESSONS: Lesson[] = [
     ages: '6-8',
     summary: 'Count by 2s, 5s or 10s to times.',
     build: skipCounting,
+    grade: 2,
     practice: { mode: { kind: 'tables', tables: [2, 5, 10], includeDivision: false }, difficulty: 'medium' },
   },
   {
@@ -570,6 +586,7 @@ export const LESSONS: Lesson[] = [
     ages: '8-10',
     summary: 'Shortcuts for 2s, 4s, 5s, 9s, 10s and 11s.',
     build: tableTricks,
+    grade: 3,
     practice: {
       mode: { kind: 'tables', tables: [2, 4, 5, 9, 10, 11], includeDivision: false },
       difficulty: 'medium',
@@ -583,6 +600,7 @@ export const LESSONS: Lesson[] = [
     ages: '9-11',
     summary: 'Times big numbers by splitting tens and ones.',
     build: breakApart,
+    grade: 4,
     practice: { mode: op('multiply'), difficulty: 'medium', showWork: true },
   },
   {
@@ -593,7 +611,8 @@ export const LESSONS: Lesson[] = [
     ages: '6-8',
     summary: 'Divide means share into equal groups.',
     build: sharing,
-    practice: { mode: op('divide'), difficulty: 'easy' },
+    grade: 3,
+    practice: { mode: { kind: 'skills', focus: 'g3-share' }, difficulty: 'medium' },
   },
   {
     id: 'fact-family',
@@ -603,6 +622,7 @@ export const LESSONS: Lesson[] = [
     ages: '8-10',
     summary: 'Use a times fact to divide.',
     build: factFamily,
+    grade: 3,
     practice: { mode: { kind: 'tables', tables: [3, 4, 6, 7, 8, 9], includeDivision: true }, difficulty: 'medium' },
   },
   {
@@ -613,8 +633,10 @@ export const LESSONS: Lesson[] = [
     ages: '9-12',
     summary: 'Divide, Multiply, Subtract, Bring down.',
     build: longDivision,
+    grade: 4,
     practice: { mode: op('divide'), difficulty: 'hard' },
   },
 ];
 
-export const findLesson = (id: string | undefined) => LESSONS.find((l) => l.id === id);
+/** Old lesson ids, from before the school words changed. */
+export const RENAMED_LESSONS: Record<string, string> = { carrying: 'bundling', borrowing: 'trading' };

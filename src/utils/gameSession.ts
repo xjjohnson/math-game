@@ -26,7 +26,7 @@ export interface SessionState {
 }
 
 export type SessionAction =
-  | { type: 'answer'; given: number; secondsLeft: number | null }
+  | { type: 'answer'; given: number; secondsLeft: number | null; helped?: boolean }
   | { type: 'timeout' }
   | { type: 'next' };
 
@@ -106,7 +106,7 @@ export function startSession(config: GameConfig): SessionState {
   };
 }
 
-function record(state: SessionState, given: number | null, secondsLeft: number | null): SessionState {
+function record(state: SessionState, given: number | null, secondsLeft: number | null, helped?: boolean): SessionState {
   const correct = given === state.problem.answer;
   const streak = correct ? state.streak + 1 : 0;
   const question = { operation: state.problem.operation, difficulty: state.difficulty, grade: state.config.grade };
@@ -129,6 +129,7 @@ function record(state: SessionState, given: number | null, secondsLeft: number |
         correct,
         points,
         ...(seconds === undefined ? {} : { seconds }),
+        ...(helped ? { helped } : {}),
       },
     ],
   };
@@ -137,7 +138,7 @@ function record(state: SessionState, given: number | null, secondsLeft: number |
 export function sessionReducer(state: SessionState, action: SessionAction): SessionState {
   switch (action.type) {
     case 'answer':
-      return state.phase === 'question' ? record(state, action.given, action.secondsLeft) : state;
+      return state.phase === 'question' ? record(state, action.given, action.secondsLeft, action.helped) : state;
     case 'timeout':
       return state.phase === 'question' ? record(state, null, 0) : state;
     case 'next': {

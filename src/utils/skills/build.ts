@@ -105,3 +105,11 @@ export function optionsFrom<T>(rng: Rng, answer: T, pool: readonly T[], count = 
 export const digitAt = (n: number, place: number) => Math.floor(n / 10 ** place) % 10;
 
 export const fromDigits = (...digits: number[]) => digits.reduce((n, d) => n * 10 + d, 0);
+
+/** How an answer is shown: its label (a word, sign, time or fraction) or the number with its unit. */
+export function answerText(problem: Problem, value: number): string {
+  const label = problem.labels?.[value];
+  if (label !== undefined) return label;
+  if (!problem.unit) return String(value);
+  return problem.unit === '¢' ? `${value}¢` : `${value} ${problem.unit}`;
+}

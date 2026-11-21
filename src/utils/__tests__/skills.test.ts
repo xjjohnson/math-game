@@ -4,7 +4,11 @@ import { problemAt } from '@/utils/gameSession';
 import { createRng } from '@/utils/seededRandom';
 import { regroupCount, tradesAcrossZero } from '@/utils/skills/arithmetic';
 import { findSkill, SKILLS } from '@/utils/skills/catalog';
+import { diagnose, helpFor, waysFor } from '@/utils/skills/help';
 import { frontier, isLearned, knows, planRound, recordSkills, withPlan } from '@/utils/skills/plan';
+import { buildProblem } from '@/utils/mathEngine';
+
+const sumProblem = (op: Problem['operation'], a: number, b: number): Problem => buildProblem(op, a, b, { add: a + b, subtract: a - b, multiply: a * b, divide: a / b }[op], createRng(1));
 
 const many = (id: string, n = 200): Problem[] => {
   const skill = findSkill(id)!;
@@ -168,5 +172,65 @@ describe('what to practise', () => {
       expect(p.choiceOnly).toBeFalsy();
       expect(p.flashMs).toBeFalsy();
     }
+  });
+});
+
+describe('help', () => {
+  const k3 = SKILLS.filter((s) => s.grade <= 3);
+
+  it.each(k3.map((s) => s.id))('%s has help that uses school words', (id) => {
+    for (const p of many(id, 25)) {
+      for (const reveal of [false, true]) {
+        const ways = waysFor(p, reveal);
+        expect(ways.length).toBeGreaterThan(0);
+        for (const w of ways) {
+          expect(w.steps.length).toBeGreaterThan(0);
+          for (const step of w.steps) {
+            expect(step.text).not.toMatch(/borrow|carr(y|ied)/i);
+            expect(step.text).not.toMatch(/undefined|NaN/);
+          }
+        }
+      }
+    }
+  });
+
+  it('keeps the answer back while the question is open', () => {
+    const p = sumProblem('subtract', 52, 18);
+    for (const w of waysFor(p, false)) {
+      expect(w.steps[w.steps.length - 1].text).not.toContain('= 34');
+    }
+    expect(waysFor(p, true).some((w) => w.steps.some((s) => s.text.includes('34')))).toBe(true);
+  });
+
+  it('starts with pictures, then tricks, then paper as a skill is learned', () => {
+    const p = { ...sumProblem('subtract', 52, 18), skill: 'g2-sub-trade' };
+    const kindAt = (progress?: Parameters<typeof helpFor>[1]) => {
+      const { ways, start } = helpFor(p, progress, true);
+      return ways[start].kind;
+    };
+    expect(kindAt(undefined)).toBe('picture');
+    expect(kindAt({ recent: '10110', tries: 5, right: 3, learned: false })).toBe('trick');
+    expect(kindAt({ recent: '11111', tries: 5, right: 5, learned: true })).toBe('paper');
+  });
+
+  it('trades across a zero with the blocks', () => {
+    const ways = waysFor(sumProblem('subtract', 304, 128), true);
+    const blocks = ways.find((w) => w.id === 'blocks')!;
+    expect(blocks.steps.some((s) => /unbundle a hundred/i.test(s.text))).toBe(true);
+  });
+
+  it('spots the usual slips', () => {
+    const p = sumProblem('subtract', 52, 18);
+    expect(diagnose(p, 46)).toMatch(/smaller digit was taken from the bigger/);
+    expect(diagnose(p, 44)).toMatch(/1 less/);
+    expect(diagnose(sumProblem('add', 47, 38), 75)).toMatch(/bundle/i);
+    expect(diagnose(sumProblem('multiply', 6, 4), 10)).toMatch(/groups of/);
+    expect(diagnose(p, 34)).toBeNull();
+  });
+
+  it('a right answer after help does not count toward learning', () => {
+    const helped = { ...answer('g2-sub-trade', true), helped: true };
+    const { skills } = recordSkills({}, Array.from({ length: 5 }, () => helped), 'd');
+    expect(skills['g2-sub-trade']).toMatchObject({ recent: '', tries: 5, learned: false });
   });
 });

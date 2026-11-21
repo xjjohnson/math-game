@@ -61,3 +61,30 @@ describe('longDivisionSteps', () => {
     expect(work?.kind === 'work' && work.lines[0].text.trim()).toBe('1 0 4');
   });
 });
+
+describe('skill lessons', () => {
+  // Imported here so the school-method lessons above stay independent of the skill engine.
+  const { ALL_LESSONS, SKILL_LESSONS, findLesson } = jest.requireActual('@/utils/skills/skillLessons');
+
+  it('have unique ids across all lessons, and old ids still open', () => {
+    expect(new Set(ALL_LESSONS.map((l: { id: string }) => l.id)).size).toBe(ALL_LESSONS.length);
+    expect(findLesson('borrowing')?.id).toBe('trading');
+    expect(findLesson('carrying')?.id).toBe('bundling');
+  });
+
+  it('always find a question that suits their way, with no old words', () => {
+    for (const lesson of SKILL_LESSONS) {
+      for (let seed = 0; seed < 30; seed++) {
+        const steps = lesson.build(createRng(seed));
+        expect(steps.length).toBeGreaterThanOrEqual(2);
+        for (const step of steps) {
+          expect(step.text).not.toMatch(/NaN|undefined|borrow|carr(y|ied)/i);
+        }
+      }
+    }
+  });
+
+  it('every lesson practises in skills mode or a mode that exists', () => {
+    for (const lesson of ALL_LESSONS) expect(['skills', 'operation', 'tables']).toContain(lesson.practice.mode.kind);
+  });
+});

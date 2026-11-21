@@ -360,8 +360,14 @@ function Sequence({ items, width, color }: { items: (number | null)[]; width: nu
   );
 }
 
-function NumberLine({ min, max, step, dot, hops, start, labels, width, color }: Extract<Picture, { kind: 'numberLine' }> & { width: number; color: string }) {
+function NumberLine({ min, max, step, dot, hops, start, labels, hideEnd, width, color }: Extract<Picture, { kind: 'numberLine' }> & { width: number; color: string }) {
   const pad = 20;
+  // Spots the hops start from and land on get their numbers written under them.
+  const stops: number[] = [];
+  if (hops && start !== undefined) {
+    stops.push(start);
+    hops.forEach((hop) => stops.push(stops[stops.length - 1] + hop));
+  }
   const h = hops?.length ? 110 : 70;
   const y = h - 34;
   const ticks = Math.round((max - min) / step);
@@ -389,7 +395,8 @@ function NumberLine({ min, max, step, dot, hops, start, labels, width, color }: 
       <Line x1={pad - 10} y1={y} x2={width - pad + 10} y2={y} stroke={INK} strokeWidth={3} />
       {Array.from({ length: ticks + 1 }, (_, i) => {
         const v = min + i * step;
-        const showLabel = labels || i === 0 || i === ticks;
+        const nearStop = stops.some((s) => Math.abs(xAt(s) - xAt(v)) < 22);
+        const showLabel = labels || ((i === 0 || i === ticks) && !nearStop);
         return (
           <G key={i}>
             <Line x1={xAt(v)} y1={y - 8} x2={xAt(v)} y2={y + 8} stroke={INK} strokeWidth={2} />
@@ -402,6 +409,19 @@ function NumberLine({ min, max, step, dot, hops, start, labels, width, color }: 
         );
       })}
       {arcs}
+      {stops.map((s, i) => {
+        const hidden = hideEnd && i === stops.length - 1 && i > 0;
+        return (
+          <G key={`stop${i}`}>
+            <Line x1={xAt(s)} y1={y - 10} x2={xAt(s)} y2={y + 10} stroke={INK} strokeWidth={3} />
+            {labels ? null : (
+              <SvgText x={xAt(s)} y={y + 26} fontSize={15} fontWeight="900" fill={hidden ? SECOND : INK} textAnchor="middle">
+                {hidden ? '?' : String(s)}
+              </SvgText>
+            )}
+          </G>
+        );
+      })}
       {dot !== undefined ? <Circle cx={xAt(dot)} cy={y} r={8} fill={color} stroke={INK} strokeWidth={2} /> : null}
     </Svg>
   );
