@@ -234,3 +234,37 @@ describe('help', () => {
     expect(skills['g2-sub-trade']).toMatchObject({ recent: '', tries: 5, learned: false });
   });
 });
+
+describe('hands-on questions', () => {
+  const { fewestCoins, handsOnCard, handsOnSlip } = jest.requireActual('@/utils/skills/handsOn');
+
+  it('hides the clock or coins until answered, then shows the right one', () => {
+    const clocks: any[] = many('g2-time', 60).filter((p) => p.interact);
+    expect(clocks.length).toBeGreaterThan(10);
+    for (const p of clocks) {
+      expect(handsOnCard(p, false).picture).toBeUndefined();
+      const shown = handsOnCard(p, true).picture;
+      expect(shown.kind).toBe('clock');
+      expect((shown.hour % 12) * 60 + shown.minute).toBe(p.answer);
+      expect(p.interact.step).toBe(5);
+    }
+  });
+
+  it('time passing ends at start plus the wait', () => {
+    for (const p of many('g3-elapsed', 60) as any[]) {
+      expect(p.interact.from).toBe(p.a);
+      expect(p.answer).toBe((p.a + p.b) % 720);
+      expect(p.choices).toContain(p.answer);
+    }
+  });
+
+  it('purse questions make the amount, or count up to what was paid', () => {
+    expect(fewestCoins(68, [1, 5, 10, 25])).toEqual([25, 25, 10, 5, 1, 1, 1]);
+    for (const p of many('g2-change', 60).filter((q) => q.interact) as any[]) {
+      expect(p.interact.from + p.answer).toBe(p.a);
+    }
+    const p = many('g2-coins', 40).find((q) => q.interact)!;
+    expect(handsOnSlip(p, p.answer + 5)).toMatch(/too much/);
+    expect(handsOnSlip(p, p.answer)).toBeNull();
+  });
+});
