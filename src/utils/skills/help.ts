@@ -45,6 +45,12 @@ const blocksOf = (n: number): Extract<Picture, { kind: 'blocks' }> => {
   return { kind: 'blocks', hundreds: Math.floor(n / 100), tens: d.t, ones: d.o };
 };
 const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? '' : 's'}`;
+/** "2 hundreds, 3 tens and 4 ones", leaving out places that are 0. */
+function hto(h: number, t: number, o: number): string {
+  const parts = [h ? plural(h, 'hundred') : '', t ? plural(t, 'ten') : '', o ? plural(o, 'one') : ''].filter(Boolean);
+  if (parts.length === 0) return '0';
+  return parts.length === 1 ? parts[0] : `${parts.slice(0, -1).join(', ')} and ${parts[parts.length - 1]}`;
+}
 const sign = (p: Problem) => ({ add: '+', subtract: '−', multiply: '×', divide: '÷' })[p.operation];
 const sentence = (p: Problem) => `${p.a} ${sign(p)} ${p.b}`;
 
@@ -119,7 +125,7 @@ function blocksAddWay(ctx: Ctx): HelpWay {
     o -= 10;
     t += 1;
     steps.push({
-      text: `That's 10 or more ones, so bundle 10 ones into 1 ten. Now there are ${plural(t, 'ten')} and ${plural(o, 'one')}.`,
+      text: `That's 10 or more ones, so bundle 10 ones into 1 ten. Now there are ${hto(0, t, o)}.`,
       visual: pic({ kind: 'blocks', hundreds: h, tens: t, ones: o }),
     });
   }
@@ -127,14 +133,14 @@ function blocksAddWay(ctx: Ctx): HelpWay {
     t -= 10;
     h += 1;
     steps.push({
-      text: `10 tens make a hundred, so bundle them into 1 hundred. Now there are ${plural(h, 'hundred')}, ${plural(t, 'ten')} and ${plural(o, 'one')}.`,
+      text: `10 tens make a hundred, so bundle them into 1 hundred. Now there are ${hto(h, t, o)}.`,
       visual: pic({ kind: 'blocks', hundreds: h, tens: t, ones: o }),
     });
   }
   steps.push(
     finish(
       ctx,
-      `Count them up: ${h ? `${plural(h, 'hundred')}, ` : ''}${plural(t, 'ten')} and ${plural(o, 'one')} is ${answer}.`,
+      `Count them up: ${hto(h, t, o)} is ${answer}.`,
       big(`${a} + ${b} = ${answer}`),
       'Count the hundreds, tens and ones. What number is that?',
     ),
@@ -276,7 +282,7 @@ function blocksSubWay(ctx: Ctx): HelpWay {
   let { t, o } = places(a);
   const steps: LessonStep[] = [
     {
-      text: `Make ${a} with blocks: ${h ? `${plural(h, 'hundred')}, ` : ''}${plural(t, 'ten')} and ${plural(o, 'one')}. We need to take away ${b}.`,
+      text: `Make ${a} with blocks: ${hto(h, t, o)}. We need to take away ${b}.`,
       visual: pic({ kind: 'blocks', hundreds: h, tens: t, ones: o }),
     },
   ];
@@ -292,7 +298,7 @@ function blocksSubWay(ctx: Ctx): HelpWay {
     t -= 1;
     o += 10;
     steps.push({
-      text: `${o - 10} ones isn't enough to take away ${y.o}. Unbundle a ten: trade 1 ten for 10 ones. Now there are ${plural(t, 'ten')} and ${o} ones.`,
+      text: `${o - 10} ones isn't enough to take away ${y.o}. Unbundle a ten: trade 1 ten for 10 ones. Now there are ${t ? `${plural(t, 'ten')} and ` : ''}${o} ones.`,
       visual: pic({ kind: 'blocks', hundreds: h, tens: t, ones: o, traded: 'ten' }),
     });
   }
@@ -305,14 +311,14 @@ function blocksSubWay(ctx: Ctx): HelpWay {
     });
   }
   steps.push({
-    text: `Now take away ${b}: cross out ${y.h ? `${plural(y.h, 'hundred')}, ` : ''}${plural(y.t, 'ten')} and ${plural(y.o, 'one')}.`,
+    text: `Now take away ${b}: cross out ${hto(Math.floor(b / 100), y.t, y.o)}.`,
     visual: pic({ kind: 'blocks', hundreds: h, tens: t, ones: o, crossed: { hundreds: Math.floor(b / 100), tens: y.t, ones: y.o } }),
   });
   const left = places(answer);
   steps.push(
     finish(
       ctx,
-      `What's left: ${left.h || Math.floor(answer / 100) ? `${plural(Math.floor(answer / 100), 'hundred')}, ` : ''}${plural(left.t, 'ten')} and ${plural(left.o, 'one')}. That's ${answer}.`,
+      `What's left: ${hto(Math.floor(answer / 100), left.t, left.o)}. That's ${answer}.`,
       big(`${a} − ${b} = ${answer}`),
       'Count what is not crossed out. What number is that?',
     ),
@@ -651,7 +657,7 @@ export function waysFor(problem: Problem, reveal: boolean): HelpWay[] {
     if (small <= 5 && small > 0) ways.push(countOnWay(ctx));
     if (answer > 10 && answer <= 20 && a < 10 && b < 10) ways.push(makeTenWay(ctx));
     if (answer >= 20 && answer < 1000 && Math.floor(a / 100) + Math.floor(b / 100) <= 4) ways.push(blocksAddWay(ctx));
-    if (a >= 10 && b >= 10) ways.push(breakApartAddWay(ctx));
+    if (a >= 10 && b >= 10 && partsOf(Math.min(a, b)).length > 1) ways.push(breakApartAddWay(ctx));
     if (a >= 10 && b >= 10 && Math.max(a % 10, b % 10) >= 7) ways.push(friendlyAddWay(ctx));
     if (a >= 10 && b >= 10) ways.push(paperWay(ctx));
     // Something to count on with, whatever the numbers.
@@ -662,7 +668,7 @@ export function waysFor(problem: Problem, reveal: boolean): HelpWay[] {
     if (a >= 20 && a < 1000 && Math.floor(a / 100) <= 5) ways.push(blocksSubWay(ctx));
     if (a > 10 && answer > 0 && b >= 5 && (answer <= 12 || a % 100 === 0)) ways.push(countUpWay(ctx));
     if (b >= 10 && b % 10 >= 7 && a >= Math.ceil(b / 10) * 10) ways.push(friendlySubWay(ctx));
-    if (a > 10 && (b >= 10 || (a % 10 > 0 && a % 10 < b))) ways.push(breakApartSubWay(ctx));
+    if (a > 10 && ((b >= 10 && partsOf(b).length > 1) || (b < 10 && a % 10 > 0 && a % 10 < b))) ways.push(breakApartSubWay(ctx));
     if (a >= 20 && b >= 10) ways.push(paperWay(ctx));
   } else if (operation === 'multiply') {
     if (a % 10 === 0 || b % 10 === 0 ? small > 0 && Math.max(a, b) >= 20 : false) ways.push(timesTensWay(ctx));
