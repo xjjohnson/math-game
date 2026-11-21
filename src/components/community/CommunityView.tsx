@@ -8,6 +8,7 @@ import { BringPanel } from '@/components/BringPanel';
 import { GridPaper, panelFace, pillFace } from '@/components/Chrome';
 import { TabBar, type TabId } from '@/components/TabBar';
 import { CommunityRoom } from '@/components/community/CommunityRoom';
+import { JoinBubble } from '@/components/community/JoinBubble';
 import { TownMap } from '@/components/community/TownMap';
 import { VisitPanel } from '@/components/VisitPanel';
 import { colors, radius, spacing, TAP_TARGET } from '@/constants/theme';
@@ -64,6 +65,11 @@ export function CommunityView({ place, actions, needsPermission = false, tab }: 
             </Pressable>
           </View>
         </View>
+        {open ? null : (
+          <View style={styles.panelSpot} pointerEvents="box-none">
+            <JoinBubble />
+          </View>
+        )}
         {open ? (
           <View style={styles.panelSpot} pointerEvents="box-none">
             <View style={styles.panel}>

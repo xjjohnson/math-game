@@ -68,7 +68,11 @@ class NearbyTransport extends Emitter implements Transport {
   }
 
   async send(msg: GameMessage, to?: string) {
-    await Nearby!.send(to ?? null, encodeMessage(msg)).catch((e) => this.fail(e));
+    // A message to nobody (a host still waiting for friends) isn't worth showing as an error,
+    // so failures here only go back to the caller.
+    await Nearby!.send(to ?? null, encodeMessage(msg)).catch((e) => {
+      throw new Error(message(e));
+    });
   }
 
   disconnect() {

@@ -119,19 +119,20 @@ const HELPER_WAIT_MS = 1500;
 /** How long an animal's "Moo!" stays over its head. */
 const SAY_MS = 1800;
 
-/** On joining a friend, things this phone moved this recently are put back the way this phone had them. */
-const KEEP_MY_CHANGES_MS = 10 * 60 * 1000;
-
 /**
  * Where things were put while playing alone, kept while the app is open so a
  * tidy classroom is still tidy after doing the job. On a visit the host keeps them instead.
  */
 const soloMemory: Record<string, Spot> = {};
-/** When each remembered thing last changed, by this phone or a friend. */
-const memoryTime: Record<string, number> = {};
-function remember(id: string, spot: Spot) {
+/**
+ * Things this phone moved itself, and nobody has moved since. On joining a friend
+ * they are put back the way this phone had them, so joining never undoes your room.
+ */
+const movedHere = new Set<string>();
+function remember(id: string, spot: Spot, mine = false) {
   soloMemory[id] = { x: spot.x, y: spot.y };
-  memoryTime[id] = Date.now();
+  if (mine) movedHere.add(id);
+  else movedHere.delete(id);
 }
 
 /** Where someone stands until they are moved: along the floor near the door, in order. */
@@ -212,7 +213,7 @@ export function CommunityRoom({ place, onDoor, onExit }: Props) {
   const put = (id: string, x: number, y: number) => {
     // People and buddies start fresh each time; things in the rooms stay where they were put,
     // even when the visit restarts (a phone left alone keeps looking again and again).
-    if (id.startsWith('~')) remember(id, { x, y });
+    if (id.startsWith('~')) remember(id, { x, y }, true);
     if (visiting) townSession().moveTo(id, x, y);
     else {
       setSoloSpots((s) => ({ ...s, [id]: { x, y } }));
@@ -247,7 +248,7 @@ export function CommunityRoom({ place, onDoor, onExit }: Props) {
     for (const [id, spot] of Object.entries(soloMemory)) if (!known[id]) session.moveTo(id, spot.x, spot.y);
   }, [status]);
 
-  // Joining a friend: once their room has arrived, put back what this phone changed lately, so a
+  // Joining a friend: once their room has arrived, put back what this phone changed, so a
   // bowl you just filled doesn't turn back into the friend's older one. After that, keep up with them.
   const joinedAt = useRef(0);
   useEffect(() => {
@@ -256,10 +257,10 @@ export function CommunityRoom({ place, onDoor, onExit }: Props) {
     const timer = setTimeout(() => {
       const session = townSession();
       const theirs = session.getState().spots;
-      const cutoff = Date.now() - KEEP_MY_CHANGES_MS;
-      for (const [id, mine] of Object.entries(soloMemory)) {
+      for (const id of movedHere) {
+        const mine = soloMemory[id];
         const now = theirs[id];
-        if ((memoryTime[id] ?? 0) > cutoff && (!now || now.x !== mine.x || now.y !== mine.y)) session.moveTo(id, mine.x, mine.y);
+        if (mine && (!now || now.x !== mine.x || now.y !== mine.y)) session.moveTo(id, mine.x, mine.y);
       }
       joinedAt.current = 0;
     }, 1500);

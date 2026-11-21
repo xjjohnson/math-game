@@ -202,8 +202,9 @@ Phases 1-6 deliver a complete single-player game before any native Bluetooth wor
 - [ ] WebRTC transport for PC multiplayer (Phase 9, only if wanted)
 - [ ] LAN WebSocket fallback if WebRTC pairing is flaky (only if needed)
 - [ ] Keep MockTransport for solo testing of multiplayer logic
+- [x] Stable joining in Community: no screen wipes on internal steps, keep your own things on join, 15 s reconnect grace, tap-to-join bubble (Several phones still uses its own join-or-host)
 - [ ] More co-op modes: Monster Battle and Relay on several phones, Team Up on one phone (protocol v3)
-- [x] Community: full-screen scrolling Toca-style street and building interiors (school, shop, bakery, library, park, farm); opening it auto-joins a nearby visit or hosts one; everyone in a building stands in the room as their character with their buddies and an accessory, and each player moves only their own person and buddies, live (protocol v6; the host ignores moves for anyone else's pieces)
+- [x] Community: full-screen scrolling Toca-style street and building interiors (school, shop, bakery, library, park, farm); opening it is always solo; each phone quietly offers a visit and shows nearby friends, and one tap on "Join" joins a friend's visit (no automatic role switching). Starting, retrying and short drops never clear the screen; joining keeps your own chalkboard, easel and room; a dropped link gets 15 seconds to reconnect; everyone in a building stands in the room as their character with their buddies and an accessory, and each player moves only their own person and buddies, live (protocol v6; the host ignores moves for anyone else's pieces)
 - [x] Join or host for Community and Several phones: look once at start, join a host or host and stay; two lonely hosts merge (tag in the advertised name, smaller tag gives way; a host with friends never does)
 - [x] A host never gives way to an older phone with no tag (it starts over and joins by itself)
 - [x] Shop and Bakery jobs: customer scene, "Give back: ?", tap green US dollar bills ($1-$100, no $2) onto the counter, hint and a second try (grade 1 up)

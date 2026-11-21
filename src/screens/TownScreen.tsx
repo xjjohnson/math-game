@@ -11,8 +11,8 @@ import { allGranted, checkPermissions, devicePermissions } from '@/utils/nearbyP
 import { Nearby } from '../../modules/math-nearby';
 
 /**
- * The community street, full screen. Opening it connects to friends nearby by
- * itself: it joins a visit someone is already hosting, or hosts one.
+ * The community street, full screen. Opening it offers a visit for friends to
+ * join and shows friends' visits nearby, which join with one tap.
  */
 export function TownScreen() {
   const profile = useActiveProfile();
@@ -25,7 +25,7 @@ export function TownScreen() {
     setNeedsPermission(!ok);
     if (!ok || townSession().active) return;
     const session = townSession();
-    void session.auto({ name: profile.name, avatar: profile.avatar });
+    void session.open({ name: profile.name, avatar: profile.avatar });
   }, [profile]);
 
   useEffect(() => {

@@ -1,5 +1,5 @@
 import { createMockNetwork } from '@/services/mockTransport';
-import { TownSession } from '@/services/townSession';
+import { joinableVisits, TownSession } from '@/services/townSession';
 import { clampSpot, defaultSpot, spotFor } from '@/utils/multiplayer/scene';
 import { buddyPieceId, encodeMessage, type GameMessage, HOST_ID, MIN_GAME_VERSION, parseMessage, PROTOCOL_VERSION } from '@/utils/multiplayer/protocol';
 
@@ -179,24 +179,26 @@ describe('shared scene', () => {
   });
 });
 
-describe('automatic connecting and what players bring', () => {
+describe('connecting and what players bring', () => {
   beforeEach(() => jest.useFakeTimers());
   afterEach(() => jest.useRealTimers());
 
-  it('joins a visit that is already hosted instead of hosting another', async () => {
+  it('joins a visit that is already hosted with one tap', async () => {
     const { sessions } = setup(2);
     const [first, second] = sessions;
-    await first.host({ name: 'H', avatar: '🐼' });
-    void second.auto({ name: 'G', avatar: '🦊' });
-    await jest.advanceTimersByTimeAsync(8000);
+    await first.open({ name: 'H', avatar: '🐼' });
+    await second.open({ name: 'G', avatar: '🦊' });
+    void second.joinVisit(joinableVisits(second.getState())[0].name);
+    await jest.advanceTimersByTimeAsync(3000);
     expect(second.getState().status).toBe('joined');
     expect(first.getState().status).toBe('hosting');
     second.stop();
+    first.stop();
   });
 
   it('hosts when nobody else is', async () => {
     const { sessions } = setup(1);
-    void sessions[0].auto({ name: 'Solo', avatar: '🐼' });
+    await sessions[0].open({ name: 'Solo', avatar: '🐼' });
     await jest.advanceTimersByTimeAsync(8000);
     expect(sessions[0].getState().status).toBe('hosting');
     sessions[0].stop();
