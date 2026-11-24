@@ -1,10 +1,10 @@
 import { DEFAULT_GRADE } from '@/constants/grades';
 import { DEFAULT_EQUIPPED } from '@/constants/shop';
 import type { Difficulty, Grade, Profile } from '@/types';
-import { addExtraRooms, AREAS_BEFORE_EXTRA_ROOMS, emptyRoom, upgradeRoom, widenHome } from '@/utils/room';
+import { addExtraRooms, AREAS_BEFORE_EXTRA_ROOMS, emptyRoom, stripToHouse, upgradeRoom, widenHome } from '@/utils/room';
 
 /** The version the profiles are saved as. Bump it, and add a step below, whenever Profile gains a field. */
-export const PROFILES_VERSION = 16;
+export const PROFILES_VERSION = 17;
 
 export interface SavedProfiles {
   profiles: Profile[];
@@ -80,7 +80,7 @@ export function migrateProfiles(persisted: unknown, version: number): SavedProfi
   }
   if (version < 13) {
     // Version 13 added extra rooms to buy. Everyone starts with none, and the new areas' paint is filled in.
-    state.profiles = state.profiles.map((p) => ({ ...p, homeRooms: p.homeRooms ?? [], room: addExtraRooms(p.room) }));
+    state.profiles = state.profiles.map((p) => ({ ...p, homeRooms: (p as { homeRooms?: string[] }).homeRooms ?? [], room: addExtraRooms(p.room) }));
   }
   if (version < 14) {
     // Version 14 added skills: how each player is doing on every skill. Everyone starts
@@ -97,6 +97,16 @@ export function migrateProfiles(persisted: unknown, version: number): SavedProfi
       ...p,
       equipped: { ...DEFAULT_EQUIPPED, ...p.equipped, voice: p.equipped?.voice ?? DEFAULT_EQUIPPED.voice },
     }));
+  }
+  if (version < 17) {
+    // Version 17 lets the home have any number of rooms: the rooms it had become a list,
+    // and spots are measured in rooms, so building one more moves nothing.
+    state.profiles = state.profiles.map((p) => {
+      const old = p as Profile & { homeRooms?: string[]; homeOrder?: string[] };
+      const { house, room } = stripToHouse({ room: old.room, homeRooms: old.homeRooms, homeOrder: old.homeOrder });
+      const { homeRooms: _bought, homeOrder: _order, ...rest } = old;
+      return { ...rest, house, room };
+    });
   }
   return state;
 }

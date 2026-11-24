@@ -9,8 +9,8 @@ import {
   type FilamentId,
   type PrintToyId,
 } from '@/constants/printer';
-import { MAX_ROOM_THINGS, ROOM_SPAN } from '@/constants/room';
-import { AREA_COUNT } from '@/utils/room';
+import { ROOM_SPAN } from '@/constants/room';
+import { thingLimit } from '@/utils/room';
 import type { AnswerRecord, Problem, Profile, Rng, RoomThing } from '@/types';
 import { SKILL_STARS } from '@/utils/progress';
 import { findSkill } from '@/utils/skills/catalog';
@@ -48,10 +48,10 @@ export type PrintResult =
   | { ok: true; profile: Profile; key: string }
   | { ok: false; reason: 'filament' | 'locked' | 'full' | 'noPrinter' | 'unknown' };
 
-/** Where a new toy lands: on the floor just to the right of the printer (or left, at the home's right end). */
-export function printSpot(printer: RoomThing): { x: number; y: number } {
-  const step = 0.3 / AREA_COUNT / ROOM_SPAN;
-  const x = printer.x + step <= 0.995 ? printer.x + step : printer.x - step;
+/** Where a new toy lands: on the floor just to the right of the printer (or left, at the right end of a home of `rooms` rooms). */
+export function printSpot(printer: RoomThing, rooms: number): { x: number; y: number } {
+  const step = 0.3 / ROOM_SPAN;
+  const x = printer.x + step <= rooms - 0.05 ? printer.x + step : printer.x - step;
   return { x, y: 0.9 };
 }
 
@@ -67,8 +67,8 @@ export function printToy(profile: Profile, printerKey: string, toy: string, fila
   if (!printer) return { ok: false, reason: 'noPrinter' };
   if (!unlocked(profile, t) || !unlocked(profile, f)) return { ok: false, reason: 'locked' };
   if (filamentLeft(profile, f.id) < 1) return { ok: false, reason: 'filament' };
-  if (profile.room.things.length >= MAX_ROOM_THINGS) return { ok: false, reason: 'full' };
-  const thing: RoomThing = { key, itemId: printId(t.id as PrintToyId, f.id as FilamentId), placed: true, ...printSpot(printer) };
+  if (profile.room.things.length >= thingLimit(profile)) return { ok: false, reason: 'full' };
+  const thing: RoomThing = { key, itemId: printId(t.id as PrintToyId, f.id as FilamentId), placed: true, ...printSpot(printer, profile.house.length) };
   return {
     ok: true,
     key,

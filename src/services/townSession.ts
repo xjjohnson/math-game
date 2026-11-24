@@ -6,7 +6,7 @@ import { chalkboard, type Chalkboard } from '@/services/chalkboard';
 import { easelBoard, type EaselBoard } from '@/services/easel';
 import { createNearbyTransport } from '@/services/nearbyTransport';
 import type { NumberLevel, PaintAction } from '@/utils/easel';
-import type { HomeSnapshot } from '@/utils/homeVisit';
+import { assembleHome, type HomePart, type HomeSnapshot } from '@/utils/homeVisit';
 import { advertName, newToken, shownName, tokenOf } from '@/utils/multiplayer/autoHost';
 import { isSharedPiece } from '@/utils/multiplayer/placeProps';
 import {
@@ -137,8 +137,10 @@ export class TownSession {
   private places = new Map<string, TownPlace>();
   private spots = new Map<string, { x: number; y: number }>();
 
-  /** This player's buddy home, for friends who ask to see it. */
-  private homeSource: (() => HomeSnapshot | null) | null = null;
+  /** This player's buddy home, in parts, for friends who ask to see it. */
+  private homeSource: (() => HomePart[]) | null = null;
+  /** Parts of the friend's home that came so far. */
+  private homeParts = new Map<number, HomePart>();
   private homeTimer: ReturnType<typeof setTimeout> | null = null;
 
   /** The tag this phone advertises when it hosts, so two phones that tap Join on each other agree who goes. */
@@ -521,13 +523,14 @@ export class TownSession {
 
   // --- friends' homes ---
   /** Tells the session how to get this player's home when a friend asks to see it. */
-  setHomeSource(source: (() => HomeSnapshot | null) | null) {
+  setHomeSource(source: (() => HomePart[]) | null) {
     this.homeSource = source;
   }
 
   /** Asks to see another player's buddy home; it shows up in `home` when it arrives. */
   askHome(of: string, name: string) {
     if (!this.active || of === this.state.myId) return;
+    this.homeParts = new Map();
     this.set({ home: { of, name, status: 'loading', snap: null } });
     if (this.state.status === 'hosting') this.send({ type: 'home-ask', of }, of);
     else this.send({ type: 'home-ask', of });
@@ -542,24 +545,45 @@ export class TownSession {
   closeHome() {
     if (this.homeTimer) clearTimeout(this.homeTimer);
     this.homeTimer = null;
+    this.homeParts = new Map();
     this.set({ home: null });
   }
 
-  private myHome(): HomeSnapshot | null {
+  private myHome(): HomePart[] {
     try {
-      return this.homeSource?.() ?? null;
+      return this.homeSource?.() ?? [];
     } catch {
-      return null;
+      return [];
     }
   }
 
-  private gotHome(of: string, snap: HomeSnapshot | null) {
+  /** Sends this player's home, part by part (or null when it can't be shown), to `to` or (from a guest) to the host. */
+  private sendHome(to: string | undefined, forId?: string) {
+    const parts = this.myHome();
+    const of = this.state.myId;
+    const extra = forId ? { for: forId } : {};
+    if (!parts.length) return this.send({ type: 'home', of, ...extra, home: null }, to);
+    for (const part of parts) this.send({ type: 'home', of, ...extra, home: part }, to);
+  }
+
+  private gotHome(of: string, part: HomePart | null) {
     const h = this.state.home;
-    if (h && h.of === of && h.status === 'loading') {
+    if (!h || h.of !== of) return;
+    if (!part) {
+      if (h.status !== 'loading') return;
       if (this.homeTimer) clearTimeout(this.homeTimer);
       this.homeTimer = null;
-      this.set({ home: { ...h, status: snap ? 'ready' : 'none', snap } });
+      this.set({ home: { ...h, status: 'none', snap: null } });
+      return;
     }
+    // A new first part means the home was sent again from the start.
+    if (part.part === 0) this.homeParts = new Map();
+    this.homeParts.set(part.part, part);
+    const snap: HomeSnapshot | null = assembleHome(this.homeParts);
+    if (!snap) return;
+    if (this.homeTimer) clearTimeout(this.homeTimer);
+    this.homeTimer = null;
+    this.set({ home: { ...h, status: 'ready', snap } });
   }
 
   wave() {
@@ -712,7 +736,7 @@ export class TownSession {
         break;
       case 'home-ask':
         if (!this.roster.some((p) => p.id === id)) return;
-        if (message.of === HOST_ID) this.send({ type: 'home', of: HOST_ID, home: this.myHome() }, id);
+        if (message.of === HOST_ID) this.sendHome(id);
         else if (message.of !== id && this.roster.some((p) => p.id === message.of)) this.send({ type: 'home-ask', of: message.of, for: id }, message.of);
         break;
       case 'home':
@@ -822,7 +846,7 @@ export class TownSession {
         break;
       case 'home-ask':
         if (message.of === this.state.myId) {
-          this.send({ type: 'home', of: this.state.myId, ...(message.for ? { for: message.for } : {}), home: this.myHome() });
+          this.sendHome(undefined, message.for);
         }
         break;
       case 'home':

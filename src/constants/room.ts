@@ -1,32 +1,80 @@
 import { PRINTER_ITEM, printedItem } from '@/constants/printer';
 
-/** The parts of the buddy's home, left to right. The home scrolls sideways through them. */
+/** The looks a room in the buddy's home can have. The home scrolls sideways through its rooms. */
 export type AreaId = 'living' | 'kitchen' | 'bedroom' | 'bathroom' | 'playroom' | 'backyard' | 'study' | 'garage' | 'bedroom2' | 'bedroom3';
 
+/** How a room looks and what it starts with: its name, emoji and starting paint. Its built-ins come with it. */
 export interface HomeArea {
   id: AreaId;
   name: string;
   emoji: string;
   /** Paint it starts with, as indexes into WALL_COLORS and FLOOR_COLORS. */
   paint: { wall: number; floor: number };
-  /** Coins to buy it. Without a price the room is there from the start. */
-  price?: number;
 }
 
+/** Every room look, each with its own built-ins. A room in the home is one of these (HouseRoom.look). */
 export const HOME_AREAS: HomeArea[] = [
   { id: 'living', name: 'Living room', emoji: '🛋️', paint: { wall: 0, floor: 0 } },
   { id: 'kitchen', name: 'Kitchen', emoji: '🍳', paint: { wall: 0, floor: 0 } },
   { id: 'bedroom', name: 'Bedroom', emoji: '🛏️', paint: { wall: 0, floor: 0 } },
   { id: 'bathroom', name: 'Bathroom', emoji: '🛁', paint: { wall: 2, floor: 6 } },
   { id: 'playroom', name: 'Playroom', emoji: '🧸', paint: { wall: 5, floor: 3 } },
-  // Extra rooms, bought with coins. Each comes with a few built-in things to play with and room to fill from the shop.
   // The backyard is outside: its "wall" paint colors the fence and its "floor" the grass.
-  { id: 'backyard', name: 'Backyard', emoji: '🌳', paint: { wall: 0, floor: 3 }, price: 100 },
-  { id: 'study', name: 'Study', emoji: '📖', paint: { wall: 4, floor: 5 }, price: 120 },
-  { id: 'bedroom2', name: 'Bedroom 2', emoji: '🛌', paint: { wall: 1, floor: 1 }, price: 80 },
-  { id: 'bedroom3', name: 'Bedroom 3', emoji: '🌙', paint: { wall: 2, floor: 4 }, price: 100 },
-  { id: 'garage', name: 'Garage', emoji: '🚗', paint: { wall: 6, floor: 2 }, price: 150 },
+  { id: 'backyard', name: 'Backyard', emoji: '🌳', paint: { wall: 0, floor: 3 } },
+  { id: 'study', name: 'Study', emoji: '📖', paint: { wall: 4, floor: 5 } },
+  { id: 'bedroom2', name: 'Bedroom 2', emoji: '🛌', paint: { wall: 1, floor: 1 } },
+  { id: 'bedroom3', name: 'Bedroom 3', emoji: '🌙', paint: { wall: 2, floor: 4 } },
+  { id: 'garage', name: 'Garage', emoji: '🚗', paint: { wall: 6, floor: 2 } },
 ];
+
+export function findArea(id: string): HomeArea | undefined {
+  return HOME_AREAS.find((a) => a.id === id);
+}
+
+/** The rooms every home starts with, free, in this order. They can be moved but not taken away. */
+export const STARTING_ROOMS: AreaId[] = ['living', 'kitchen', 'bedroom', 'bathroom', 'playroom'];
+
+export type RoomKind = 'bedroom' | 'kitchen' | 'bathroom' | 'living' | 'playroom' | 'study' | 'garage' | 'backyard';
+
+/** Rooms that can be built with coins. Each new one takes the next of its looks in turn. */
+export interface RoomKindInfo {
+  id: RoomKind;
+  name: string;
+  emoji: string;
+  looks: AreaId[];
+  /** Only one per home (the backyard, which is outside). */
+  once?: boolean;
+}
+
+export const ROOM_KINDS: RoomKindInfo[] = [
+  { id: 'bedroom', name: 'Bedroom', emoji: '🛏️', looks: ['bedroom2', 'bedroom3', 'bedroom'] },
+  { id: 'playroom', name: 'Playroom', emoji: '🧸', looks: ['playroom'] },
+  { id: 'kitchen', name: 'Kitchen', emoji: '🍳', looks: ['kitchen'] },
+  { id: 'bathroom', name: 'Bathroom', emoji: '🛁', looks: ['bathroom'] },
+  { id: 'living', name: 'Living room', emoji: '🛋️', looks: ['living'] },
+  { id: 'study', name: 'Study', emoji: '📖', looks: ['study'] },
+  { id: 'garage', name: 'Garage', emoji: '🚗', looks: ['garage'] },
+  { id: 'backyard', name: 'Backyard', emoji: '🌳', looks: ['backyard'], once: true },
+];
+
+/** The kind of room a look belongs to. */
+export function kindOf(look: AreaId): RoomKindInfo {
+  return ROOM_KINDS.find((k) => k.looks.includes(look)) ?? ROOM_KINDS[0];
+}
+
+/** What the first built room costs, how much more each one after it costs, and the most a room ever costs. */
+export const ROOM_PRICE = { first: 80, step: 20, most: 300 } as const;
+
+/** Coins for the next room, when the home already has `extra` rooms beyond the starting ones. */
+export function roomPrice(extra: number): number {
+  return Math.min(ROOM_PRICE.most, ROOM_PRICE.first + ROOM_PRICE.step * Math.max(0, extra));
+}
+
+/** A home can grow this big; the limit only keeps the saved game small. */
+export const MAX_ROOMS = 60;
+
+/** Longest name a player can give a room. */
+export const ROOM_NAME_MAX = 20;
 
 /** How many screens wide each area is. */
 export const ROOM_SPAN = 2.5;
@@ -322,8 +370,8 @@ export const ROOM_ITEMS: RoomItem[] = [
 export const WALL_COLORS = ['#F3E6D3', '#FBE3EA', '#DDEFFB', '#E3F3DC', '#EDE4FA', '#FFF3C4', '#FFD8B5', '#3E3A5C'];
 export const FLOOR_COLORS = ['#C98F5E', '#E7CFC4', '#B9C7D9', '#A8C79A', '#D9B8E8', '#8D6E63', '#F2F2F2', '#2F2B40'];
 
-/** Most things the whole home can hold, so it stays tidy enough to play in. */
-export const MAX_ROOM_THINGS = 80;
+/** Things a home can hold for each room it has, so it stays tidy enough to play in. */
+export const MAX_THINGS_PER_ROOM = 40;
 
 /** Drawn height of a buddy, as a share of the room's size unit. */
 export const BUDDY_SIZE = 0.38;
@@ -348,7 +396,8 @@ export function isSmall(item: RoomItem): boolean {
  * `height` are in the room's size unit.
  */
 export interface FixtureSpot {
-  area: AreaId;
+  /** The room it is in: a look's id in the constants below, the room's id (HouseRoom.id) once placed in a home. */
+  area: string;
   left: number;
   width: number;
   bottom: number;
@@ -396,7 +445,7 @@ export const CUPBOARDS: Cupboard[] = [
 /** A built-in ledge small things can stand on, `bottom` up from the floor line. */
 export interface Surface {
   id: string;
-  area: AreaId;
+  area: string;
   left: number;
   width: number;
   bottom: number;
@@ -498,7 +547,7 @@ export interface BuiltInSeat {
   /** The appliance it belongs to. */
   appliance: string;
   name: string;
-  area: AreaId;
+  area: string;
   left: number;
   width: number;
   bottom: number;
@@ -531,7 +580,9 @@ export const BUILT_IN_SEATS: BuiltInSeat[] = [
 ];
 
 export function findBuiltInSeat(id: string): BuiltInSeat | undefined {
-  return BUILT_IN_SEATS.find((s) => s.id === id);
+  const [room, base] = splitBuiltIn(id);
+  const s = BUILT_IN_SEATS.find((f) => f.id === base);
+  return s && room ? { ...s, id, area: room, appliance: builtInId(room, s.appliance) } : s;
 }
 
 /** Pictures a chalkboard cycles through; the first is a clean board. */
@@ -544,7 +595,7 @@ export const CHALK_DRAWINGS = ['', 'sun', 'house', 'smiley face'];
 export interface Gadget {
   id: string;
   name: string;
-  area: AreaId;
+  area: string;
   x: number;
   bottom: number;
   size: number;
@@ -576,5 +627,83 @@ export const GADGETS: Gadget[] = [
 ];
 
 export function findCupboard(id: string): Cupboard | undefined {
-  return CUPBOARDS.find((c) => c.id === id);
+  const [room, base] = splitBuiltIn(id);
+  const c = CUPBOARDS.find((f) => f.id === base);
+  return c && room ? { ...c, id, area: room } : c;
+}
+
+export function findSurface(id: string): Surface | undefined {
+  const [room, base] = splitBuiltIn(id);
+  const s = SURFACES.find((f) => f.id === base);
+  return s && room ? { ...s, id, area: room } : s;
+}
+
+// --- Built-ins in a home ---
+//
+// The built-ins above are written for each look. A room whose id is its look's id (the rooms
+// every home started with, and the ones that were bought before rooms could be built) uses
+// them as they are. A built room gets its own copies, with ids that start with the room's id
+// and BUILT_IN_SEP, so two bedrooms each have their own wardrobe.
+
+/** Between a built room's id and the id of one of its built-ins. */
+export const BUILT_IN_SEP = '~';
+
+/** A built-in's id in a room: as written for the room's look, or with the room's id in front for a built room. */
+export function builtInId(roomId: string, baseId: string): string {
+  return roomId in LOOK_IDS ? baseId : roomId + BUILT_IN_SEP + baseId;
+}
+
+const LOOK_IDS: Record<string, true> = Object.fromEntries(HOME_AREAS.map((a) => [a.id, true]));
+
+/** A built-in id split into its built room's id (null for a look's own) and the id as written above. */
+export function splitBuiltIn(id: string): [string | null, string] {
+  const at = id.indexOf(BUILT_IN_SEP);
+  return at < 0 ? [null, id] : [id.slice(0, at), id.slice(at + 1)];
+}
+
+/** A room in a home as the built-ins need it. */
+export interface RoomPlace {
+  id: string;
+  look: AreaId;
+}
+
+/** Every built-in of a home, each placed in its room. */
+export interface BuiltIns {
+  cupboards: Cupboard[];
+  surfaces: Surface[];
+  appliances: Appliance[];
+  seats: BuiltInSeat[];
+  gadgets: Gadget[];
+}
+
+/** Copies of the built-ins written for each room's look, placed in that room. */
+export function placeBuiltIns<T extends { area: string; id?: string }>(list: T[], rooms: RoomPlace[]): T[] {
+  const out: T[] = [];
+  for (const r of rooms) {
+    for (const f of list) {
+      if (f.area !== r.look) continue;
+      out.push(r.id === r.look ? f : { ...f, area: r.id, ...(f.id !== undefined ? { id: builtInId(r.id, f.id) } : {}) });
+    }
+  }
+  return out;
+}
+
+const builtInCache = new WeakMap<RoomPlace[], BuiltIns>();
+
+/** The built-ins of a home with these rooms. */
+export function builtInsOf(rooms: RoomPlace[]): BuiltIns {
+  const hit = builtInCache.get(rooms);
+  if (hit) return hit;
+  const built: BuiltIns = {
+    cupboards: placeBuiltIns(CUPBOARDS, rooms),
+    surfaces: placeBuiltIns(SURFACES, rooms),
+    appliances: placeBuiltIns(APPLIANCES, rooms),
+    seats: placeBuiltIns(BUILT_IN_SEATS, rooms).map((s) => {
+      const [room] = splitBuiltIn(s.id);
+      return room ? { ...s, appliance: builtInId(room, s.appliance) } : s;
+    }),
+    gadgets: placeBuiltIns(GADGETS, rooms),
+  };
+  builtInCache.set(rooms, built);
+  return built;
 }
