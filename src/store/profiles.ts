@@ -31,6 +31,7 @@ import {
   type HomeRoomBuyResult,
   type RoomBuyResult,
 } from '@/utils/room';
+import { claimTreeHouseCoins } from '@/utils/treeHouse';
 import { buyFilament, printToy, recordPrinterCheck, type FilamentBuyResult, type PrintResult } from '@/utils/printer';
 import { grantStarRewards } from '@/utils/starLevels';
 import { finishShift, type BuildingId, type ShiftPay } from '@/utils/town';
@@ -155,6 +156,8 @@ interface ProfilesState {
   claimLolo: (id: string, history: AnswerRecord[]) => FindResult;
   /** Parent area: turns Lolo on or off for a player. */
   setLoloOff: (id: string, off: boolean) => void;
+  /** Takes today's coins from the tree house chest; returns how many (0 if already taken today). */
+  claimTreeHouseCoins: (id: string) => number;
 }
 
 /** Where the profiles are saved: backed up before each upgrade, and never saved over by a failed load. */
@@ -345,6 +348,13 @@ export const useProfiles = create<ProfilesState>()(
       },
       setLoloOff: (id, off) =>
         set((s) => ({ profiles: s.profiles.map((p) => (p.id === id ? setAxolotlOff(p, off) : p)) })),
+      claimTreeHouseCoins: (id) => {
+        const current = get().profiles.find((p) => p.id === id);
+        if (!current) return 0;
+        const { profile, coins } = claimTreeHouseCoins(current, dateKey());
+        if (coins) set((s) => ({ profiles: s.profiles.map((p) => (p.id === id ? profile : p)) }));
+        return coins;
+      },
       noteSkillHelp: (id, skill) =>
         set((s) => ({
           profiles: s.profiles.map((p) => (p.id === id ? { ...p, skills: noteHelp(p.skills ?? {}, skill) } : p)),

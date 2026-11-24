@@ -10,6 +10,7 @@ import { findBadge } from '@/constants/badges';
 import { itemsIn, SHOP_CATEGORIES, type ShopCategory, type ShopItem } from '@/constants/shop';
 import { colors, fontSizes, radius, spacing, TAP_TARGET } from '@/constants/theme';
 import { useActiveProfile, useProfiles } from '@/store/profiles';
+import { storyVoices } from '../../modules/math-voice';
 import { speakInVoice } from '@/utils/feedback';
 import { freeAvatars, isEquipped, owns } from '@/utils/shop';
 import { playSound } from '@/utils/soundEffects';
@@ -99,7 +100,10 @@ export function ShopScreen() {
         </Text>
       ) : null}
       <View style={styles.grid}>
-        {itemsIn(category).map((item) => {
+        {itemsIn(category)
+          // Story voices are built into newer APKs only; hide them where this app can't play them.
+          .filter((item) => item.category !== 'voice' || !item.voice.story || storyVoices().includes(item.voice.story))
+          .map((item) => {
           const owned = owns(profile, item);
           const using = isEquipped(profile, item);
           const affordable = profile.coins >= item.price;

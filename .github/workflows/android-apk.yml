@@ -90,6 +90,37 @@ jobs:
       - uses: gradle/actions/setup-gradle@v4
         if: steps.plan.outputs.mode == 'apk'
 
+      # Story Voice: the sherpa-onnx library and two natural Piper voices
+      # (hfc female and male, medium). About 120 MB, so they're fetched here
+      # instead of kept in git. A failed download stops the build, so the
+      # phones keep the last good APK.
+      - name: Download Story Voice
+        if: steps.plan.outputs.mode == 'apk'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          mod=modules/math-voice/android
+          mkdir -p "$mod/libs" "$mod/src/main/assets/voices"
+          aar=$(gh api repos/k2-fsa/sherpa-onnx/releases/latest \
+            --jq '[.assets[] | select(.name | test("^sherpa-onnx-[0-9.]+\\.aar$"))][0].browser_download_url')
+          echo "sherpa-onnx library: $aar"
+          curl -fsSL -o "$mod/libs/sherpa-onnx.aar" "$aar"
+          for voice in hfc_female hfc_male; do
+            dir=vits-piper-en_US-$voice-medium
+            curl -fsSL "https://github.com/k2-fsa/sherpa-onnx/releases/download/tts-models/$dir.tar.bz2" | tar xj -C /tmp
+            mkdir -p "$mod/src/main/assets/voices/$voice"
+            cp /tmp/$dir/*.onnx "$mod/src/main/assets/voices/$voice/model.onnx"
+            cp /tmp/$dir/tokens.txt "$mod/src/main/assets/voices/$voice/"
+            if [ ! -d "$mod/src/main/assets/voices/espeak-ng-data" ]; then
+              cp -r /tmp/$dir/espeak-ng-data "$mod/src/main/assets/voices/"
+            fi
+            # Keep the voice's license next to it.
+            cp /tmp/$dir/MODEL_CARD "$mod/src/main/assets/voices/$voice/" 2>/dev/null || true
+            echo "--- $voice license ---"; grep -i -A3 license /tmp/$dir/MODEL_CARD || true
+          done
+          du -sh "$mod/libs" "$mod/src/main/assets/voices"/*
+
       - name: Generate the Android project
         if: steps.plan.outputs.mode == 'apk'
         run: npx expo prebuild --platform android --no-install

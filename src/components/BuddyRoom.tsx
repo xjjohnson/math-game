@@ -139,6 +139,8 @@ interface Props {
   pictures?: Record<string, Picture>;
   /** Something happened up in the tree house (or it was climbed into); `inside` are the buddies up there. */
   onTreeHouse?: (e: TreeHouseEvent, inside: string[]) => void;
+  /** Today's coins are still in the tree house treasure chest. */
+  treeHouseCoins?: boolean;
   /** The backyard's sun (or moon) was tapped: whether it is night there now. */
   onNight?: (night: boolean) => void;
   /** A 3D print in progress: the printer prints it, and the new toy (already in the room) stays hidden until it's done. */
@@ -1075,6 +1077,7 @@ export function BuddyRoom(props: Props) {
           width={view.width}
           height={view.height}
           buddies={pieces.filter((p) => p.builtIn === TREE_SEAT && p.buddyId).flatMap((p) => buddyById.get(p.buddyId as string) ?? [])}
+          coinsReady={props.treeHouseCoins}
           onTapBuddy={onTapBuddy}
           onClose={() => setTreeOpen(false)}
           onEvent={(e) => {

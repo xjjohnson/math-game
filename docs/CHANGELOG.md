@@ -7,6 +7,18 @@
 - **Tap Lolo** and it pops out: "You found me!" One question from your own skill list (with Help), then **15 coins and 1 star** (10 coins after a miss). Once a day per player; after that Lolo naps until tomorrow.
 - **Finds add up:** at 5 Lolo moves into the living room fish tank (swims there after you find it), 10 golden, 20 wild green, 30 a tiny crown, 50 sparkly blue.
 - **Parent area:** "Where is Lolo?" shows each player's spot today, with a switch to turn Lolo off.
+## 2026-11-24 (Tree house sleeping bags)
+
+- **Three sleeping bags in the tree house** (red, blue and green), rolled up and hanging on pegs on the wall. Tap one to roll it out on the floor, tap it again to roll it back up.
+- **Drag anyone onto a rolled-out bag and they climb in**, head on the pillow and the bag pulled up to the chin. Tap them to hop out, or drag them out.
+- **Turn the lights off** and everyone in a bag closes their eyes and Zzz float up. When everybody is tucked in, it's a "Sleepover! Goodnight, everyone!" Lights back on means a big good-morning stretch.
+- The colored mats under everyone are gone. People and buddies now have a soft shadow under their feet, like at home.
+- No new APK needed: tap Update now (or restart) to get it.
+
+## 2026-11-24 (Tree house coins)
+
+- **The treasure chest in the tree house now has coins once a day.** The first time each player opens it each day, it gives 10 coins with a little party. While today's coins are waiting, a 🪙 sits on the closed chest. After that the chest still shows its treasures and says "Come back tomorrow for more coins."
+- Each player has their own daily coins, and the day starts at midnight on the phone's clock.
 - No new APK needed: tap Update now (or restart) to get it.
 
 ## 2026-11-24 (Drive around the town)

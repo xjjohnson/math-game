@@ -140,6 +140,8 @@ export interface Profile {
   filament: Record<string, number>;
   /** The car driven round the town, its paint and how it is steered. Missing until first changed. */
   garage?: Garage;
+  /** Local date ("YYYY-MM-DD") the tree house chest coins were last taken; missing means never. */
+  treeHouseCoinsDay?: string;
   /** Lolo the hidden axolotl: the last day found, how many days found, and if a parent switched it off. Missing until first found. */
   axolotl?: AxolotlState;
 }
