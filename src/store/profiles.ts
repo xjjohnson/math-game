@@ -33,6 +33,7 @@ import {
   type BuildRoomResult,
   type RoomBuyResult,
 } from '@/utils/room';
+import { claimTreeHouseCoins } from '@/utils/treeHouse';
 import { buyFilament, printToy, recordPrinterCheck, type FilamentBuyResult, type PrintResult } from '@/utils/printer';
 import { grantStarRewards } from '@/utils/starLevels';
 import { finishShift, type BuildingId, type ShiftPay } from '@/utils/town';
@@ -157,6 +158,8 @@ interface ProfilesState {
   printToy: (id: string, printerKey: string, toy: string, filament: string) => PrintResult;
   /** Saves printer check answers to the skill record; returns how many skills were newly learned. */
   recordPrinterCheck: (id: string, history: AnswerRecord[]) => number;
+  /** Takes today's coins from the tree house chest; returns how many (0 if already taken today). */
+  claimTreeHouseCoins: (id: string) => number;
 }
 
 /** Where the profiles are saved: backed up before each upgrade, and never saved over by a failed load. */
@@ -341,6 +344,13 @@ export const useProfiles = create<ProfilesState>()(
         const { profile, learned } = recordPrinterCheck(current, history, dateKey());
         set((s) => ({ profiles: s.profiles.map((p) => (p.id === id ? profile : p)) }));
         return learned;
+      },
+      claimTreeHouseCoins: (id) => {
+        const current = get().profiles.find((p) => p.id === id);
+        if (!current) return 0;
+        const { profile, coins } = claimTreeHouseCoins(current, dateKey());
+        if (coins) set((s) => ({ profiles: s.profiles.map((p) => (p.id === id ? profile : p)) }));
+        return coins;
       },
       noteSkillHelp: (id, skill) =>
         set((s) => ({

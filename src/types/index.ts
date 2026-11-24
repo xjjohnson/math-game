@@ -139,6 +139,8 @@ export interface Profile {
   filament: Record<string, number>;
   /** The car driven round the town, its paint and how it is steered. Missing until first changed. */
   garage?: Garage;
+  /** Local date ("YYYY-MM-DD") the tree house chest coins were last taken; missing means never. */
+  treeHouseCoinsDay?: string;
 }
 
 /** A player's car choice for the town (see utils/garage.ts for the defaults). */

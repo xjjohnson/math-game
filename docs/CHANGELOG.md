@@ -13,6 +13,20 @@
 - **Visiting a big house** over Nearby: the house comes room by room, so the friend can walk in straight away; a room still on its way says "Moving in...". Nearby protocol 12: both phones need this update to visit each other's homes (a phone on this update can still visit an older phone's home).
 - No new APK needed: tap Update now (or restart) to get it.
 
+## 2026-11-24 (Tree house sleeping bags)
+
+- **Three sleeping bags in the tree house** (red, blue and green), rolled up and hanging on pegs on the wall. Tap one to roll it out on the floor, tap it again to roll it back up.
+- **Drag anyone onto a rolled-out bag and they climb in**, head on the pillow and the bag pulled up to the chin. Tap them to hop out, or drag them out.
+- **Turn the lights off** and everyone in a bag closes their eyes and Zzz float up. When everybody is tucked in, it's a "Sleepover! Goodnight, everyone!" Lights back on means a big good-morning stretch.
+- The colored mats under everyone are gone. People and buddies now have a soft shadow under their feet, like at home.
+- No new APK needed: tap Update now (or restart) to get it.
+
+## 2026-11-24 (Tree house coins)
+
+- **The treasure chest in the tree house now has coins once a day.** The first time each player opens it each day, it gives 10 coins with a little party. While today's coins are waiting, a 🪙 sits on the closed chest. After that the chest still shows its treasures and says "Come back tomorrow for more coins."
+- Each player has their own daily coins, and the day starts at midnight on the phone's clock.
+- No new APK needed: tap Update now (or restart) to get it.
+
 ## 2026-11-24 (Drive around the town)
 
 - **The Town is now a place you drive.** It is drawn from above in the game's own style: roofs, signs, roads with lines and zebra crossings, a roundabout with a fountain, trees, street lamps, a duck pond, chimney smoke, someone out for a walk, birds and drifting cloud shadows. At night (8 PM to 6 AM on the phone's clock) the lamps and windows light up.

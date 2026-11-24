@@ -15,6 +15,11 @@ export interface VoiceStyle {
   emoji: string;
   /** One line about it on the Shop card. */
   blurb: string;
+  /**
+   * A natural Story Voice built into the APK (modules/math-voice), e.g. "hfc_female".
+   * Where the app doesn't have it, `pick`, pitch and rate are used instead.
+   */
+  story?: string;
 }
 
 export interface CardStyle {
@@ -741,6 +746,8 @@ export const VOICE_ITEMS: ShopItem[] = [
   { id: 'voice-robot', category: 'voice', name: 'Robot', price: 60, voice: { pick: 'second', pitch: 0.4, rate: 0.8, emoji: '🤖', blurb: 'Beep boop, very low' } },
   { id: 'voice-grandpa', category: 'voice', name: 'Grandpa', price: 60, voice: { pick: 'best', pitch: 0.75, rate: 0.78, emoji: '👴', blurb: 'A little low and slow' } },
   { id: 'voice-grandma', category: 'voice', name: 'Grandma', price: 60, voice: { pick: 'second', pitch: 1.15, rate: 0.78, emoji: '👵', blurb: 'Warm and slow' } },
+  { id: 'voice-story-woman', category: 'voice', name: 'Story Voice: Woman', price: 200, voice: { pick: 'best', pitch: 1, rate: 0.9, story: 'hfc_female', emoji: '🌟', blurb: 'Sounds like a real person reading' } },
+  { id: 'voice-story-man', category: 'voice', name: 'Story Voice: Man', price: 200, voice: { pick: 'best', pitch: 1, rate: 0.9, story: 'hfc_male', emoji: '✨', blurb: 'Sounds like a real person reading' } },
 ];
 SHOP_ITEMS.push(...VOICE_ITEMS);
 

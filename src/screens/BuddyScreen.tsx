@@ -82,6 +82,7 @@ import { owns } from '@/utils/shop';
 import { canWear, lookOf, moodOf, MOOD_EMOJI, MOOD_NAME, outfitOf } from '@/utils/wardrobe';
 import { MOODS, type Mood } from '@/components/PersonFigure';
 import { playSound } from '@/utils/soundEffects';
+import { treeHouseCoinsReady } from '@/utils/treeHouse';
 
 /** The tabs along the bottom; each opens a drawer over the home. */
 /** What's said when a buddy is dropped into a built-in. */
@@ -141,7 +142,7 @@ export function BuddyScreen() {
   }, [savedPictures]);
   const { careForBuddy, equip, buyRoomItem, buildHomeRoom, renameHomeRoom, removeHomeRoom, moveInRoom, moveHomeRoom, setPlaced, paintRoom, setBuddyHome, wear, undress, setLook, setMood, takeOff, moveWearable } =
     useProfiles();
-  const { buyFilament, printToy, recordPrinterCheck } = useProfiles();
+  const { buyFilament, printToy, recordPrinterCheck, claimTreeHouseCoins } = useProfiles();
   /** The 3D printer whose panel is open (its thing key). */
   const [printerKey, setPrinterKey] = useState<string | null>(null);
   /** A print in progress: the toy is already in the room, hidden until the printer finishes it. */
@@ -499,15 +500,39 @@ export function BuddyScreen() {
                     say(lines[a.kind][on ? 0 : 1]);
           }}
           onNight={(night) => say(night ? 'Night time in the backyard. Look, fireflies! ✨' : 'Good morning, sunshine! ☀️')}
+          treeHouseCoins={treeHouseCoinsReady(profile, dateKey())}
           onTreeHouse={(e, inside) => {
             const who = inside.length ? nameOf(inside[0]) : name;
             if (e.kind === 'open') say(inside.length ? `Welcome to the tree house, ${who}! 🌳` : 'The tree house! Tap "Call the buddies up" to bring everyone in.');
             else if (e.kind === 'callUp') say('Everybody up the ladder! 🪜');
             else if (e.kind === 'telescope') say(`${who} looks through the telescope and sees ${e.sight}! 🔭`);
-            else if (e.kind === 'chest') say(e.open ? `${who} opens the treasure chest and finds ${e.treasure}! ✨` : 'The treasure is safe for next time.');
+            else if (e.kind === 'chest') {
+              const coins = e.open ? claimTreeHouseCoins(profile.id) : 0;
+              if (coins) setParty((n) => n + 1);
+              say(
+                !e.open
+                  ? 'The treasure is safe for next time.'
+                  : coins
+                    ? `${who} opens the treasure chest and finds ${coins} coins! 🪙`
+                    : `${who} opens the treasure chest and finds ${e.treasure}! ✨ Come back tomorrow for more coins.`,
+              );
+            }
             else if (e.kind === 'lights') say(e.on ? 'Twinkle, twinkle! ✨' : 'Lights off. Spooky hideout! 🔦');
             else if (e.kind === 'bucket') say(`${who} pulls up the bucket. It has ${e.snack}! Yum! 😋`);
             else if (e.kind === 'down') say(`${who} climbs back down the ladder.`);
+            else if (e.kind === 'bag') {
+              const sleeper = e.who ? nameOf(e.who) : who;
+              say(
+                e.action === 'unroll'
+                  ? 'Sleeping bag rolled out. Drag someone onto it to tuck them in! 🛌'
+                  : e.action === 'rollUp'
+                    ? 'Sleeping bag rolled up.'
+                    : e.action === 'in'
+                      ? `${sleeper} wriggles into the sleeping bag. So cozy! 🛌`
+                      : `${sleeper} hops out of the sleeping bag!`,
+              );
+            } else if (e.kind === 'sleepover') say('Sleepover! Goodnight, everyone! 🌙');
+            else if (e.kind === 'wakeUp') say('Good morning! Big stretch! ☀️');
           }}
         />
         <Confetti burst={party} />
