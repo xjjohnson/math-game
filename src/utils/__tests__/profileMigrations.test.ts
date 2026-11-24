@@ -113,6 +113,9 @@ describe('upgrading saved profiles', () => {
       for (const t of p.room.things) expect(t.x).toBeLessThanOrEqual(1);
     }
     if (version >= 8) expect(Object.keys(p.room.buddies)).toEqual(['pup']);
+    // Version 16 added voices: everyone has one, and older players start on Classic.
+    expect(p.equipped.voice).toBe(version >= 16 ? p.equipped.voice : 'voice-classic');
+    if (version >= 3 && version < 16) expect(p.equipped.companion).toBe('pup');
   });
 
   it('keeps several players and leaves an up-to-date profile alone', () => {

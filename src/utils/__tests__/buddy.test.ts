@@ -16,7 +16,7 @@ const withPup = (overrides = {}) =>
   makeProfile({
     coins: 20,
     unlocks: ['buddy-pup'],
-    equipped: { background: 'bg-cream', cardStyle: 'card-classic', companion: 'buddy-pup' },
+    equipped: { background: 'bg-cream', cardStyle: 'card-classic', companion: 'buddy-pup', voice: 'voice-classic' },
     ...overrides,
   });
 

@@ -19,6 +19,8 @@ import type { Profile } from '@/types';
 import { dateKey, dayStreak } from '@/utils/dates';
 import { accuracy } from '@/utils/progress';
 import { trickiest } from '@/utils/weakSpots';
+import { speakInVoice } from '@/utils/feedback';
+import { loadVoices, type DeviceVoice } from '@/utils/voices';
 
 const PIN_LENGTH = 4;
 
@@ -50,6 +52,7 @@ export function ParentScreen() {
     <Screen>
       <SavedData />
       <PayoutSettings />
+      <VoiceCheck />
       <ParentReport />
       <View style={styles.actions}>
         <BigButton label="🔒 Lock" color={colors.text} onPress={() => setOpen(false)} />
@@ -178,6 +181,48 @@ function SavedData() {
           {note}
         </Text>
       ) : null}
+    </View>
+  );
+}
+
+/** Lists the offline English voices the game found, which the Shop's voices are made from. */
+function VoiceCheck() {
+  const [voices, setVoices] = useState<DeviceVoice[] | null>(null);
+  useEffect(() => {
+    let live = true;
+    loadVoices().then((list) => live && setVoices(list));
+    return () => {
+      live = false;
+    };
+  }, []);
+  return (
+    <View style={styles.card}>
+      <Text style={styles.player}>🗣️ Voice check</Text>
+      <Text style={styles.line}>
+        Voices in the Shop use the offline voices on this tablet. Clear Teacher and most fun voices use the first one
+        below, and Friendly Storyteller, Robot and Grandma use the second.
+      </Text>
+      {voices === null ? (
+        <Text style={styles.line}>Looking for voices…</Text>
+      ) : voices.length === 0 ? (
+        <Text style={[styles.line, styles.warn]}>
+          No offline English voice found yet, so every voice uses the tablet's own. To add one: open Settings,
+          Accessibility, Text-to-speech output, pick Google's speech engine, tap its gear, then Install voice data,
+          English (United States).
+        </Text>
+      ) : (
+        voices.slice(0, 6).map((v, i) => (
+          <BigButton
+            key={v.identifier}
+            label={`${i === 0 ? '1st · ' : i === 1 ? '2nd · ' : ''}${v.name}${v.quality === 'Enhanced' ? ' ★' : ''}`}
+            color={colors.text}
+            outline
+            onPress={() =>
+              speakInVoice('What is 7 times 8?', { pick: i === 0 ? 'best' : 'second', pitch: 1, rate: 0.9, emoji: '', blurb: '' })
+            }
+          />
+        ))
+      )}
     </View>
   );
 }

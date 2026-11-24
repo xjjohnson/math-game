@@ -143,7 +143,7 @@ Cross-platform interactive math learning game for kids (ages 5-15), React Native
 ## Accessibility
 
 - Large typography, extra-large tap targets, high-contrast palette
-- Text-to-speech prompts toggle
+- Text-to-speech prompts toggle; each player picks a voice bought in the Shop (best offline device voice, with pitch and speed styles)
 - Dyslexia-friendly font option
 - Colorblind-safe palette toggle
 - Reduce-motion toggle (also respects OS setting)
@@ -185,6 +185,7 @@ Phases 1-6 deliver a complete single-player game before any native Bluetooth wor
 - Nearby is Android-to-Android only; PC multiplayer needs WebRTC on a shared network or hotspot
 - PC version is a browser web app, not a native Windows program
 - Scope is large: phases 1-6 ship a complete single-player game first
+- Device voices differ per tablet; a tablet with no offline voice downloaded falls back to its default voice
 
 ---
 
@@ -283,6 +284,8 @@ Phases 1-6 deliver a complete single-player game before any native Bluetooth wor
 - [x] Animations, batch 2 (one approach for the whole app, written up in docs/animation.md): in Community the people and buddies breathe, blink, walk to where they're put instead of jumping (friends' moves too), hop and wave when waving, and squash a little when put down; things slide to where they land; bodies match the buddy home (each buddy in its own colors and clothes, people buddies and people avatars drawn as whole people); a buddy standing by the bakery mixer runs it for you (pulls the bowl over, mixes, rocks while it works, "Mixing! 🥄"); on Home your character and buddy breathe, and tapping your character makes it hop
 - [x] A buddy dragged onto the bakery mixer hangs off the end of its arm and swings while it mixes the bowl for you
 - [x] 3D printer (buddy home, Appliances shelf, 150 coins): filament spools 10 coins = 3 prints (red, blue, green, yellow, purple, white); pick a toy and color, answer one printer check question from the child's skill list (wrong = help and another question, no filament lost; counts toward skills), then about 8 seconds of printing (head zig-zags, toy builds up in layers, spool turns, toy pops out onto the floor). 12 original toys drawn in code, unlocked by stars (never spent): star/heart/boat/cat at start, dinosaur/race car 25, rocket/robot 50, octopus/castle 100 + glow-in-the-dark filament, dragon 175, trophy 275 + rainbow filament. Printed toys are normal room things (item id print-<toy>-<color>), shown on home visits. Profile store version 15; no Nearby protocol change
+- [x] Voices shelf in the Shop (coins): Classic free; Clear Teacher 40, Friendly Storyteller 60 (best offline device voices); Chipmunk 50, Giant 50, Robot 60, Grandpa 60, Grandma 60 (pitch and speed styles); Listen before buying; each player keeps their own and it reads everywhere (questions, help, lessons, books, town); Parent area Voice check lists the offline voices found. Ships over the air (profile store version 16, no Nearby protocol change)
+- [ ] Story Voice (planned): natural Piper neural voices en_US-hfc_female-medium and en_US-hfc_male-medium built into the app with sherpa-onnx, reading everywhere for the player who owns it; needs a new APK and adds about 120 MB; Samsung tablets
 
 ---
 

@@ -5,6 +5,7 @@ import { PatrickHand_400Regular } from '@expo-google-fonts/patrick-hand/400Regul
 import { useFonts } from 'expo-font';
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
+import { useEffect } from 'react';
 import { Platform } from 'react-native';
 
 import { ScreenZoom } from '@/components/Motion';
@@ -12,6 +13,7 @@ import { colors } from '@/constants/theme';
 import { useMotion } from '@/hooks/useAccessibility';
 import { useActiveProfile } from '@/store/profiles';
 import { backgroundColor } from '@/utils/shop';
+import { loadVoices } from '@/utils/voices';
 
 // PC/web: a thick, clear ring around whatever the keyboard is on (the browser's default is thin).
 if (Platform.OS === 'web' && typeof document !== 'undefined') {
@@ -25,6 +27,10 @@ export default function RootLayout() {
   useFonts({ Lexend_400Regular, Lexend_700Bold, Lexend_900Black, PatrickHand_400Regular });
   const background = backgroundColor(useActiveProfile());
   const { animate } = useMotion();
+  // Find the tablet's offline voices early, so a bought voice is ready the first time it speaks.
+  useEffect(() => {
+    void loadVoices();
+  }, []);
   return (
     <>
       <StatusBar style="dark" />

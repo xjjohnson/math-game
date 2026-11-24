@@ -10,6 +10,7 @@ import { findBadge } from '@/constants/badges';
 import { itemsIn, SHOP_CATEGORIES, type ShopCategory, type ShopItem } from '@/constants/shop';
 import { colors, fontSizes, radius, spacing, TAP_TARGET } from '@/constants/theme';
 import { useActiveProfile, useProfiles } from '@/store/profiles';
+import { speakInVoice } from '@/utils/feedback';
 import { freeAvatars, isEquipped, owns } from '@/utils/shop';
 import { playSound } from '@/utils/soundEffects';
 
@@ -30,6 +31,7 @@ export function ShopScreen() {
   const choose = (item: ShopItem) => {
     if (owns(profile, item)) {
       equip(profile.id, item.id);
+      if (item.category === 'voice') speakInVoice(`Hi! I'm ${item.name}.`, item.voice);
       setMessage(
         item.category === 'companion' && isEquipped(profile, item)
           ? `${item.name} is taking a nap.`
@@ -44,6 +46,7 @@ export function ShopScreen() {
       setMessage(
         `You got ${item.name}!${badge ? ` New badge: ${badge.emoji} ${badge.name}` : ''}`,
       );
+      if (item.category === 'voice') speakInVoice(`Hi! I'm ${item.name}.`, item.voice);
     } else if (result.reason === 'coins') {
       setMessage(`You need ${item.price - profile.coins} more coins for ${item.name}. Keep playing!`);
     }
@@ -90,6 +93,11 @@ export function ShopScreen() {
           <Text style={styles.heading}>Shop avatars</Text>
         </>
       ) : null}
+      {category === 'voice' ? (
+        <Text style={styles.hint}>
+          Your voice reads questions, help and books out loud. Tap ▶ Listen to hear one first.
+        </Text>
+      ) : null}
       <View style={styles.grid}>
         {itemsIn(category).map((item) => {
           const owned = owns(profile, item);
@@ -118,6 +126,20 @@ export function ShopScreen() {
             >
               <Preview item={item} />
               <Text style={styles.name}>{item.name}</Text>
+              {item.category === 'voice' ? (
+                <>
+                  <Text style={styles.blurb}>{item.voice.blurb}</Text>
+                  <Pressable
+                    onPress={() => speakInVoice('What is 7 times 8?', item.voice)}
+                    accessibilityRole="button"
+                    accessibilityLabel={`Listen to ${item.name}`}
+                    hitSlop={6}
+                    style={({ pressed }) => [styles.listen, pressed && styles.pressed]}
+                  >
+                    <Text style={styles.listenText}>▶ Listen</Text>
+                  </Pressable>
+                </>
+              ) : null}
               <Text style={[styles.status, using && styles.statusUsing, !owned && styles.price]}>{status}</Text>
               {!owned && !affordable ? (
                 <Text style={styles.need}>Need {item.price - profile.coins} more</Text>
@@ -136,6 +158,8 @@ function Preview({ item }: { item: ShopItem }) {
       return <Sticker value={item.emoji} size={48} />;
     case 'companion':
       return <Sticker value={item.companion.emoji} size={48} />;
+    case 'voice':
+      return <Text style={styles.voiceEmoji}>{item.voice.emoji}</Text>;
     case 'background':
       return (
         <View style={[styles.swatch, styles.scene, { backgroundColor: item.color }]}>
@@ -214,5 +238,20 @@ const styles = StyleSheet.create({
   status: { fontSize: 16, fontWeight: '700', color: colors.textMuted },
   statusUsing: { color: colors.correct },
   price: { fontSize: fontSizes.body, fontWeight: '900', color: colors.text },
+  hint: { fontSize: 16, fontWeight: '700', color: colors.textMuted, textAlign: 'center' },
+  voiceEmoji: { fontSize: 40, lineHeight: 52 },
+  blurb: { fontSize: 15, fontWeight: '600', color: colors.textMuted, textAlign: 'center' },
+  listen: {
+    minHeight: TAP_TARGET,
+    minWidth: TAP_TARGET * 2,
+    paddingHorizontal: spacing.md,
+    borderRadius: radius.lg,
+    borderWidth: 2,
+    borderColor: colors.primary,
+    backgroundColor: colors.surface,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  listenText: { fontSize: 16, fontWeight: '900', color: colors.primary },
   need: { fontSize: 15, fontWeight: '700', color: colors.accentStrong },
 });

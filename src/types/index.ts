@@ -218,6 +218,8 @@ export interface Equipped {
   background: string;
   cardStyle: string;
   companion: string | null;
+  /** Voice shop item that reads aloud for this player (profile store version 16). */
+  voice: string;
 }
 
 export interface WeekProgress {

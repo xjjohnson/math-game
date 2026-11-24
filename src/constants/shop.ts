@@ -1,4 +1,21 @@
-export type ShopCategory = 'avatar' | 'background' | 'cardStyle' | 'companion';
+export type ShopCategory = 'avatar' | 'background' | 'cardStyle' | 'companion' | 'voice';
+
+/**
+ * How a bought voice sounds. Every voice is the tablet's own offline speech engine:
+ * `pick` says which of its voices to use, and pitch and rate change how it sounds.
+ */
+export interface VoiceStyle {
+  /** 'default' is whatever voice the tablet uses; 'best' and 'second' are the two best offline English voices found (utils/voices.ts). */
+  pick: 'default' | 'best' | 'second';
+  /** 1 is normal; lower is deeper, higher is squeakier. */
+  pitch: number;
+  /** 1 is normal speed. */
+  rate: number;
+  /** Picture on the Shop card. */
+  emoji: string;
+  /** One line about it on the Shop card. */
+  blurb: string;
+}
 
 export interface CardStyle {
   background: string;
@@ -32,13 +49,15 @@ export type ShopItem =
   /** `decor` scatters faint pictures over the color for a themed look. */
   | (BaseItem & { category: 'background'; color: string; decor?: string[] })
   | (BaseItem & { category: 'cardStyle'; style: CardStyle })
-  | (BaseItem & { category: 'companion'; companion: Companion });
+  | (BaseItem & { category: 'companion'; companion: Companion })
+  | (BaseItem & { category: 'voice'; voice: VoiceStyle });
 
 export const SHOP_CATEGORIES: { value: ShopCategory; label: string }[] = [
   { value: 'avatar', label: '😀 Avatars' },
   { value: 'background', label: '🎨 Backgrounds' },
   { value: 'cardStyle', label: '🃏 Cards' },
   { value: 'companion', label: '🐾 Buddies' },
+  { value: 'voice', label: '🗣️ Voices' },
 ];
 
 export const SHOP_ITEMS: ShopItem[] = [
@@ -712,10 +731,24 @@ export const SHOP_ITEMS: ShopItem[] = [
   },
 ];
 
+/** Voices to buy. Classic is today's voice and free for everyone. */
+export const VOICE_ITEMS: ShopItem[] = [
+  { id: 'voice-classic', category: 'voice', name: 'Classic', price: 0, voice: { pick: 'default', pitch: 1, rate: 0.9, emoji: '🙂', blurb: "The tablet's own voice" } },
+  { id: 'voice-teacher', category: 'voice', name: 'Clear Teacher', price: 40, voice: { pick: 'best', pitch: 1, rate: 0.9, emoji: '🧑‍🏫', blurb: 'The clearest voice on this tablet' } },
+  { id: 'voice-storyteller', category: 'voice', name: 'Friendly Storyteller', price: 60, voice: { pick: 'second', pitch: 1, rate: 0.82, emoji: '📖', blurb: 'Another voice, a little slower' } },
+  { id: 'voice-chipmunk', category: 'voice', name: 'Chipmunk', price: 50, voice: { pick: 'best', pitch: 1.8, rate: 1.1, emoji: '🐿️', blurb: 'High and quick' } },
+  { id: 'voice-giant', category: 'voice', name: 'Giant', price: 50, voice: { pick: 'best', pitch: 0.55, rate: 0.75, emoji: '🦣', blurb: 'Big, low and slow' } },
+  { id: 'voice-robot', category: 'voice', name: 'Robot', price: 60, voice: { pick: 'second', pitch: 0.4, rate: 0.8, emoji: '🤖', blurb: 'Beep boop, very low' } },
+  { id: 'voice-grandpa', category: 'voice', name: 'Grandpa', price: 60, voice: { pick: 'best', pitch: 0.75, rate: 0.78, emoji: '👴', blurb: 'A little low and slow' } },
+  { id: 'voice-grandma', category: 'voice', name: 'Grandma', price: 60, voice: { pick: 'second', pitch: 1.15, rate: 0.78, emoji: '👵', blurb: 'Warm and slow' } },
+];
+SHOP_ITEMS.push(...VOICE_ITEMS);
+
 export const DEFAULT_EQUIPPED = {
   background: 'bg-cream',
   cardStyle: 'card-classic',
   companion: null as string | null,
+  voice: 'voice-classic',
 };
 
 export function findItem(id: string | null | undefined): ShopItem | undefined {
