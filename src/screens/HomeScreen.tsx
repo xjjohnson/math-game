@@ -1,3 +1,5 @@
+import { Axolotl } from '@/components/Axolotl';
+import { clueFor, colorOf, foundToday, hasCrown } from '@/utils/axolotl';
 import { router } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { Pressable, StyleSheet, useWindowDimensions, View } from 'react-native';
@@ -58,6 +60,9 @@ export function HomeScreen() {
   const avatarSize = wide ? 120 : 84;
   const buddySize = wide ? 80 : 56;
 
+  const loloClue = profile ? clueFor(profile, today) : null;
+  const loloFound = !!profile && foundToday(profile, today);
+
   const scene = (
     <View style={[styles.scene, wide && styles.sceneWide]}>
       <View style={styles.pills}>
@@ -89,6 +94,12 @@ export function HomeScreen() {
             ) : null}
           </View>
           <View style={[styles.grass, wide && styles.grassWide]} />
+          {loloClue ? (
+            <View style={styles.lolo} accessible accessibilityLabel={loloClue}>
+              <Axolotl size={34} pose={loloFound ? 'whole' : 'peek'} mood={loloFound ? 'happy' : 'smile'} color={colorOf(profile)} crown={hasCrown(profile)} alive={!loloFound} />
+              <Text style={styles.loloText}>{loloFound ? `✓ ${loloClue}` : loloClue}</Text>
+            </View>
+          ) : null}
         </>
       ) : (
         <View style={styles.bubble}>
@@ -213,6 +224,19 @@ const styles = StyleSheet.create({
     maxWidth: '90%',
   },
   bubbleText: { fontSize: 16, fontWeight: '700', color: colors.text, textAlign: 'center' },
+  lolo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginTop: spacing.sm,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 4,
+    backgroundColor: 'rgba(255, 253, 248, 0.92)',
+    borderRadius: 16,
+    zIndex: 2,
+    maxWidth: '100%',
+  },
+  loloText: { fontSize: 14, fontWeight: '800', color: colors.text, flexShrink: 1 },
   cast: { flexDirection: 'row', alignItems: 'flex-end', gap: spacing.md, marginTop: spacing.md, zIndex: 2 },
   grass: { position: 'absolute', left: 0, right: 0, bottom: 0, height: 70, backgroundColor: '#A6E39A' },
   // Wide (tablet on its side): the scene on the left, the buttons on the right.

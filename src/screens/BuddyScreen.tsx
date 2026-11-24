@@ -1,3 +1,4 @@
+import { foundToday, hidingAt, livesInTank } from '@/utils/axolotl';
 import { router, Stack } from 'expo-router';
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { PanResponder, Pressable, ScrollView, StyleSheet, View } from 'react-native';
@@ -383,6 +384,8 @@ export function BuddyScreen() {
     }, PRINT_MS);
   };
 
+  const loloSpot = hidingAt(profile, dateKey());
+  const loloHome = loloSpot?.kind === 'home' ? loloSpot : null;
   const careNow = careToday(profile, dateKey());
   const careWaiting = !!buddyId && careNow.pets === 0 && careNow.treats === 0 && careNow.playHearts === 0;
   const back = () => (router.canGoBack() ? router.back() : router.replace('/'));
@@ -394,6 +397,8 @@ export function BuddyScreen() {
         <BuddyRoom
           room={profile.room}
           buddies={homeBuddies}
+          lolo={loloHome}
+          loloInTank={livesInTank(profile) && foundToday(profile, dateKey())}
           areas={areas}
           area={area}
           findBuddy={findBuddy}

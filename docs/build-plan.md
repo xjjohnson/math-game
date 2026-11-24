@@ -138,6 +138,7 @@ Cross-platform interactive math learning game for kids (ages 5-15), React Native
 - Daily challenge with bonus reward (60 seconds a question, 90 for K-2nd; right answers under 30 seconds pay +2 coins each, and 7+ speedy answers add +1 star)
 - Daily streak calendar (separate from in-session streak)
 - Weekly goals that unlock a special badge
+- Lolo the hidden axolotl: hides in a new built-in spot each day (buddy home, backyard, town buildings), one per player; found once a day, asks one skill question at the player's grade, pays 15 coins + 1 star (10 coins after a miss); counted finds move Lolo into the living room fish tank (5), and unlock golden (10), wild green (20), a crown (30) and sparkly blue (50)
 - Town cars: 100 stars (Number Ninja) gives every car a faster gear; the race car is fastest
 - Parent report: accuracy by operation (PIN area)
 
@@ -255,6 +256,7 @@ Phases 1-6 deliver a complete single-player game before any native Bluetooth wor
 - [ ] Daily streak calendar (Phase 4)
 - [ ] Weekly goals that unlock a special badge (Phase 5)
 - [ ] Parent report of accuracy by operation (Phase 6)
+- [x] Daily hidden axolotl (Lolo): utils/axolotl.ts, components/Axolotl.tsx, AxolotlFind.tsx; profile.axolotl optional, no store bump, OTA only
 
 ### Accessibility
 - [ ] Dyslexia-friendly font option (Phase 6)

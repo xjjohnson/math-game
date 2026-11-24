@@ -8,6 +8,7 @@ import { StatusBar } from 'expo-status-bar';
 import { useEffect } from 'react';
 import { Platform } from 'react-native';
 
+import { AxolotlFindHost } from '@/components/AxolotlFind';
 import { ScreenZoom } from '@/components/Motion';
 import { colors } from '@/constants/theme';
 import { useMotion } from '@/hooks/useAccessibility';
@@ -73,6 +74,7 @@ export default function RootLayout() {
         />
         <Stack.Screen name="nearby-play" options={{ title: 'Several phones' }} />
       </Stack>
+      <AxolotlFindHost />
     </>
   );
 }

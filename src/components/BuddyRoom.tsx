@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
-import Animated, { Easing, useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
+import Animated, { cancelAnimation, Easing, useAnimatedStyle, useSharedValue, withRepeat, withTiming } from 'react-native-reanimated';
 import {
   Pressable,
   ScrollView,
@@ -70,6 +70,10 @@ import type { Picture } from '@/utils/easel';
 import { AREA_COUNT, BUDDY_KEY, FIXTURE_KEY, paintOf, type Placement } from '@/utils/room';
 import { INK, shade, SHADOW, tint } from '@/constants/artStyle';
 import { GroundShadow } from '@/components/GroundShadow';
+import { Axolotl } from '@/components/Axolotl';
+import { HiddenLolo } from '@/components/AxolotlFind';
+import { colorOf, type HomeHideSpot } from '@/utils/axolotl';
+import { useActiveProfile } from '@/store/profiles';
 import { DrawnItem, hasDrawing } from '@/components/DrawnItem';
 import { PrintedToy, Printer3D, type PrintJob } from '@/components/Printer3D';
 import { parsePrintId, PRINTER_ITEM, type FilamentId, type PrintToyId } from '@/constants/printer';
@@ -95,6 +99,10 @@ export interface HomeBuddy {
 interface Props {
   room: Room;
   buddies: HomeBuddy[];
+  /** Where Lolo the axolotl is hiding today in this home, if it is. */
+  lolo?: HomeHideSpot | null;
+  /** Lolo swims in the living room fish tank (found today, and moved in after enough finds). */
+  loloInTank?: boolean;
   /** Rooms left to right in the player's order; the starting order when missing. */
   areas?: HomeArea[];
   /** Area in view, a place along `areas`. Changing it scrolls there. */
@@ -1044,6 +1052,15 @@ export function BuddyRoom(props: Props) {
           );
         })}
 
+        {props.lolo && size.order.includes(props.lolo.area) ? (
+          <HiddenLolo
+            spot={props.lolo}
+            size={Math.round(size.unit * LOLO_SIZE)}
+            style={loloPlace(props.lolo, size)}
+          />
+        ) : null}
+        {props.loloInTank && size.order.includes('living') ? <TankLolo size={size} /> : null}
+
         {pops.map((p) => (
           <FloatUp
             key={p.id}
@@ -1966,3 +1983,37 @@ const styles = StyleSheet.create({
   bubble: { borderColor: '#B3E5FC' },
   pop: { position: 'absolute', zIndex: 20 },
 });
+
+/** Lolo's size in the home, as a share of the room's size unit. */
+const LOLO_SIZE = 0.13;
+/** How far down Lolo's box its edge (the ledge it holds, the water line, the floor) is, by pose. */
+const LOLO_EDGE = { peek: 0.86, water: 0.84, tail: 0.97 } as const;
+
+/** Where hiding Lolo's box goes: centred on the spot, with its edge on the ledge, water or floor. */
+function loloPlace(spot: HomeHideSpot, size: HomeSize): { left: number; top: number } {
+  const at = fixtureBox({ area: spot.area, left: spot.left, width: 0, bottom: spot.bottom, height: 0 }, size);
+  const d = Math.round(size.unit * LOLO_SIZE);
+  return { left: at.left - d / 2, top: at.top - d * LOLO_EDGE[spot.pose] };
+}
+
+/** Lolo at home in the living room fish tank, swimming slowly back and forth. */
+function TankLolo({ size }: { size: HomeSize }) {
+  const profile = useActiveProfile();
+  const tank = APPLIANCES.find((a) => a.kind === 'aquarium');
+  const { animate } = useMotion();
+  const t = useSharedValue(0);
+  useEffect(() => {
+    if (!animate) return;
+    t.value = withRepeat(withTiming(1, { duration: 7000, easing: Easing.inOut(Easing.quad) }), -1, true);
+    return () => cancelAnimation(t);
+  }, [animate, t]);
+  const box = tank ? fixtureBox(tank, size) : null;
+  const d = box ? Math.round(box.height * 0.5) : 0;
+  const look = useAnimatedStyle(() => ({ transform: [{ translateX: (box ? box.width * 0.5 - d : 0) * t.value }, { scaleX: t.value > 0.5 ? -1 : 1 }] }));
+  if (!box || !profile) return null;
+  return (
+    <Animated.View pointerEvents="none" style={[{ position: 'absolute', left: box.left + box.width * 0.18, top: box.top + box.height * 0.28 }, look]}>
+      <Axolotl size={d} pose="whole" color={colorOf(profile)} />
+    </Animated.View>
+  );
+}

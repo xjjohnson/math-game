@@ -1,5 +1,12 @@
 # Change log
 
+## 2026-11-24 (Lolo the hidden axolotl)
+
+- **Lolo, a little pink axolotl, hides somewhere new every day**, a different spot for each player: by built-in things in the buddy home and backyard (top of the fridge, in the bathtub, in the tree house window...) or inside a town building (the shop counter, the park pond, the hen house roof...). Only part of Lolo shows, blinking and wiggling its gills. Lolo only hides in rooms you own, and only in town until you have a buddy.
+- **A clue on Home** says where to start: at home, in the backyard or in town. K to 2nd also hear the room or building.
+- **Tap Lolo** and it pops out: "You found me!" One question from your own skill list (with Help), then **15 coins and 1 star** (10 coins after a miss). Once a day per player; after that Lolo naps until tomorrow.
+- **Finds add up:** at 5 Lolo moves into the living room fish tank (swims there after you find it), 10 golden, 20 wild green, 30 a tiny crown, 50 sparkly blue.
+- **Parent area:** "Where is Lolo?" shows each player's spot today, with a switch to turn Lolo off.
 ## 2026-11-24 (Tree house sleeping bags)
 
 - **Three sleeping bags in the tree house** (red, blue and green), rolled up and hanging on pegs on the wall. Tap one to roll it out on the floor, tap it again to roll it back up.
