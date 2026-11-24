@@ -248,7 +248,7 @@ function Lot({ lot, night }: { lot: TownLot; night: boolean }) {
       <Rect key="dirt" x={x} y={y - depth} width={w} height={depth} rx={12} fill="#D9C7A6" stroke={INK} strokeWidth={3} strokeDasharray="10 8" />,
       <Rect key="post" x={x + w / 2 - 4} y={y - depth / 2 - 10} width={8} height={40} fill="#A8743E" stroke={INK} strokeWidth={2} />,
       <Rect key="board" x={x + w / 2 - 60} y={y - depth / 2 - 44} width={120} height={38} rx={8} fill={WHITE} stroke={INK} strokeWidth={3} />,
-      <SvgText key="t" x={x + w / 2} y={y - depth / 2 - 19} fontSize={17} fontWeight="bold" fill={INK} textAnchor="middle">
+      <SvgText key="t" x={x + w / 2} y={y - depth / 2 - 19} fontSize={17} fontFamily="Lexend_700Bold" fill={INK} textAnchor="middle">
         Coming soon
       </SvgText>,
     );
@@ -393,7 +393,7 @@ function sign(lot: TownLot, y: number): ReactNode {
   return (
     <G key="sign">
       <Rect x={cx - tw / 2} y={y - 28} width={tw} height={30} rx={15} fill={WHITE} stroke={INK} strokeWidth={2.5} />
-      <SvgText x={cx} y={y - 7} fontSize={17} fontWeight="bold" fill={INK} textAnchor="middle">
+      <SvgText x={cx} y={y - 7} fontSize={17} fontFamily="Lexend_700Bold" fill={INK} textAnchor="middle">
         {lot.name}
       </SvgText>
     </G>

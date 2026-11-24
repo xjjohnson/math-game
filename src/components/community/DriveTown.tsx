@@ -135,7 +135,7 @@ export function DriveTown({ onDoor }: { onDoor: (id: BuildingId) => void }) {
     });
     if (!placed.current && width > 0) {
       placed.current = true;
-      const s = Math.max(MIN_ZOOM, Math.min(1, width / 560));
+      const s = Math.max(MIN_ZOOM, Math.min(1.1, width / 480));
       const { pt, heading } = placeOf(pos.current);
       cx.value = pt.x;
       cy.value = pt.y;
@@ -531,7 +531,7 @@ export function DriveTown({ onDoor }: { onDoor: (id: BuildingId) => void }) {
 
       {/* Parked at a door: go in. At the car wash, pump or bakery: a little treat. */}
       {parked && mode === 'drive' && !menu ? (
-        <View style={styles.goSpot} pointerEvents="box-none">
+        <View style={[styles.goSpot, { bottom: controls === 'wheel' ? bottomGap + 136 : 76 }]} pointerEvents="box-none">
           {isDoor(parked.kind) ? (
             <Pressable onPress={() => enter(parked)} accessibilityRole="button" accessibilityLabel={`Go into ${parked.name}`} style={({ pressed }) => [styles.goIn, pressed && styles.pressed]}>
               <Text style={styles.goInText}>Go in · {parked.name}</Text>
@@ -753,7 +753,7 @@ const styles = StyleSheet.create({
   noteSpot: { position: 'absolute', top: 76, left: 0, right: 0, alignItems: 'center' },
   hintSpot: { position: 'absolute', bottom: 160, left: 0, right: 0, alignItems: 'center' },
   note: { fontSize: 17, fontWeight: '800', color: INK, backgroundColor: 'rgba(255,253,248,0.96)', paddingHorizontal: 16, paddingVertical: 8, borderRadius: 18, overflow: 'hidden', textAlign: 'center' },
-  goSpot: { position: 'absolute', top: 76, left: 70, right: 70, alignItems: 'center', gap: 8 },
+  goSpot: { position: 'absolute', left: 12, right: 12, alignItems: 'center', gap: 8 },
   goIn: { backgroundColor: colors.correct, borderRadius: 30, borderWidth: 3, borderColor: INK, paddingHorizontal: 22, paddingVertical: 12, minHeight: 56, justifyContent: 'center', boxShadow: '0px 4px 0px rgba(78, 51, 36, 0.25)' },
   goInText: { fontSize: 20, fontWeight: '900', color: '#FFFFFF', textAlign: 'center' },
   pedals: { position: 'absolute', left: 12, right: 12, flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'space-between' },
