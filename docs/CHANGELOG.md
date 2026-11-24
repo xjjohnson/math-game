@@ -12,6 +12,28 @@
 - With the room lights off, a built fort glows from inside.
 - No new save data version and no Nearby protocol change: the blanket is kept in the fort's item id, and friends' phones with this update see your fort when they visit.
 
+## 2026-11-24 (Unlimited rooms)
+
+- **Build as many rooms as you like.** Tap the room name at the top of the buddy home to open the **House map**, then tap **Build a room**. Pick a bedroom, playroom, kitchen, bathroom, living room, study or garage (any number of each) or the backyard (one), give it a name, and tap Build twice. The first new room costs 80 coins and each one after costs 20 more, never more than 300.
+- **Every new room comes ready to play in** with its own built-ins: a new kitchen has its own fridge, oven and cupboards, a new bathroom its own tub, a new bedroom a bed or bunk beds, a wardrobe or toy chest, and lamps. Bedrooms take turns between three different looks.
+- **House map:** the whole home as a dollhouse, floors of four rooms with the first floor at the bottom. Each room shows its colors, a few of its things and who is in it. Tap a room to jump there.
+- **Change rooms around:** hold a room on the map to move it left or right (or tap where it should go), rename it, or take a room you built away (what was in it goes to the toy box; no coins come back). The 5 starting rooms always stay.
+- **Send things to another room:** drag a toy or a buddy onto the room name at the top, then tap the room it should go to.
+- The row of room buttons at the top is now one room name with arrows on each side. The Paint tab's Move buttons moved to the House map.
+- Each room holds 40 things (the whole house used to hold 80), and only the room you're in and the ones next to it are drawn, so a big house stays quick.
+- Rooms already bought (backyard, study, bedrooms 2 and 3, garage) are kept, and everything stays exactly where it was. Rooms still "for sale" are now built from the House map instead.
+- **Visiting a big house** over Nearby: the house comes room by room, so the friend can walk in straight away; a room still on its way says "Moving in...". Nearby protocol 12: both phones need this update to visit each other's homes (a phone on this update can still visit an older phone's home).
+- No new APK needed: tap Update now (or restart) to get it.
+
+## 2026-11-24 (Lolo the hidden axolotl)
+
+- **Lolo, a little pink axolotl, hides somewhere new every day**, a different spot for each player: by built-in things in the buddy home and backyard (top of the fridge, in the bathtub, in the tree house window...) or inside a town building (the shop counter, the park pond, the hen house roof...). Only part of Lolo shows, blinking and wiggling its gills. Lolo only hides in rooms you own, and only in town until you have a buddy.
+- **A clue on Home** says where to start: at home, in the backyard or in town. K to 2nd also hear the room or building.
+- **Tap Lolo** and it pops out: "You found me!" One question from your own skill list (with Help), then **15 coins and 1 star** (10 coins after a miss). Once a day per player; after that Lolo naps until tomorrow.
+- **Finds add up:** at 5 Lolo moves into the living room fish tank (swims there after you find it), 10 golden, 20 wild green, 30 a tiny crown, 50 sparkly blue.
+- **Parent area:** "Where is Lolo?" shows each player's spot today, with a switch to turn Lolo off.
+- No new APK needed: tap Update now (or restart) to get it.
+
 ## 2026-11-24 (Tree house sleeping bags)
 
 - **Three sleeping bags in the tree house** (red, blue and green), rolled up and hanging on pegs on the wall. Tap one to roll it out on the floor, tap it again to roll it back up.

@@ -1,6 +1,6 @@
 import { DEFAULT_EQUIPPED } from '@/constants/shop';
 import type { AnswerRecord, Difficulty, Profile } from '@/types';
-import { emptyRoom } from '@/utils/room';
+import { emptyRoom, startingHouse } from '@/utils/room';
 
 /** Test helpers only; not used by the app. */
 export const rec = (correct: boolean, difficulty: Difficulty = 'easy'): AnswerRecord => ({
@@ -46,7 +46,7 @@ export const makeProfile = (overrides: Partial<Profile> = {}): Profile => ({
   wardrobe: [],
   outfits: {},
   looks: {},
-  homeRooms: [],
+  house: startingHouse(),
   filament: {},
   town: { date: '', done: [] },
   skills: {},

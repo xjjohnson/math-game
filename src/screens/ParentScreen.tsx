@@ -1,3 +1,4 @@
+import { AXOLOTL_NAME, axolotlOff, FIND_COINS, FIND_COINS_AFTER_MISS, findsOf, foundToday, placeName, todaysSpot } from '@/utils/axolotl';
 import { useEffect, useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 
@@ -52,6 +53,7 @@ export function ParentScreen() {
     <Screen>
       <SavedData />
       <PayoutSettings />
+      <LoloSettings />
       <VoiceCheck />
       <ParentReport />
       <View style={styles.actions}>
@@ -256,6 +258,47 @@ function PayoutSettings() {
   );
 }
 
+/** Where Lolo the hidden axolotl is today for each player, and a switch to turn it off. */
+function LoloSettings() {
+  const profiles = useProfiles((s) => s.profiles);
+  const setOff = useProfiles((s) => s.setLoloOff);
+  const today = dateKey();
+  if (profiles.length === 0) return null;
+  return (
+    <View style={styles.card}>
+      <Text style={styles.player}>🔎 Where is {AXOLOTL_NAME}?</Text>
+      <Text style={styles.line}>
+        {AXOLOTL_NAME} the axolotl hides in a new spot each day for each player. Finding it asks one question and pays{' '}
+        {FIND_COINS} coins and 1 star ({FIND_COINS_AFTER_MISS} coins after a miss), once a day.
+      </Text>
+      {profiles.map((p) => {
+        const spot = todaysSpot(p, today);
+        const status = axolotlOff(p)
+          ? 'Turned off'
+          : foundToday(p, today)
+            ? `Found today (${findsOf(p)} ${findsOf(p) === 1 ? 'find' : 'finds'} so far)`
+            : `${spot.name[0].toUpperCase()}${spot.name.slice(1)}, ${placeName(spot)}`;
+        return (
+          <View key={p.id} style={styles.loloRow}>
+            <Text style={[styles.line, styles.loloWhere]}>
+              <Text style={styles.heading}>{p.name}: </Text>
+              {status}
+            </Text>
+            <BigButton
+              small
+              outline
+              label={axolotlOff(p) ? 'Turn on' : 'Turn off'}
+              color={colors.primary}
+              onPress={() => setOff(p.id, !axolotlOff(p))}
+              accessibilityHint={`Turns ${AXOLOTL_NAME} ${axolotlOff(p) ? 'on' : 'off'} for ${p.name}`}
+            />
+          </View>
+        );
+      })}
+    </View>
+  );
+}
+
 function ParentReport() {
   const profiles = useProfiles((s) => s.profiles);
   if (profiles.length === 0) {
@@ -390,6 +433,8 @@ const styles = StyleSheet.create({
     gap: spacing.xs,
   },
   player: { fontSize: fontSizes.button, fontWeight: '900', color: colors.text },
+  loloRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginTop: spacing.xs },
+  loloWhere: { flex: 1 },
   heading: { fontSize: fontSizes.body, fontWeight: '800', color: colors.text, marginTop: spacing.sm },
   line: { fontSize: 16, color: colors.text },
   warn: { fontWeight: '800', color: colors.primary },

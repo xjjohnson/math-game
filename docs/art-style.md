@@ -48,3 +48,4 @@ Add more ids to `DRAWINGS` bit by bit, most-seen first. The 3D printer and the 1
 `components/Printer3D.tsx` (toys take a filament colour; rainbow colours each part). Drawn so far: couch, chair, bed, TV, plant,
 clock, radio, apples, bread, cookies, cupcake, milk, hot cocoa, teddy bear, ball, rubber duck,
 blocks, books, backpack, balloon.
+Lolo the hidden axolotl (peek, tail, in-water and whole poses, moods, unlockable colours and crown) is drawn in `components/Axolotl.tsx`.

@@ -10,10 +10,10 @@ import {
   type NumberLevel,
   type PaintAction,
 } from '@/utils/easel';
-import { parseHomeSnapshot, type HomeSnapshot } from '@/utils/homeVisit';
+import { parseHomePart, type HomePart } from '@/utils/homeVisit';
 
 /** Bump when messages change shape, so phones on different builds say so instead of misbehaving. */
-export const PROTOCOL_VERSION = 11;
+export const PROTOCOL_VERSION = 12;
 
 /**
  * The oldest version that can still play matches with this one. v5 only added
@@ -107,6 +107,13 @@ export interface ChalkStroke {
 /** The first version that can show a friend's buddy home (and move things in the community rooms). */
 export const HOME_VERSION = 7;
 
+/**
+ * The first version that sends a buddy home in parts, room by room (v12), so a home with
+ * any number of rooms fits. It still reads a home sent the old way, in one go; an older
+ * phone can't read the parts, and says the home can't be shown.
+ */
+export const HOME_PARTS_VERSION = 12;
+
 /** The first version that lets everyone drag the people around a shared scene. */
 export const SCENE_VERSION = 6;
 
@@ -199,8 +206,8 @@ export type GameMessage =
    * passes the ask on to `of`, saying who it is `for`.
    */
   | { type: 'home-ask'; of: string; for?: string }
-  /** Homes (v7): player `of`'s home, or null if it can't be shown. The host passes it on to `for`. */
-  | { type: 'home'; of: string; for?: string; home: HomeSnapshot | null }
+  /** Homes (v7): player `of`'s home, or null if it can't be shown. The host passes it on to `for`. Since v12 a home comes in parts, one message each. */
+  | { type: 'home'; of: string; for?: string; home: HomePart | null }
   /** School (v8): a line on the chalkboard, new or grown longer. The host keeps it and passes it on. */
   | { type: 'chalk'; stroke: ChalkStroke }
   /** School (v8): the board was wiped clean. */
@@ -356,7 +363,7 @@ export function parseMessage(text: string): GameMessage | null {
       return isId(m.of) ? { type: 'home-ask', of: m.of, ...(isId(m.for) ? { for: m.for } : {}) } : null;
     case 'home': {
       if (!isId(m.of)) return null;
-      const home = m.home === null ? null : parseHomeSnapshot(m.home);
+      const home = m.home === null ? null : parseHomePart(m.home);
       if (m.home !== null && !home) return null;
       return { type: 'home', of: m.of, ...(isId(m.for) ? { for: m.for } : {}), home };
     }

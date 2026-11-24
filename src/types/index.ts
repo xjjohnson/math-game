@@ -1,3 +1,4 @@
+import type { AreaId } from '@/constants/room';
 import type { Mood } from '@/components/PersonFigure';
 import type { PersonLook } from '@/constants/wardrobe';
 import type { Money, Picture } from '@/types/picture';
@@ -126,10 +127,8 @@ export interface Profile {
   looks: Record<string, PersonLook>;
   /** The face each buddy was set to in Feelings; missing means its everyday smile. */
   moods?: Record<string, Mood>;
-  /** Ids of the extra rooms (HomeArea.price) bought for the buddies' home. */
-  homeRooms: string[];
-  /** Order of the rooms in the home, left to right, as HomeArea ids. Missing means the starting order. */
-  homeOrder?: string[];
+  /** The rooms of the buddies' home, left to right (profile store version 17). */
+  house: HouseRoom[];
   /** What was picked on the New game screen last time, so it starts that way again. */
   lastGame?: GameChoices;
   /** Community buildings whose daily job is done, for today only. */
@@ -142,6 +141,18 @@ export interface Profile {
   garage?: Garage;
   /** Local date ("YYYY-MM-DD") the tree house chest coins were last taken; missing means never. */
   treeHouseCoinsDay?: string;
+  /** Lolo the hidden axolotl: the last day found, how many days found, and if a parent switched it off. Missing until first found. */
+  axolotl?: AxolotlState;
+}
+
+/** A player's Lolo record (see utils/axolotl.ts). */
+export interface AxolotlState {
+  /** The last day Lolo was found ("YYYY-MM-DD"): one find a day. */
+  day?: string;
+  /** How many days Lolo has been found, for the unlocks. */
+  finds: number;
+  /** Switched off in the parent area. */
+  off?: boolean;
 }
 
 /** A player's car choice for the town (see utils/garage.ts for the defaults). */
@@ -177,9 +188,23 @@ export interface TownVisits {
 /** Wearable ids a buddy has on, one per spot. */
 export type Outfit = Partial<Record<'hat' | 'face' | 'neck' | 'shirt' | 'legs' | 'feet', string>>;
 
+/** One room of the buddies' home. */
+export interface HouseRoom {
+  /**
+   * Its id. The rooms a home started with (and rooms bought before rooms could be built)
+   * have their look's id; a built room has its own ("r1", "r2", ...).
+   */
+  id: string;
+  /** How it looks and which built-ins it has (an AreaId in constants/room.ts). */
+  look: AreaId;
+  /** A name the player gave it; the look's name when missing. */
+  name?: string;
+}
+
 /**
- * Spots are shares of the whole home's width (x, so 0 to 1 spans every area) and of its
- * height (y, where things stand).
+ * Spots are measured in rooms across the home (x: 0 is the first room's left wall, 1 the
+ * second room's, so 2.5 is the middle of the third room) and as shares of its height (y,
+ * where things stand). Adding a room on the end moves nothing.
  */
 export interface RoomSpot {
   x: number;
@@ -214,7 +239,7 @@ export interface AreaPaint {
 }
 
 export interface Room {
-  /** Paint for each area, in HOME_AREAS order. */
+  /** Paint for each room, in the home's order (Profile.house). */
   paint: AreaPaint[];
   /** Buddies at home and where they stand, keyed by shop item id. The buddy in use is always home. */
   buddies: Record<string, BuddySpot>;

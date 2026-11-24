@@ -1,7 +1,8 @@
 import { createMockNetwork } from '@/services/mockTransport';
 import { TownSession } from '@/services/townSession';
 import { makeProfile } from '@/test/fixtures';
-import { homeSnapshot, parseHomeSnapshot } from '@/utils/homeVisit';
+import { assembleHome, homeParts, MAX_HOME_BYTES, parseHomePart, type HomePart } from '@/utils/homeVisit';
+import { buildRoom, STRIP_AREAS } from '@/utils/room';
 import {
   BAKERY,
   FLOOR,
@@ -135,7 +136,7 @@ describe('things in the community rooms', () => {
 });
 
 describe("visiting a friend's buddy home", () => {
-  const withHome = (name: string) => () => homeSnapshot(makeProfile({ name }));
+  const withHome = (name: string) => () => homeParts(makeProfile({ name }));
 
   it('shows the host the home of a guest, and a guest the home of the host', async () => {
     const net = createMockNetwork(2);
@@ -189,14 +190,86 @@ describe("visiting a friend's buddy home", () => {
     }
   });
 
+  /** A big home: 30 rooms, each with 25 things in it. */
+  const bigHome = () => {
+    let p = makeProfile({ name: 'Max', coins: 99999 });
+    while (p.house.length < 30) {
+      const r = buildRoom(p, 'bedroom');
+      if (!r.ok) throw new Error('build failed');
+      p = r.profile;
+    }
+    const things = p.house.flatMap((_, room) =>
+      Array.from({ length: 25 }, (_, i) => ({ key: `t${room}-${i}`, itemId: 'teddy', placed: true, x: room + 0.1 + i * 0.03, y: 0.9 })),
+    );
+    return { ...p, room: { ...p.room, things } };
+  };
+
+  it('sends a big home in parts small enough for Nearby, and puts it back together', () => {
+    const p = bigHome();
+    const parts = homeParts(p);
+    expect(parts.length).toBeGreaterThan(1);
+    for (const part of parts) {
+      expect(JSON.stringify(part).length).toBeLessThanOrEqual(MAX_HOME_BYTES + 40);
+      expect(part.parts).toBe(parts.length);
+      expect(parseHomePart(JSON.parse(JSON.stringify(part)))).not.toBeNull();
+    }
+    expect(parts.flatMap((x) => x.rooms)).toEqual(p.house.map((r) => r.id));
+    // The first part alone shows the home, with the other rooms still on their way.
+    const first = assembleHome(new Map([[0, parts[0]]]))!;
+    expect(first.house).toEqual(p.house);
+    expect(first.arriving).toEqual(p.house.map((r) => r.id).filter((id) => !parts[0].rooms.includes(id)));
+    const all = assembleHome(new Map(parts.map((x) => [x.part, x] as [number, HomePart])))!;
+    expect(all.arriving).toEqual([]);
+    expect(all.room.things).toHaveLength(p.room.things.length);
+    // Nothing shows before the first part.
+    expect(assembleHome(new Map([[1, parts[1]]]))).toBeNull();
+  });
+
+  it('shows a big home on a friend\'s phone room by room', async () => {
+    const net = createMockNetwork(2);
+    const [host, guest] = net.map((t) => new TownSession(() => t));
+    await joinAll([host, guest]);
+    const p = bigHome();
+    guest.setHomeSource(() => homeParts(p));
+    host.askHome(guest.getState().myId, 'Max');
+    for (let i = 0; i < 6; i++) await tick();
+    const home = host.getState().home;
+    expect(home?.status).toBe('ready');
+    expect(home?.snap?.house).toHaveLength(30);
+    expect(home?.snap?.arriving).toEqual([]);
+    expect(home?.snap?.room.things).toHaveLength(p.room.things.length);
+  });
+
+  it('reads a home sent the old way by a phone on an older version', () => {
+    const share = (slot: number, x: number) => (slot + x) / STRIP_AREAS;
+    const old = {
+      name: 'Old',
+      room: {
+        paint: Array.from({ length: STRIP_AREAS }, () => ({ wall: 1, floor: 1 })),
+        buddies: { pup: { x: share(1, 0.5), y: 0.9 } },
+        things: [{ key: 'k', itemId: 'bed', placed: true, x: share(6, 0.2), y: 0.9 }],
+      },
+      buddies: [{ id: 'pup', emoji: '🐶', gift: null, name: 'Pup', spot: { x: share(1, 0.5), y: 0.9 }, fur: '#fff', belly: '#eee', dressed: {} }],
+      homeRooms: ['study'],
+      homeOrder: ['living', 'kitchen', 'bedroom', 'bathroom', 'playroom', 'backyard', 'study'],
+    };
+    const part = parseHomePart(JSON.parse(JSON.stringify(old)))!;
+    expect(part.plan?.house.map((r) => r.id)).toEqual(['living', 'kitchen', 'bedroom', 'bathroom', 'playroom', 'study']);
+    expect(part.things[0].x).toBeCloseTo(5.2);
+    expect(part.plan?.buddies[0].spot.x).toBeCloseTo(1.5);
+    const snap = assembleHome(new Map([[0, part]]))!;
+    expect(snap.arriving).toEqual([]);
+  });
+
   it('checks homes sent by other phones', () => {
-    const snap = homeSnapshot(makeProfile({ name: 'Ava' }))!;
-    expect(parseHomeSnapshot(JSON.parse(JSON.stringify(snap)))).not.toBeNull();
+    const snap = homeParts(makeProfile({ name: 'Ava' }))[0];
+    expect(parseHomePart(JSON.parse(JSON.stringify(snap)))).not.toBeNull();
     const msg: GameMessage = { type: 'home', of: 'p1', for: 'p2', home: snap };
     expect(parseMessage(encodeMessage(msg))).toEqual(JSON.parse(encodeMessage(msg)));
     expect(parseMessage(encodeMessage({ type: 'home-ask', of: 'p1' }))).toEqual({ type: 'home-ask', of: 'p1' });
     expect(parseMessage(encodeMessage({ type: 'home', of: 'p1', home: null }))).toEqual({ type: 'home', of: 'p1', home: null });
     expect(parseMessage(JSON.stringify({ type: 'home', of: 'p1', home: { name: 'x' } }))).toBeNull();
-    expect(parseMessage(JSON.stringify({ type: 'home', of: 'p1', home: { ...snap, room: { ...snap.room, things: 'lots' } } }))).toBeNull();
+    expect(parseMessage(JSON.stringify({ type: 'home', of: 'p1', home: { ...snap, things: 'lots' } }))).toBeNull();
+    expect(parseMessage(JSON.stringify({ type: 'home', of: 'p1', home: { ...snap, plan: { ...snap.plan, house: [{ id: 'x', look: 'castle' }] } } }))).toBeNull();
   });
 });
