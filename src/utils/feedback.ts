@@ -2,8 +2,12 @@ import * as Haptics from 'expo-haptics';
 import * as Speech from 'expo-speech';
 import { Platform } from 'react-native';
 
+import type { VoiceStyle } from '@/constants/shop';
+import { useProfiles } from '@/store/profiles';
 import { useSettings } from '@/store/settings';
 import type { Problem } from '@/types';
+import { voiceStyleFor } from '@/utils/shop';
+import { loadedVoices, loadVoices, voiceIdFor } from '@/utils/voices';
 
 const SPOKEN: Record<Problem['operation'], string> = {
   add: 'plus',
@@ -25,12 +29,32 @@ export function speakProblem(problem: Problem, force = false) {
   speakText(spokenProblem(problem), force);
 }
 
-/** Reads any text aloud, under the same rule as speakProblem. */
+/** Reads any text aloud in the active player's voice, under the same rule as speakProblem. */
 export function speakText(text: string, force = false) {
   if (!force && !useSettings.getState().textToSpeech) return;
+  const { profiles, activeProfileId } = useProfiles.getState();
+  speakInVoice(text, voiceStyleFor(profiles.find((p) => p.id === activeProfileId)));
+}
+
+/**
+ * Reads text in a given voice style, e.g. for the Shop's Listen button. Pitch and rate are
+ * always passed, because Android keeps the last ones used otherwise. If the picked voice
+ * can't speak, it says it again in the tablet's own voice.
+ */
+export function speakInVoice(text: string, style: VoiceStyle) {
+  // Start finding the device's voices; the first words may use the default voice while it looks.
+  void loadVoices();
+  const voice = voiceIdFor(style, loadedVoices());
+  const say = (withVoice: string | undefined): void =>
+    Speech.speak(text, {
+      pitch: style.pitch,
+      rate: style.rate,
+      ...(withVoice ? { voice: withVoice } : {}),
+      onError: withVoice ? (): void => say(undefined) : undefined,
+    });
   try {
     Speech.stop();
-    Speech.speak(text, { rate: 0.9 });
+    say(voice);
   } catch {
     // Some browsers have no speech voices; the game works the same without them.
   }

@@ -4,7 +4,7 @@ import { findSkill } from '@/utils/skills/catalog';
 import { BUILDINGS, changeBills, paymentBills, changeHint, customerPays, eggTakeAway, sensiblePayments, FIRST_BONUS_COINS, FIRST_BONUS_HEARTS, finishShift, handedBack, REPLAY_COINS_PER_RIGHT, shiftDone, shiftQuestions, SHIFT_QUESTIONS } from '@/utils/town';
 
 const today = '2026-11-07';
-const withPup = makeProfile({ unlocks: ['buddy-pup'], equipped: { background: 'bg-cream', cardStyle: 'card-classic', companion: 'buddy-pup' } });
+const withPup = makeProfile({ unlocks: ['buddy-pup'], equipped: { background: 'bg-cream', cardStyle: 'card-classic', companion: 'buddy-pup', voice: 'voice-classic' } });
 
 describe('community shifts', () => {
   it('asks five questions with the answer among the choices', () => {
