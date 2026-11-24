@@ -6,11 +6,12 @@ import { Text } from '@/components/AppText';
 import { Birds } from '@/components/Backyard';
 import { BuddyFigure } from '@/components/BuddyFigure';
 import type { HomeBuddy } from '@/components/BuddyRoom';
-import { Flicker, FloatUp, Glide, Lively, type BounceKind } from '@/components/Motion';
+import { Drifting, Flicker, FloatUp, Glide, Lively, type BounceKind } from '@/components/Motion';
 import { PersonFigure } from '@/components/PersonFigure';
 import { BUDDY_SIZE } from '@/constants/room';
 import { useMotion } from '@/hooks/useAccessibility';
-import { INK } from '@/constants/artStyle';
+import { INK, shade, tint } from '@/constants/artStyle';
+import { GroundShadow } from '@/components/GroundShadow';
 
 /** What happened in the tree house, for the buddy's speech bubble. */
 export type TreeHouseEvent =
@@ -20,6 +21,12 @@ export type TreeHouseEvent =
   | { kind: 'lights'; on: boolean }
   | { kind: 'bucket'; snack: string }
   | { kind: 'callUp' }
+  /** A sleeping bag was rolled out or up, or someone got in or out (`who` is the buddy's id). */
+  | { kind: 'bag'; action: 'unroll' | 'rollUp' | 'in' | 'out'; who?: string }
+  /** Lights off and everyone up there is tucked into a sleeping bag. */
+  | { kind: 'sleepover' }
+  /** Lights back on while someone was asleep in a bag. */
+  | { kind: 'wakeUp' }
   | { kind: 'down' };
 
 /** What the telescope shows, one after another: a picture and its name. */
@@ -52,6 +59,8 @@ const OUTLINE = INK;
 const PLANKS = ['#C08A5B', '#B07A4F'];
 const BULBS = ['#FF5252', '#FFD740', '#69F0AE', '#40C4FF', '#E040FB'];
 const POP_MS = 1300;
+/** The tree house's sleeping bags, one colour each. */
+const BAG_COLORS = ['#E53935', '#1E88E5', '#43A047'];
 /** How many phone screens wide the tree house is (a room in the home is 2.5). */
 const SPAN = 1.8;
 /** Below this many pixels a touch on a buddy is a tap, not a drag. */
@@ -94,7 +103,11 @@ export function TreeHouseInside({ width: w, height: h, buddies, coinsReady, onEv
   const [bumps, setBumps] = useState<Record<string, { n: number; kind: BounceKind }>>({});
   const [spots, setSpots] = useState<Record<string, Spot>>({});
   const [dragging, setDragging] = useState<string | null>(null);
-  const drag = useRef<{ id: string; pageX: number; pageY: number; from: Spot; moved: boolean } | null>(null);
+  const drag = useRef<{ id: string; pageX: number; pageY: number; from: Spot; moved: boolean; fromBag: boolean } | null>(null);
+  /** Which sleeping bags are rolled out on the floor. */
+  const [bags, setBags] = useState<boolean[]>(() => BAG_COLORS.map(() => false));
+  /** Who is in which sleeping bag, by buddy id. */
+  const [inBag, setInBag] = useState<Record<string, number>>({});
   const turns = useRef({ sight: 0, treasure: 0, snack: 0, pop: 0 });
   const timers = useRef<ReturnType<typeof setTimeout>[]>([]);
   const bucket = useSharedValue(0);
@@ -121,6 +134,36 @@ export function TreeHouseInside({ width: w, height: h, buddies, coinsReady, onEv
   const scope = { left: win.left + win.size * 0.8, top: floor - scopeH, width: unit * 0.22, height: scopeH };
   const chestBox = { left: screen * 1.15, width: unit * 0.24, height: unit * 0.16 };
   const rope = { x: cw - screen * 0.12, bottom: floor - unit * 0.36 };
+  // Sleeping bags: rolled up and hung on pegs on the wall (above everyone's heads, so they're easy to tap),
+  // or rolled out on the floor below.
+  const bagLen = Math.round(fig * 1.05);
+  const bagH = Math.round(bagLen * 0.5);
+  const bagX = (i: number) => screen * 0.62 + i * fig * 1.25;
+  const bagFloorY = floor + (h - floor) * 0.58;
+  const rollW = fig * 0.5;
+  const rollH = fig * 0.22;
+  const rollY = floor - fig * 0.68;
+  const occupant = (i: number) => buddies.find((b) => inBag[b.id] === i);
+  /** The rolled-out, empty bag a buddy let go at `s` lands in, if any. */
+  const bagAt = (s: Spot) =>
+    bags.findIndex(
+      (open, i) =>
+        open &&
+        !occupant(i) &&
+        Math.abs(s.x - bagX(i)) < bagLen * 0.55 &&
+        s.y > bagFloorY - bagH * 1.6 &&
+        s.y < bagFloorY + fig * 0.35,
+    );
+  /** Lights off with everyone tucked in (or every bag full): it's a sleepover. */
+  const checkSleepover = (lightsOn: boolean, tucked: Record<string, number>) => {
+    const n = buddies.filter((b) => tucked[b.id] !== undefined).length;
+    if (!lightsOn && n > 0 && (n === buddies.length || n === BAG_COLORS.length)) onEvent({ kind: 'sleepover' });
+  };
+  const tapBag = (i: number) => {
+    const open = !bags[i];
+    setBags((all) => all.map((o, j) => (j === i ? open : o)));
+    onEvent({ kind: 'bag', action: open ? 'unroll' : 'rollUp' });
+  };
 
   // Where each buddy stands: where it was dragged, or spread across the floor in two staggered rows.
   const spotOf = (id: string, i: number): Spot =>
@@ -163,9 +206,17 @@ export function TreeHouseInside({ width: w, height: h, buddies, coinsReady, onEv
   const bucketLook = useAnimatedStyle(() => ({ transform: [{ translateY: bucket.value }] }));
 
   // Dragging a buddy around the floor; a touch that doesn't move is a tap.
-  const grab = (id: string, from: Spot, e: GestureResponderEvent) => {
-    drag.current = { id, pageX: e.nativeEvent.pageX, pageY: e.nativeEvent.pageY, from, moved: false };
+  const grab = (id: string, from: Spot, e: GestureResponderEvent, fromBag = false) => {
+    drag.current = { id, pageX: e.nativeEvent.pageX, pageY: e.nativeEvent.pageY, from, moved: false, fromBag };
     return true;
+  };
+  /** Touching someone in a sleeping bag: they climb out, standing in front of it, and can be dragged on. */
+  const climbOut = (id: string, i: number, e: GestureResponderEvent) => {
+    const spot = clampSpot({ x: bagX(i), y: bagFloorY + fig * 0.12 });
+    setInBag(({ [id]: _gone, ...rest }) => rest);
+    setSpots((all) => ({ ...all, [id]: spot }));
+    onEvent({ kind: 'bag', action: 'out', who: id });
+    grab(id, spot, e, true);
   };
   const move = (e: GestureResponderEvent) => {
     const d = drag.current;
@@ -184,16 +235,30 @@ export function TreeHouseInside({ width: w, height: h, buddies, coinsReady, onEv
     if (!d) return;
     if (!d.moved) {
       setBumps((all) => ({ ...all, [d.id]: { n: (all[d.id]?.n ?? 0) + 1, kind: 'hop' } }));
-      onTapBuddy(d.id);
+      if (!d.fromBag) onTapBuddy(d.id);
       return;
     }
-    // Let go, it drops to the floor and squashes there (Glide).
+    // Let go over a rolled-out sleeping bag, it climbs in; anywhere else it drops to the floor and squashes there (Glide).
+    const at = spots[d.id] ?? d.from;
+    const bag = bagAt(at);
+    if (bag >= 0) {
+      const tucked = { ...inBag, [d.id]: bag };
+      setInBag(tucked);
+      onEvent({ kind: 'bag', action: 'in', who: d.id });
+      checkSleepover(lights, tucked);
+      return;
+    }
     setSpots((all) => ({ ...all, [d.id]: clampSpot(all[d.id] ?? d.from) }));
   };
 
   const bulbs = Math.max(8, Math.round(cw / 45));
   // Back to front, so whoever stands lower on the floor is in front.
-  const placed = buddies.map((b, i) => ({ b, i, spot: spotOf(b.id, i) })).sort((a, c) => a.spot.y - c.spot.y);
+  const placed = buddies.map((b, i) => ({ b, i, spot: spotOf(b.id, i) })).filter(({ b }) => inBag[b.id] === undefined);
+  // Everything on the floor, back to front: standing buddies and the sleeping bags (with whoever is in them).
+  const onFloor = [
+    ...placed.map((p) => ({ y: p.spot.y, buddy: p, bag: -1 })),
+    ...BAG_COLORS.map((_, i) => ({ y: bags[i] ? bagFloorY : rollY, buddy: null, bag: i })),
+  ].sort((a, c) => a.y - c.y);
 
   return (
     <View style={[StyleSheet.absoluteFill, styles.inside]} accessibilityLabel="Inside the tree house">
@@ -245,8 +310,16 @@ export function TreeHouseInside({ width: w, height: h, buddies, coinsReady, onEv
         {/* String lights under the beam, the whole way across: tap to switch them. */}
         <Pressable
           onPress={() => {
-            setLights(!lights);
-            onEvent({ kind: 'lights', on: !lights });
+            const on = !lights;
+            setLights(on);
+            onEvent({ kind: 'lights', on });
+            const sleepers = buddies.filter((b) => inBag[b.id] !== undefined);
+            if (!on) checkSleepover(on, inBag);
+            else if (sleepers.length) {
+              // Wakey wakey: a big stretch in the bags.
+              setBumps((all) => ({ ...all, ...Object.fromEntries(sleepers.map((b) => [b.id, { n: (all[b.id]?.n ?? 0) + 1, kind: 'wiggle' as BounceKind }])) }));
+              onEvent({ kind: 'wakeUp' });
+            }
           }}
           accessibilityRole="button"
           accessibilityLabel={lights ? 'Turn off the lights' : 'Turn on the lights'}
@@ -306,7 +379,74 @@ export function TreeHouseInside({ width: w, height: h, buddies, coinsReady, onEv
         </Pressable>
 
         {/* The buddies who climbed up, as big as at home: drag them about, tap to say hi. */}
-        {placed.map(({ b, i, spot }) => {
+        {onFloor.map(({ buddy, bag }) => {
+          if (bag >= 0) {
+            const who = occupant(bag);
+            const color = BAG_COLORS[bag];
+            if (!bags[bag]) {
+              return (
+                <Pressable
+                  key={`bag-${bag}`}
+                  onPress={() => tapBag(bag)}
+                  accessibilityRole="button"
+                  accessibilityLabel="Roll out the sleeping bag"
+                  style={at(bagX(bag) - rollW / 2, rollY - rollH, rollW, rollH)}
+                >
+                  <RolledBag color={color} width={rollW} height={rollH} />
+                </Pressable>
+              );
+            }
+            const box = at(bagX(bag) - bagLen / 2, bagFloorY - bagH, bagLen, bagH);
+            if (!who) {
+              return (
+                <Pressable key={`bag-${bag}`} onPress={() => tapBag(bag)} accessibilityRole="button" accessibilityLabel="Roll up the sleeping bag" style={box}>
+                  <OpenBag color={color} length={bagLen} height={bagH} />
+                </Pressable>
+              );
+            }
+            const bump = bumps[who.id];
+            const fs = Math.round(bagLen * 0.95);
+            // People are drawn shorter than their box (look.height), feet at the bottom: slide them up so the top
+            // of the head is on the pillow. The bag comes up to the chin (about 0.41 of the way down a figure).
+            const tall = who.person?.look.height ?? 1;
+            const headX = bagLen * 0.04;
+            const figLeft = headX - fs * (1 - tall);
+            const chinX = headX + fs * (tall - 0.41);
+            return (
+              <View
+                key={`bag-${bag}`}
+                accessible
+                accessibilityLabel={`${who.name} in a sleeping bag. Tap to climb out`}
+                onStartShouldSetResponder={() => true}
+                onResponderGrant={(e) => climbOut(who.id, bag, e)}
+                onResponderMove={move}
+                onResponderRelease={letGo}
+                onResponderTerminate={letGo}
+                onResponderTerminationRequest={() => false}
+                style={box}
+              >
+                <OpenBag color={color} length={bagLen} height={bagH} under />
+                {/* Lying down, head on the pillow: the figure turned on its side, the bag pulled up to the chin. */}
+                <View pointerEvents="none" style={[at(figLeft, bagH * 0.5 - fs / 2, fs, fs), { transform: [{ rotate: '-90deg' }] }]}>
+                  <Lively height={fs} seed={who.id} breathe asleep={!lights} bounce={bump?.n} bounceKind={bump?.kind} style={StyleSheet.absoluteFill}>
+                    {who.person ? (
+                      <PersonFigure look={who.person.look} size={fs} dressed={who.person.dressed} gift={null} alive asleep={!lights} mood={who.mood} />
+                    ) : (
+                      <BuddyFigure value={who.emoji} size={fs} fur={who.fur} belly={who.belly} dressed={who.dressed} gift={null} mood={who.mood} />
+                    )}
+                  </Lively>
+                </View>
+                <BagCover color={color} length={bagLen} height={bagH} from={chinX - bagLen * 0.02} />
+                {!lights ? (
+                  <Drifting rise={bagH * 0.6} style={at((headX + chinX) / 2, -bagH * 0.6, bagH * 0.6, bagH * 0.6)}>
+                    <Text style={{ fontSize: Math.round(bagH * 0.38) }}>💤</Text>
+                  </Drifting>
+                ) : null}
+              </View>
+            );
+          }
+          if (!buddy) return null;
+          const { b, spot } = buddy;
           const bump = bumps[b.id];
           const held = dragging === b.id;
           return (
@@ -331,7 +471,7 @@ export function TreeHouseInside({ width: w, height: h, buddies, coinsReady, onEv
                 onResponderTerminationRequest={() => false}
                 style={StyleSheet.absoluteFill}
               >
-                <View pointerEvents="none" style={[styles.cushion, at(fig * 0.1, fig * 0.86, fig * 0.8, fig * 0.16), { backgroundColor: BULBS[(i + 2) % BULBS.length], borderRadius: fig, opacity: held ? 0 : 1 }]} />
+                <GroundShadow width={fig * 0.42} hidden={held} style={{ left: fig / 2 - fig * 0.21, bottom: -fig * 0.035 }} />
                 <Lively height={fig} seed={b.id} breathe={!held} bounce={bump?.n} bounceKind={bump?.kind} style={StyleSheet.absoluteFill}>
                   {b.person ? (
                     <PersonFigure look={b.person.look} size={fig} dressed={b.person.dressed} gift={b.gift} alive mood={held ? 'happy' : b.mood} wave={bump?.kind === 'hop' ? bump.n : undefined} />
@@ -382,6 +522,48 @@ export function TreeHouseInside({ width: w, height: h, buddies, coinsReady, onEv
   );
 }
 
+/** A sleeping bag rolled up and tied, seen from the side: a fat roll with its swirl showing at the end. */
+function RolledBag({ color, width, height }: { color: string; width: number; height: number }) {
+  return (
+    <View style={StyleSheet.absoluteFill} pointerEvents="none">
+      <View style={[styles.bagPart, at(0, 0, width - height * 0.4, height), { backgroundColor: color, borderRadius: height / 2 }]} />
+      <View style={[styles.strap, at(width * 0.3, -2, 6, height + 4)]} />
+      <View style={[styles.loop, at(width * 0.3 - height * 0.25, -height * 0.55, height * 0.5 + 6, height * 0.6), { borderRadius: height }]} />
+      <View style={[styles.peg, at(width * 0.3 - 4, -height * 0.62, 14, 14)]} />
+      <View style={[styles.bagPart, at(width - height, 0, height, height), { backgroundColor: tint(color), borderRadius: height }]}>
+        <View style={[styles.swirl, { margin: height * 0.18, borderRadius: height, borderColor: shade(color) }]}>
+          <View style={[styles.swirl, { margin: height * 0.08, borderRadius: height, borderColor: shade(color) }]} />
+        </View>
+      </View>
+    </View>
+  );
+}
+
+/** A sleeping bag rolled out on the floor with its pillow. Empty, its top lies flat; `under` leaves the top off for someone inside. */
+function OpenBag({ color, length, height, under = false }: { color: string; length: number; height: number; under?: boolean }) {
+  return (
+    <View style={StyleSheet.absoluteFill} pointerEvents="none">
+      <View style={[styles.bagPart, at(0, height * 0.62, length, height * 0.38), { backgroundColor: shade(color, 0.25), borderRadius: height * 0.2 }]} />
+      <View style={[styles.pillow, at(length * 0.03, height * 0.42, length * 0.3, height * 0.36), { borderRadius: height * 0.18 }]} />
+      {under ? null : (
+        <View style={[styles.bagPart, at(length * 0.34, height * 0.5, length * 0.66, height * 0.36), { backgroundColor: color, borderRadius: height * 0.18 }]}>
+          <View style={[styles.hem, { width: length * 0.07, backgroundColor: tint(color, 0.5) }]} />
+        </View>
+      )}
+    </View>
+  );
+}
+
+/** The puffy top of a sleeping bag with someone inside, pulled up to their chin. */
+function BagCover({ color, length, height, from }: { color: string; length: number; height: number; from: number }) {
+  return (
+    <View pointerEvents="none" style={[styles.bagPart, at(from, height * 0.1, length - from, height * 0.84), { backgroundColor: color, borderRadius: height * 0.32 }]}>
+      <View style={[styles.hem, { width: length * 0.08, backgroundColor: tint(color, 0.5) }]} />
+      <View style={[styles.zip, { top: height * 0.3 }]} />
+    </View>
+  );
+}
+
 const styles = StyleSheet.create({
   inside: { backgroundColor: '#B07A4F', overflow: 'hidden' },
   plank: { flex: 1, borderRightWidth: 2, borderColor: 'rgba(0,0,0,0.15)' },
@@ -409,8 +591,15 @@ const styles = StyleSheet.create({
   coinHint: { position: 'absolute' },
   chest: { backgroundColor: '#A1887F', borderWidth: 3, borderColor: OUTLINE, borderRadius: 4, alignItems: 'center' },
   lock: { marginTop: -6, width: 14, height: 16, borderRadius: 3, backgroundColor: '#FFCA28', borderWidth: 2, borderColor: OUTLINE },
-  cushion: { borderWidth: 2, borderColor: OUTLINE },
   raised: { zIndex: 5 },
+  bagPart: { borderWidth: 2.5, borderColor: OUTLINE, overflow: 'hidden' },
+  strap: { backgroundColor: '#5D4037', borderRadius: 2 },
+  loop: { borderWidth: 3, borderColor: '#5D4037', borderBottomWidth: 0 },
+  peg: { backgroundColor: '#6D4C41', borderWidth: 2, borderColor: OUTLINE, borderRadius: 7 },
+  swirl: { flex: 1, borderWidth: 2 },
+  pillow: { backgroundColor: '#FFFDF5', borderWidth: 2.5, borderColor: OUTLINE },
+  hem: { position: 'absolute', left: 0, top: 0, bottom: 0, borderRightWidth: 2, borderColor: 'rgba(0,0,0,0.2)' },
+  zip: { position: 'absolute', left: '14%', right: '6%', height: 2, backgroundColor: 'rgba(0,0,0,0.25)' },
   callUp: { backgroundColor: '#FFF8E7', borderWidth: 3, borderColor: OUTLINE, borderRadius: 20, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 10 },
   callUpText: { fontSize: 20, fontWeight: '800', color: '#5B3A24' },
   down: { backgroundColor: '#FFF8E7', borderWidth: 3, borderColor: OUTLINE, borderRadius: 20, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 10 },
