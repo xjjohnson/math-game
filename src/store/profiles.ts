@@ -1,3 +1,4 @@
+import { claimFind, setAxolotlOff, type FindResult } from '@/utils/axolotl';
 import { buyCar as buyCarFor, garageOf, type CarBuy } from '@/utils/garage';
 import { useSyncExternalStore } from 'react';
 import { create } from 'zustand';
@@ -158,6 +159,10 @@ interface ProfilesState {
   printToy: (id: string, printerKey: string, toy: string, filament: string) => PrintResult;
   /** Saves printer check answers to the skill record; returns how many skills were newly learned. */
   recordPrinterCheck: (id: string, history: AnswerRecord[]) => number;
+  /** Pays for finding Lolo today (once a day) and saves the answers to the skill record. */
+  claimLolo: (id: string, history: AnswerRecord[]) => FindResult;
+  /** Parent area: turns Lolo on or off for a player. */
+  setLoloOff: (id: string, off: boolean) => void;
   /** Takes today's coins from the tree house chest; returns how many (0 if already taken today). */
   claimTreeHouseCoins: (id: string) => number;
 }
@@ -345,6 +350,15 @@ export const useProfiles = create<ProfilesState>()(
         set((s) => ({ profiles: s.profiles.map((p) => (p.id === id ? profile : p)) }));
         return learned;
       },
+      claimLolo: (id, history) => {
+        const current = get().profiles.find((p) => p.id === id);
+        if (!current) return { ok: false, reason: 'off' };
+        const result = claimFind(current, dateKey(), history, useSettings.getState().coinPayout);
+        if (result.ok) set((s) => ({ profiles: s.profiles.map((p) => (p.id === id ? result.profile : p)) }));
+        return result;
+      },
+      setLoloOff: (id, off) =>
+        set((s) => ({ profiles: s.profiles.map((p) => (p.id === id ? setAxolotlOff(p, off) : p)) })),
       claimTreeHouseCoins: (id) => {
         const current = get().profiles.find((p) => p.id === id);
         if (!current) return 0;
