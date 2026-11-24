@@ -94,6 +94,9 @@ jobs:
       # (hfc female and male, medium). About 120 MB, so they're fetched here
       # instead of kept in git. A failed download stops the build, so the
       # phones keep the last good APK.
+      # Android refuses to build a library module (math-voice) that depends on
+      # a local .aar, so the .aar is opened up here: its classes become a .jar
+      # in libs/ and its native .so files go in src/main/jniLibs/.
       - name: Download Story Voice
         if: steps.plan.outputs.mode == 'apk'
         env:
@@ -101,11 +104,16 @@ jobs:
         run: |
           set -euo pipefail
           mod=modules/math-voice/android
-          mkdir -p "$mod/libs" "$mod/src/main/assets/voices"
+          mkdir -p "$mod/libs" "$mod/src/main/jniLibs" "$mod/src/main/assets/voices"
           aar=$(gh api repos/k2-fsa/sherpa-onnx/releases/latest \
             --jq '[.assets[] | select(.name | test("^sherpa-onnx-[0-9.]+\\.aar$"))][0].browser_download_url')
           echo "sherpa-onnx library: $aar"
-          curl -fsSL -o "$mod/libs/sherpa-onnx.aar" "$aar"
+          curl -fsSL -o /tmp/sherpa-onnx.aar "$aar"
+          rm -rf /tmp/sherpa-aar && mkdir /tmp/sherpa-aar
+          unzip -q /tmp/sherpa-onnx.aar -d /tmp/sherpa-aar
+          cp /tmp/sherpa-aar/classes.jar "$mod/libs/sherpa-onnx.jar"
+          cp -r /tmp/sherpa-aar/jni/* "$mod/src/main/jniLibs/"
+          find "$mod/src/main/jniLibs" -name '*.so'
           for voice in hfc_female hfc_male; do
             dir=vits-piper-en_US-$voice-medium
             curl -fsSL "https://github.com/k2-fsa/sherpa-onnx/releases/download/tts-models/$dir.tar.bz2" | tar xj -C /tmp
@@ -119,7 +127,7 @@ jobs:
             cp /tmp/$dir/MODEL_CARD "$mod/src/main/assets/voices/$voice/" 2>/dev/null || true
             echo "--- $voice license ---"; grep -i -A3 license /tmp/$dir/MODEL_CARD || true
           done
-          du -sh "$mod/libs" "$mod/src/main/assets/voices"/*
+          du -sh "$mod/libs" "$mod/src/main/jniLibs" "$mod/src/main/assets/voices"/*
 
       - name: Generate the Android project
         if: steps.plan.outputs.mode == 'apk'
