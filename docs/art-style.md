@@ -31,6 +31,7 @@ which is checked for contrast.
 | G3 | Drawn furniture, food and toys instead of emoji (`DrawnItem`, 20 so far) | Building |
 | G4 | Rooms with depth: crown moulding, chair rail and darker lower wall, floorboards, wall shadow on the floor, a front edge | Built |
 | G5 | Round buttons with a white ring and shadow, red dots, colour-coded buddy home tabs, white panels on grid paper (`components/Chrome.tsx`) | Built |
+| G7 | The town from above: roofs, front walls, signs, roads, lamps, trees, pond and 8 cars, all drawn in code (`community/TownArt.tsx`, `community/CarDrawing.tsx`); moving bits in `community/TownLife.tsx` | Built |
 | G6 | Drawn menu background patterns: every themed background repeats small drawings in a darker shade of its colour (`constants/patterns.ts`), drifting like before | Built |
 
 ## Faces

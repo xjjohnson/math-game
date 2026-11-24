@@ -166,6 +166,7 @@ export function DriveTown({ onDoor }: { onDoor: (id: BuildingId) => void }) {
     let raf = 0;
     let last = Date.now();
     let followAt = 0;
+    let routeAt = 0;
     const tick = () => {
       const now = Date.now();
       const dt = Math.min(0.05, (now - last) / 1000);
@@ -234,6 +235,14 @@ export function DriveTown({ onDoor }: { onDoor: (id: BuildingId) => void }) {
         const k = Math.min(1, dt * 6);
         tx.value = tx.value + (goal.x - tx.value) * k;
         ty.value = ty.value + (goal.y - ty.value) * k;
+      }
+
+      // Trim the dotted line to what is still ahead.
+      const q = plan.current;
+      if (q && now - routeAt > 400) {
+        routeAt = now;
+        const via = q.via.slice(Math.max(0, pos.current.kind === 'turn' ? q.i - 1 : q.i));
+        setRoute({ pts: routePoints(pos.current, q.goal, via).map((r) => `${r.x},${r.y}`).join(' '), lot: q.lot });
       }
 
       // Parked by a building?
