@@ -510,6 +510,19 @@ export function BuddyScreen() {
             else if (e.kind === 'lights') say(e.on ? 'Twinkle, twinkle! ✨' : 'Lights off. Spooky hideout! 🔦');
             else if (e.kind === 'bucket') say(`${who} pulls up the bucket. It has ${e.snack}! Yum! 😋`);
             else if (e.kind === 'down') say(`${who} climbs back down the ladder.`);
+            else if (e.kind === 'bag') {
+              const sleeper = e.who ? nameOf(e.who) : who;
+              say(
+                e.action === 'unroll'
+                  ? 'Sleeping bag rolled out. Drag someone onto it to tuck them in! 🛌'
+                  : e.action === 'rollUp'
+                    ? 'Sleeping bag rolled up.'
+                    : e.action === 'in'
+                      ? `${sleeper} wriggles into the sleeping bag. So cozy! 🛌`
+                      : `${sleeper} hops out of the sleeping bag!`,
+              );
+            } else if (e.kind === 'sleepover') say('Sleepover! Goodnight, everyone! 🌙');
+            else if (e.kind === 'wakeUp') say('Good morning! Big stretch! ☀️');
           }}
         />
         <Confetti burst={party} />
