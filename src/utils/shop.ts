@@ -4,6 +4,7 @@ import {
   type CardStyle,
   type Companion,
   type ShopItem,
+  type VoiceStyle,
 } from '@/constants/shop';
 import { PERSON_AVATARS } from '@/constants/art';
 import { AVATARS, colors } from '@/constants/theme';
@@ -27,6 +28,8 @@ export function isEquipped(profile: Profile, item: ShopItem): boolean {
       return profile.equipped.cardStyle === item.id;
     case 'companion':
       return profile.equipped.companion === item.id;
+    case 'voice':
+      return (profile.equipped.voice ?? DEFAULT_EQUIPPED.voice) === item.id;
   }
 }
 
@@ -77,6 +80,8 @@ export function equipItem(profile: Profile, itemId: string): Profile {
           companion: profile.equipped.companion === item.id ? null : item.id,
         },
       };
+    case 'voice':
+      return { ...profile, equipped: { ...profile.equipped, voice: item.id } };
   }
 }
 
@@ -100,4 +105,11 @@ export function cardStyleFor(profile: Profile | undefined): CardStyle | undefine
 export function companionFor(profile: Profile | undefined): Companion | undefined {
   const item = findItem(profile?.equipped.companion);
   return item?.category === 'companion' ? item.companion : undefined;
+}
+
+/** How this player's voice sounds; the free Classic voice when none is picked. */
+export function voiceStyleFor(profile: Profile | undefined): VoiceStyle {
+  const item = findItem(profile?.equipped.voice) ?? findItem(DEFAULT_EQUIPPED.voice);
+  if (item?.category === 'voice') return item.voice;
+  return { pick: 'default', pitch: 1, rate: 0.9, emoji: '🙂', blurb: '' };
 }

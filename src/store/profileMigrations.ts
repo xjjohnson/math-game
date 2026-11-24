@@ -4,7 +4,7 @@ import type { Difficulty, Grade, Profile } from '@/types';
 import { addExtraRooms, AREAS_BEFORE_EXTRA_ROOMS, emptyRoom, upgradeRoom, widenHome } from '@/utils/room';
 
 /** The version the profiles are saved as. Bump it, and add a step below, whenever Profile gains a field. */
-export const PROFILES_VERSION = 15;
+export const PROFILES_VERSION = 16;
 
 export interface SavedProfiles {
   profiles: Profile[];
@@ -90,6 +90,13 @@ export function migrateProfiles(persisted: unknown, version: number): SavedProfi
   if (version < 15) {
     // Version 15 added the 3D printer's filament. Everyone starts with none.
     state.profiles = state.profiles.map((p) => ({ ...p, filament: p.filament ?? {} }));
+  }
+  if (version < 16) {
+    // Version 16 added voices to buy. Everyone starts on the free Classic voice.
+    state.profiles = state.profiles.map((p) => ({
+      ...p,
+      equipped: { ...DEFAULT_EQUIPPED, ...p.equipped, voice: p.equipped?.voice ?? DEFAULT_EQUIPPED.voice },
+    }));
   }
   return state;
 }

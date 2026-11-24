@@ -13,7 +13,7 @@ import {
 import { parseHomeSnapshot, type HomeSnapshot } from '@/utils/homeVisit';
 
 /** Bump when messages change shape, so phones on different builds say so instead of misbehaving. */
-export const PROTOCOL_VERSION = 10;
+export const PROTOCOL_VERSION = 11;
 
 /**
  * The oldest version that can still play matches with this one. v5 only added
@@ -69,6 +69,24 @@ export function paintBatches(actions: PaintAction[]): PaintAction[][] {
   }
   if (batch.length) out.push(batch);
   return out;
+}
+
+/**
+ * The first version with cars in the town (v11). Car messages are new types that
+ * older phones ignore, so they can still visit; they just don't see the cars.
+ */
+export const CAR_VERSION = 11;
+
+/** A player's car out on the town's roads, in map points. */
+export interface CarSpot {
+  x: number;
+  y: number;
+  /** Heading in degrees, 0 = right. */
+  h: number;
+  /** Car id (constants/cars.ts), paint index, rainbow stripe. */
+  k: string;
+  p: number;
+  st?: boolean;
 }
 
 /** Chalk colors on the school board; 0 is the eraser (it draws in the board's own green). */
@@ -192,7 +210,11 @@ export type GameMessage =
   /** School easel (v10): one action was undone. */
   | { type: 'paint-undo'; id: string }
   /** School easel (v10): a fresh sheet, blank or a coloring page (`lv` is the color-by-number level, or null). */
-  | { type: 'paint-page'; page: string; lv: NumberLevel | null };
+  | { type: 'paint-page'; page: string; lv: NumberLevel | null }
+  /** Town (v11): where a car is. Guests send their own (no id); the host passes it on with the sender's id. */
+  | { type: 'car'; id?: string; car: CarSpot }
+  /** Town (v11): a honk at player `to`. The host passes it on, saying who it is `from`. */
+  | { type: 'honk'; to: string; from?: string };
 
 export function encodeMessage(message: GameMessage): string {
   return JSON.stringify(message);
@@ -228,6 +250,7 @@ function parsePlayers(v: unknown): PlayerInfo[] | null {
   return players;
 }
 
+const isNum = (v: unknown): v is number => typeof v === 'number' && Number.isFinite(v);
 const isUnit = (v: unknown): v is number => typeof v === 'number' && v >= 0 && v <= 1;
 const parseSpotList = (v: unknown): SpotEntry[] =>
   Array.isArray(v)
@@ -358,6 +381,15 @@ export function parseMessage(text: string): GameMessage | null {
       if (!isPage(m.page)) return null;
       if (m.lv !== null && m.lv !== 0 && m.lv !== 1 && m.lv !== 2) return null;
       return { type: 'paint-page', page: m.page, lv: m.lv as NumberLevel | null };
+    case 'car': {
+      const c = m.car as Record<string, unknown> | undefined;
+      if (!c || !isNum(c.x) || !isNum(c.y) || !isNum(c.h) || !isId(c.k) || !isInt(c.p) || c.p < 0 || c.p > 31) return null;
+      if (Math.abs(c.x) > 5000 || Math.abs(c.y) > 5000) return null;
+      const car: CarSpot = { x: c.x, y: c.y, h: c.h, k: c.k.slice(0, 24), p: c.p, ...(c.st === true ? { st: true } : {}) };
+      return { type: 'car', ...(isId(m.id) ? { id: m.id } : {}), car };
+    }
+    case 'honk':
+      return isId(m.to) ? { type: 'honk', to: m.to, ...(isId(m.from) ? { from: m.from } : {}) } : null;
     default:
       return null;
   }

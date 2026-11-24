@@ -12,6 +12,31 @@
 - With the room lights off, a built fort glows from inside.
 - No new save data version and no Nearby protocol change: the blanket is kept in the fort's item id, and friends' phones with this update see your fort when they visit.
 
+## 2026-11-24 (Tree house sleeping bags)
+
+- **Three sleeping bags in the tree house** (red, blue and green), rolled up and hanging on pegs on the wall. Tap one to roll it out on the floor, tap it again to roll it back up.
+- **Drag anyone onto a rolled-out bag and they climb in**, head on the pillow and the bag pulled up to the chin. Tap them to hop out, or drag them out.
+- **Turn the lights off** and everyone in a bag closes their eyes and Zzz float up. When everybody is tucked in, it's a "Sleepover! Goodnight, everyone!" Lights back on means a big good-morning stretch.
+- The colored mats under everyone are gone. People and buddies now have a soft shadow under their feet, like at home.
+- No new APK needed: tap Update now (or restart) to get it.
+
+## 2026-11-24 (Tree house coins)
+
+- **The treasure chest in the tree house now has coins once a day.** The first time each player opens it each day, it gives 10 coins with a little party. While today's coins are waiting, a 🪙 sits on the closed chest. After that the chest still shows its treasures and says "Come back tomorrow for more coins."
+- Each player has their own daily coins, and the day starts at midnight on the phone's clock.
+- No new APK needed: tap Update now (or restart) to get it.
+
+## 2026-11-24 (Drive around the town)
+
+- **The Town is now a place you drive.** It is drawn from above in the game's own style: roofs, signs, roads with lines and zebra crossings, a roundabout with a fountain, trees, street lamps, a duck pond, chimney smoke, someone out for a walk, birds and drifting cloud shadows. At night (8 PM to 6 AM on the phone's clock) the lamps and windows light up.
+- **Two ways to drive.** *Tap to drive* (the start for K and 1st): tap a building or a road and the car drives there by itself, with a dotted line showing the way. *Wheel and GO* (the start for 2nd up): hold GO to drive and turn the wheel the way you want to go at the next crossing; an arrow on the road shows which way you will turn. There is a horn and a turn-around button. On a computer: arrow keys or WASD, space to honk. Switch in My car.
+- **Cars never leave the road**, keep to the right and go round the roundabout, so nobody gets stuck or lost.
+- **Park and go in.** Every building has a parking spot by its door. Stop there and a big **Go in** button appears. Where to? lists every place. Walk switches back to the old look-around map.
+- **8 cars to drive**, all drawn in code: little round car and pickup truck (free), ice cream van, school bus, bakery van and farm tractor (coins), fire truck (50 stars, lights flash when you honk) and race car (175 stars, fastest). Paint any car one of 8 colors for free; the rainbow stripe is 30 coins. Your buddies ride along. At 100 stars every car gets a faster gear.
+- **Fun stops:** car wash (bubbles), gas pump (fills a meter) and a bakery drive-through window.
+- **Drive with friends.** On a visit, everyone's cars drive in the same town with name flags. Tap a friend's car to honk at them, tap it twice to follow them. Nearby protocol 11; older phones can still visit, they just don't see the cars.
+- No new APK needed: tap Update now (or restart) to get it.
+
 ## 2026-11-21 (3D printer)
 
 - **3D printer** on the Appliances shelf of the buddy home's Shop, 150 coins. Tap it to open the printer panel.

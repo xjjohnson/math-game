@@ -1,3 +1,4 @@
+import { buyCar as buyCarFor, garageOf, type CarBuy } from '@/utils/garage';
 import { useSyncExternalStore } from 'react';
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
@@ -10,7 +11,7 @@ import { migrateProfiles, PROFILES_VERSION } from '@/store/profileMigrations';
 import { noteHelp } from '@/utils/skills/plan';
 import { createSafeStorage, type LoadStatus } from '@/store/safeStorage';
 import { rawStorage } from '@/store/storage';
-import type { AnswerRecord, Grade, InputStyle, Profile } from '@/types';
+import type { AnswerRecord, Garage, Grade, InputStyle, Profile } from '@/types';
 import { dateKey } from '@/utils/dates';
 import { applyRound, type RoundOutcome, type RoundResult } from '@/utils/progress';
 import { careForBuddy as applyCare, heartForRound, type CareAction, type CareResult } from '@/utils/buddy';
@@ -30,6 +31,7 @@ import {
   type RoomBuyResult,
 } from '@/utils/room';
 import { setFortBlanket, type FortResult } from '@/utils/fort';
+import { claimTreeHouseCoins } from '@/utils/treeHouse';
 import { buyFilament, printToy, recordPrinterCheck, type FilamentBuyResult, type PrintResult } from '@/utils/printer';
 import { grantStarRewards } from '@/utils/starLevels';
 import { finishShift, type BuildingId, type ShiftPay } from '@/utils/town';
@@ -106,6 +108,10 @@ interface ProfilesState {
   setAvatar: (id: string, avatar: string) => void;
   /** Parent area: adds (or with a minus, takes away) coins and stars, never below zero. */
   adjustBalance: (id: string, change: { coins?: number; stars?: number }) => void;
+  /** Buys a car (or the rainbow stripe) for the town with coins. */
+  buyCar: (id: string, carId: string) => CarBuy;
+  /** Changes the car, paint or steering (see utils/garage.ts). */
+  setGarage: (id: string, change: Partial<Garage>) => void;
   /** Pets, feeds or plays with the buddy in use. */
   careForBuddy: (id: string, action: CareAction) => CareResult;
   /** Buys a thing for the buddies' home and sets it down in `area` (an index into HOME_AREAS). */
@@ -148,6 +154,8 @@ interface ProfilesState {
   recordPrinterCheck: (id: string, history: AnswerRecord[]) => number;
   /** Sets up a folded blanket fort, or changes a built one's blanket. */
   setFortBlanket: (id: string, key: string, blanket: string) => FortResult;
+  /** Takes today's coins from the tree house chest; returns how many (0 if already taken today). */
+  claimTreeHouseCoins: (id: string) => number;
 }
 
 /** Where the profiles are saved: backed up before each upgrade, and never saved over by a failed load. */
@@ -213,6 +221,15 @@ export const useProfiles = create<ProfilesState>()(
               : p,
           ),
         })),
+      buyCar: (id, carId) => {
+        const current = get().profiles.find((p) => p.id === id);
+        if (!current) return { ok: false, reason: 'unknown' };
+        const result = buyCarFor(current, carId);
+        if (result.ok) set((s) => ({ profiles: s.profiles.map((p) => (p.id === id ? { ...p, coins: result.coins, garage: result.garage } : p)) }));
+        return result;
+      },
+      setGarage: (id, change) =>
+        set((s) => ({ profiles: s.profiles.map((p) => (p.id === id ? { ...p, garage: { ...garageOf(p), ...change } } : p)) })),
       careForBuddy: (id, action) => {
         const current = get().profiles.find((p) => p.id === id);
         if (!current) return { ok: false, reason: 'noBuddy' };
@@ -326,6 +343,13 @@ export const useProfiles = create<ProfilesState>()(
         const { profile, learned } = recordPrinterCheck(current, history, dateKey());
         set((s) => ({ profiles: s.profiles.map((p) => (p.id === id ? profile : p)) }));
         return learned;
+      },
+      claimTreeHouseCoins: (id) => {
+        const current = get().profiles.find((p) => p.id === id);
+        if (!current) return 0;
+        const { profile, coins } = claimTreeHouseCoins(current, dateKey());
+        if (coins) set((s) => ({ profiles: s.profiles.map((p) => (p.id === id ? profile : p)) }));
+        return coins;
       },
       noteSkillHelp: (id, skill) =>
         set((s) => ({

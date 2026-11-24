@@ -6,6 +6,7 @@ import Svg, { Circle, Ellipse, Path, Polygon } from 'react-native-svg';
 import { Text } from '@/components/AppText';
 import { BlanketSheet } from '@/components/BlanketFort';
 import { BuddyFigure } from '@/components/BuddyFigure';
+import { GroundShadow } from '@/components/GroundShadow';
 import type { HomeBuddy } from '@/components/BuddyRoom';
 import { Drifting, Flicker, FloatUp, Glide, Lively, type BounceKind } from '@/components/Motion';
 import { PersonFigure } from '@/components/PersonFigure';
@@ -293,9 +294,8 @@ export function FortInside({ width: w, height: h, blanket, buddies, extras, next
           onResponderMove={(e) => setBeam({ x: e.nativeEvent.locationX, y: e.nativeEvent.locationY + top + unit * 0.06 })}
         />
 
-        {/* The floor: a soft rug of sleeping bags. */}
+        {/* The floor. */}
         <View style={[styles.floor, at(0, floor, cw, h - floor)]} />
-        <View style={[styles.bag, at(screen * 0.55, floor + (h - floor) * 0.15, mainW * 0.5, (h - floor) * 0.5)]} />
 
         {/* The tunnel through to the second room. */}
         {tunnel ? (
@@ -424,7 +424,7 @@ export function FortInside({ width: w, height: h, blanket, buddies, extras, next
                 onResponderTerminationRequest={() => false}
                 style={StyleSheet.absoluteFill}
               >
-                <View pointerEvents="none" style={[styles.cushion, at(fig * 0.1, fig * 0.86, fig * 0.8, fig * 0.16), { backgroundColor: BULBS[(i + 1) % BULBS.length], borderRadius: fig, opacity: held ? 0 : 1 }]} />
+                <GroundShadow width={fig * 0.42} hidden={held} style={{ left: fig / 2 - fig * 0.21, bottom: -fig * 0.035 }} />
                 <Lively height={fig} seed={b.id} breathe={!held} asleep={sleeping} bounce={bump?.n} bounceKind={bump?.kind} style={StyleSheet.absoluteFill}>
                   {b.person ? (
                     <PersonFigure look={b.person.look} size={fig} dressed={b.person.dressed} gift={b.gift} alive asleep={sleeping} mood={held ? 'happy' : b.mood} wave={bump?.kind === 'hop' ? bump.n : undefined} />
@@ -546,7 +546,6 @@ const styles = StyleSheet.create({
   inside: { backgroundColor: '#3A2A33', overflow: 'hidden' },
   sag: { backgroundColor: 'rgba(0,0,0,0.18)', borderBottomLeftRadius: 999, borderBottomRightRadius: 999 },
   floor: { backgroundColor: '#8C6D5A', borderTopWidth: 4, borderColor: OUTLINE },
-  bag: { backgroundColor: '#5C7FBF', borderWidth: 3, borderColor: OUTLINE, borderRadius: 30 },
   tunnel: { backgroundColor: '#1E1418', borderWidth: 3, borderColor: OUTLINE, borderTopLeftRadius: 999, borderTopRightRadius: 999 },
   pole: { backgroundColor: '#C08A5B', borderWidth: 2, borderColor: OUTLINE, borderRadius: 4 },
   pillow: { position: 'absolute', borderWidth: 2.5, borderColor: OUTLINE, borderRadius: 18 },
@@ -559,7 +558,6 @@ const styles = StyleSheet.create({
   moon: { backgroundColor: 'rgba(255,255,255,0.85)', borderWidth: 3, borderColor: OUTLINE, alignItems: 'center', justifyContent: 'center' },
   wire: { backgroundColor: '#3E2723' },
   bulb: { flex: 1, borderRadius: 6, borderWidth: 1.5, borderColor: '#3E2723' },
-  cushion: { borderWidth: 2, borderColor: OUTLINE },
   lump: { backgroundColor: 'rgba(0,0,0,0.2)', borderWidth: 2, borderColor: 'rgba(78,51,36,0.35)' },
   zzz: { position: 'absolute', top: -10, right: 0 },
   raised: { zIndex: 5 },

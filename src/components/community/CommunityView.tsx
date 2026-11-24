@@ -9,7 +9,7 @@ import { GridPaper, panelFace, pillFace } from '@/components/Chrome';
 import { TabBar, type TabId } from '@/components/TabBar';
 import { CommunityRoom } from '@/components/community/CommunityRoom';
 import { JoinBubble } from '@/components/community/JoinBubble';
-import { TownMap } from '@/components/community/TownMap';
+import { DriveTown } from '@/components/community/DriveTown';
 import { VisitPanel } from '@/components/VisitPanel';
 import { colors, radius, spacing, TAP_TARGET } from '@/constants/theme';
 import { usePlace } from '@/hooks/usePlace';
@@ -40,7 +40,7 @@ export function CommunityView({ place, actions, needsPermission = false, tab }: 
     <SafeAreaView style={styles.safe} edges={tab ? ['left', 'right'] : ['bottom', 'left', 'right']}>
       <View style={styles.fill}>
         {place === 'street' ? (
-          <TownMap onDoor={goInside} />
+          <DriveTown onDoor={goInside} />
         ) : (
           <CommunityRoom place={place} onDoor={goInside} onExit={() => router.back()} />
         )}

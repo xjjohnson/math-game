@@ -138,6 +138,22 @@ export interface Profile {
   skills: Record<SkillId, SkillProgress>;
   /** 3D printer filament: toys left to print, by filament id (constants/printer.ts). */
   filament: Record<string, number>;
+  /** The car driven round the town, its paint and how it is steered. Missing until first changed. */
+  garage?: Garage;
+  /** Local date ("YYYY-MM-DD") the tree house chest coins were last taken; missing means never. */
+  treeHouseCoinsDay?: string;
+}
+
+/** A player's car choice for the town (see utils/garage.ts for the defaults). */
+export interface Garage {
+  car?: string;
+  /** Index into CAR_PAINTS. */
+  paint?: number;
+  /** The rainbow stripe is on (once bought). */
+  stripe?: boolean;
+  controls?: 'tap' | 'wheel';
+  /** Cars (and the stripe) bought with coins. */
+  owned?: string[];
 }
 
 /** New game screen picks (grade and difficulty are kept on the profile itself). */
@@ -218,6 +234,8 @@ export interface Equipped {
   background: string;
   cardStyle: string;
   companion: string | null;
+  /** Voice shop item that reads aloud for this player (profile store version 16). */
+  voice: string;
 }
 
 export interface WeekProgress {
