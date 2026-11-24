@@ -1,5 +1,11 @@
 # Change log
 
+## 2026-11-24 (Tree house coins)
+
+- **The treasure chest in the tree house now has coins once a day.** The first time each player opens it each day, it gives 10 coins with a little party. While today's coins are waiting, a 🪙 sits on the closed chest. After that the chest still shows its treasures and says "Come back tomorrow for more coins."
+- Each player has their own daily coins, and the day starts at midnight on the phone's clock.
+- No new APK needed: tap Update now (or restart) to get it.
+
 ## 2026-11-24 (Drive around the town)
 
 - **The Town is now a place you drive.** It is drawn from above in the game's own style: roofs, signs, roads with lines and zebra crossings, a roundabout with a fountain, trees, street lamps, a duck pond, chimney smoke, someone out for a walk, birds and drifting cloud shadows. At night (8 PM to 6 AM on the phone's clock) the lamps and windows light up.

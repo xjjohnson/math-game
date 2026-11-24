@@ -62,6 +62,8 @@ interface Props {
   height: number;
   /** Buddies up in the tree house. */
   buddies: HomeBuddy[];
+  /** Today's coins are still in the treasure chest (they come once a day). */
+  coinsReady?: boolean;
   onEvent: (e: TreeHouseEvent) => void;
   onTapBuddy: (id: string) => void;
   onClose: () => void;
@@ -83,7 +85,7 @@ interface Spot {
  * and a bucket on a rope that brings up snacks. Buddies who climbed up are drawn as big as at
  * home and can be dragged anywhere on the floor.
  */
-export function TreeHouseInside({ width: w, height: h, buddies, onEvent, onTapBuddy, onClose }: Props) {
+export function TreeHouseInside({ width: w, height: h, buddies, coinsReady, onEvent, onTapBuddy, onClose }: Props) {
   const { animate } = useMotion();
   const [lights, setLights] = useState(true);
   const [chest, setChest] = useState(false);
@@ -140,7 +142,7 @@ export function TreeHouseInside({ width: w, height: h, buddies, onEvent, onTapBu
     const [emoji, name] = TREASURES[turns.current.treasure % TREASURES.length];
     if (now) {
       turns.current.treasure++;
-      popAt(chestBox.left + chestBox.width / 2, floor - chestBox.height, emoji);
+      popAt(chestBox.left + chestBox.width / 2, floor - chestBox.height, coinsReady ? '🪙' : emoji);
       hopAll('hop');
     }
     onEvent({ kind: 'chest', open: now, treasure: name });
@@ -273,7 +275,7 @@ export function TreeHouseInside({ width: w, height: h, buddies, onEvent, onTapBu
         <Pressable
           onPress={openChest}
           accessibilityRole="button"
-          accessibilityLabel={chest ? 'Shut the treasure chest' : 'Open the treasure chest'}
+          accessibilityLabel={chest ? 'Shut the treasure chest' : coinsReady ? 'Open the treasure chest, coins inside today' : 'Open the treasure chest'}
           style={at(chestBox.left, floor - chestBox.height * 1.5, chestBox.width, chestBox.height * 1.5)}
         >
           {chest ? <View style={[styles.gold, at(chestBox.width * 0.1, chestBox.height * 0.45, chestBox.width * 0.8, chestBox.height * 0.25)]} /> : null}
@@ -281,6 +283,9 @@ export function TreeHouseInside({ width: w, height: h, buddies, onEvent, onTapBu
           <View style={[styles.chest, at(0, chestBox.height * 0.7, chestBox.width, chestBox.height * 0.8)]}>
             <View style={styles.lock} />
           </View>
+          {coinsReady && !chest ? (
+            <Text style={[styles.coinHint, { left: chestBox.width * 0.7, top: 0, fontSize: Math.round(unit * 0.05) }]}>🪙</Text>
+          ) : null}
         </Pressable>
 
         {/* A bucket on a rope out of a hole in the floor: pull it to bring up a snack. */}
@@ -401,6 +406,7 @@ const styles = StyleSheet.create({
   bucketBand: { marginTop: '30%', height: 4, backgroundColor: '#607D8B' },
   gold: { backgroundColor: '#FFD54F', borderWidth: 2, borderColor: '#F9A825', borderRadius: 99 },
   lid: { backgroundColor: '#8D6E63', borderWidth: 3, borderColor: OUTLINE, borderTopLeftRadius: 30, borderTopRightRadius: 30 },
+  coinHint: { position: 'absolute' },
   chest: { backgroundColor: '#A1887F', borderWidth: 3, borderColor: OUTLINE, borderRadius: 4, alignItems: 'center' },
   lock: { marginTop: -6, width: 14, height: 16, borderRadius: 3, backgroundColor: '#FFCA28', borderWidth: 2, borderColor: OUTLINE },
   cushion: { borderWidth: 2, borderColor: OUTLINE },
