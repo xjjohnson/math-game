@@ -39,3 +39,7 @@ yarn-error.*
 # generated native folders (made by `npx expo prebuild`)
 /ios
 /android
+
+# Story Voice: downloaded by the Android workflow, too big for git
+modules/math-voice/android/libs/
+modules/math-voice/android/src/main/assets/voices/
