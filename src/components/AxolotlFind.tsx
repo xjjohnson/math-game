@@ -10,7 +10,7 @@ import { SkillQuestionCard } from '@/components/SkillQuestionCard';
 import { colors, radius, spacing } from '@/constants/theme';
 import { useActiveProfile, useProfiles } from '@/store/profiles';
 import type { AnswerRecord, Problem } from '@/types';
-import { AXOLOTL_NAME, colorOf, hasCrown, lolosQuestion, type HideSpot } from '@/utils/axolotl';
+import { AXOLOTL_NAME, coinsFor, colorOf, hasCrown, JACKPOT, levelFor, RUN_MAX, runQuestion, type HideSpot } from '@/utils/axolotl';
 import { createRng, randomSeed } from '@/utils/seededRandom';
 
 /** Lolo was just tapped: the find panel is open over whatever screen it was on. */
@@ -46,7 +46,20 @@ export function HiddenLolo({ spot, size, style }: { spot: HideSpot; size: number
   );
 }
 
-type Step = { kind: 'hello' } | { kind: 'question'; problem: Problem; n: number; answered: boolean | null } | { kind: 'paid'; coins: number; stars: number; learned: number; unlock: string | null };
+type Step =
+  | { kind: 'hello' }
+  | { kind: 'question'; problem: Problem; n: number; answered: boolean | null; over: boolean }
+  | { kind: 'done'; missed: boolean };
+
+/** What today's run has paid so far, shown as Lolo's treasure jar. */
+interface Jar {
+  coins: number;
+  stars: number;
+  learned: number;
+  run: number;
+  best: boolean;
+  unlock: string | null;
+}
 
 /** Put once at the top of the app: the panel that opens when Lolo is found. */
 export function AxolotlFindHost() {
@@ -54,30 +67,47 @@ export function AxolotlFindHost() {
   return open ? <FindPanel /> : null;
 }
 
+/**
+ * Lolo's run: question after question, harder as it goes, until a miss or RUN_MAX right.
+ * Each right answer pays straight away (into the jar), so stopping or leaving keeps it all.
+ */
 function FindPanel() {
   const profile = useActiveProfile();
   const hide = useLoloFind((s) => s.hide);
-  const claim = useProfiles((s) => s.claimLolo);
+  const start = useProfiles((s) => s.startLolo);
+  const answer = useProfiles((s) => s.answerLolo);
   const [step, setStep] = useState<Step>({ kind: 'hello' });
-  const history = useRef<AnswerRecord[]>([]);
+  const [jar, setJar] = useState<Jar>({ coins: 0, stars: 0, learned: 0, run: 0, best: false, unlock: null });
   const rng = useMemo(() => createRng(randomSeed()), []);
   if (!profile) return null;
   const color = colorOf(profile);
   const crown = hasCrown(profile);
 
-  const ask = (n: number) => setStep({ kind: 'question', problem: lolosQuestion(profile, rng), n, answered: null });
+  const ask = (n: number) => setStep({ kind: 'question', problem: runQuestion(profile, n, rng), n, answered: null, over: false });
 
-  const mood = step.kind === 'paid' ? 'happy' : step.kind === 'question' && step.answered === false ? 'sad' : 'smile';
+  const begin = () => {
+    const r = start(profile.id);
+    if (!r.ok) return hide();
+    setJar((j) => ({ ...j, unlock: r.unlock }));
+    ask(0);
+  };
+
+  const next = step.kind === 'question' ? coinsFor(jar.run + 1) : 0;
+  const mood = step.kind === 'done' ? (step.missed && jar.run === 0 ? 'smile' : 'happy') : step.kind === 'question' && step.answered === false ? 'sad' : step.kind === 'question' && step.answered ? 'happy' : 'smile';
   const words =
     step.kind === 'hello'
-      ? 'You found me! Answer my question and I’ll give you a treat.'
+      ? `You found me! Answer my questions. Each right one is worth more, until you miss one!`
       : step.kind === 'question'
         ? step.answered === true
-          ? 'Yes! You got it!'
+          ? step.over
+            ? `WOW! ${RUN_MAX} in a row! You win my jackpot!`
+            : `Yes! ${jar.run} in a row! The next one is harder.`
           : step.answered === false
-            ? 'Let’s try another one.'
-            : 'Here’s my question...'
-        : `Thanks for finding me! See you tomorrow in a new spot.`;
+            ? 'Oh no, so close! Look at how it works.'
+            : `Question ${step.n + 1}, worth 🪙 ${next}${jar.run + 1 === RUN_MAX ? ` + ${JACKPOT} jackpot` : ''}!`
+        : jar.run === 0
+          ? 'Thanks for finding me! Here’s a little treat. See you tomorrow!'
+          : `${jar.run} in a row! See you tomorrow in a new spot.`;
 
   return (
     <View style={styles.cover}>
@@ -91,8 +121,21 @@ function FindPanel() {
             </View>
           </View>
 
+          {step.kind !== 'hello' ? (
+            <View style={styles.jar} accessible accessibilityLabel={`${jar.run} right in a row, ${jar.coins} coins and ${jar.stars} stars so far`}>
+              <Text style={styles.jarText}>🫙 {jar.run} in a row</Text>
+              <Text style={styles.jarText}>
+                🪙 {jar.coins}
+                {jar.stars ? `   ⭐ ${jar.stars}` : ''}
+              </Text>
+            </View>
+          ) : null}
+
           {step.kind === 'hello' ? (
-            <BigButton label="❓ Ask me!" color={colors.primary} onPress={() => ask(0)} />
+            <>
+              <BigButton label="❓ Ask me!" color={colors.primary} onPress={begin} />
+              <BigButton label="Later" outline small onPress={hide} accessibilityHint="Lolo stays hiding here until you come back" />
+            </>
           ) : null}
 
           {step.kind === 'question' ? (
@@ -102,47 +145,55 @@ function FindPanel() {
                 problem={step.problem}
                 progress={step.problem.skill ? profile.skills?.[step.problem.skill] : undefined}
                 onAnswered={(given, right, helped) => {
-                  history.current.push({
+                  const level = levelFor(step.n, profile.grade);
+                  const pay = answer(profile.id, {
                     problem: step.problem,
-                    difficulty: 'easy',
-                    grade: profile.grade,
+                    difficulty: level.difficulty,
+                    grade: level.grade,
                     given,
                     correct: right,
                     points: 0,
                     ...(helped ? { helped } : {}),
                   });
-                  setStep({ ...step, answered: right });
+                  if (pay) {
+                    setJar((j) => ({
+                      ...j,
+                      coins: j.coins + pay.coins,
+                      stars: j.stars + pay.stars,
+                      learned: j.learned + pay.learned,
+                      run: pay.run,
+                      best: j.best || pay.best,
+                    }));
+                  }
+                  setStep({ ...step, answered: right, over: pay?.over ?? true });
                 }}
               />
-              {step.answered === true ? (
-                <BigButton
-                  label="🎁 Get my treat"
-                  color={colors.correct}
-                  onPress={() => {
-                    const r = claim(profile.id, history.current);
-                    if (r.ok) setStep({ kind: 'paid', coins: r.coins, stars: r.stars, learned: r.learned, unlock: r.unlock });
-                    else hide();
-                  }}
-                />
+              {step.answered === true && !step.over ? (
+                <>
+                  <BigButton label={`➡️ Next question: 🪙 ${coinsFor(jar.run + 1)}`} color={colors.correct} onPress={() => ask(step.n + 1)} />
+                  <BigButton label="Stop and keep my coins" outline small color={colors.primary} onPress={() => setStep({ kind: 'done', missed: false })} />
+                </>
               ) : null}
-              {step.answered === false ? <BigButton label="Try another question" color={colors.primary} onPress={() => ask(step.n + 1)} /> : null}
+              {step.answered !== null && step.over ? (
+                <BigButton label="🎁 See my treasure" color={colors.correct} onPress={() => setStep({ kind: 'done', missed: !step.answered })} />
+              ) : null}
             </>
           ) : null}
 
-          {step.kind === 'paid' ? (
+          {step.kind === 'done' ? (
             <>
               <Text style={styles.reward}>
-                🪙 +{step.coins} {'   '}⭐ +{step.stars}
+                🪙 +{jar.coins}
+                {jar.stars ? `   ⭐ +${jar.stars}` : ''}
               </Text>
-              {step.learned > 0 ? <Text style={styles.note}>You learned a new skill!</Text> : null}
-              {step.unlock ? <Text style={styles.unlock}>🎉 {step.unlock}</Text> : null}
+              {jar.best ? <Text style={styles.unlock}>🏆 Your best run ever: {jar.run}!</Text> : null}
+              {jar.learned > 0 ? <Text style={styles.note}>You learned a new skill!</Text> : null}
+              {jar.unlock ? <Text style={styles.unlock}>🎉 {jar.unlock}</Text> : null}
               <BigButton label="Bye, Lolo!" color={colors.primary} onPress={hide} />
             </>
           ) : null}
-
-          {step.kind !== 'paid' ? <BigButton label="Later" outline small onPress={hide} accessibilityHint="Lolo stays hiding here until you come back" /> : null}
         </ScrollView>
-        {step.kind === 'paid' ? <Confetti burst={1} /> : null}
+        {step.kind === 'done' && jar.run > 0 ? <Confetti burst={1} /> : null}
       </View>
     </View>
   );
@@ -176,4 +227,13 @@ const styles = StyleSheet.create({
   reward: { fontSize: 30, fontWeight: '900', color: colors.text, textAlign: 'center' },
   note: { fontSize: 16, fontWeight: '700', color: colors.textMuted, textAlign: 'center' },
   unlock: { fontSize: 18, fontWeight: '800', color: colors.text, textAlign: 'center' },
+  jar: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    backgroundColor: colors.background,
+    borderRadius: radius.md,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 6,
+  },
+  jarText: { fontSize: 18, fontWeight: '900', color: colors.text },
 });
