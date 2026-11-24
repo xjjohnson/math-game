@@ -1,0 +1,25 @@
+plugins {
+  id 'com.android.library'
+  id 'expo-module-gradle-plugin'
+}
+
+group = 'com.xjjohnson.mathgame'
+version = '0.1.0'
+
+android {
+  namespace "expo.modules.mathvoice"
+  defaultConfig {
+    versionCode 1
+    versionName "0.1.0"
+  }
+  // The voice models are already compressed; don't squeeze them again.
+  androidResources {
+    noCompress += ['onnx']
+  }
+}
+
+dependencies {
+  // sherpa-onnx (offline neural speech). The Android workflow downloads the
+  // release .aar into libs/ before building; it isn't kept in git.
+  implementation fileTree(dir: 'libs', include: ['*.aar'])
+}

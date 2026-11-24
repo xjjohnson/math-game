@@ -1,5 +1,7 @@
 import * as Haptics from 'expo-haptics';
 import * as Speech from 'expo-speech';
+
+import { speakStory, stopStory } from '../../modules/math-voice';
 import { Platform } from 'react-native';
 
 import type { VoiceStyle } from '@/constants/shop';
@@ -54,6 +56,9 @@ export function speakInVoice(text: string, style: VoiceStyle) {
     });
   try {
     Speech.stop();
+    stopStory();
+    // Story voices read at the player's speed; 0.9 is "normal" for the other voices.
+    if (style.story && speakStory(style.story, text, style.rate / 0.9, () => say(voice))) return;
     say(voice);
   } catch {
     // Some browsers have no speech voices; the game works the same without them.
@@ -61,6 +66,7 @@ export function speakInVoice(text: string, style: VoiceStyle) {
 }
 
 export function stopSpeaking() {
+  stopStory();
   try {
     Speech.stop();
   } catch {
