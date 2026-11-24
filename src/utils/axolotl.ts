@@ -1,8 +1,10 @@
 import { HOME_AREAS, type AreaId } from '@/constants/room';
 import { itemsIn } from '@/constants/shop';
-import type { AnswerRecord, Problem, Profile, Rng } from '@/types';
+import type { AnswerRecord, Difficulty, Grade, Problem, Profile, Rng } from '@/types';
 import { addDays, dateSeed } from '@/utils/dates';
-import { printerCheck, recordPrinterCheck } from '@/utils/printer';
+import { recordPrinterCheck } from '@/utils/printer';
+import { findSkill } from '@/utils/skills/catalog';
+import { planRound } from '@/utils/skills/plan';
 import { createRng } from '@/utils/seededRandom';
 import type { BuildingId } from '@/utils/town';
 
@@ -207,10 +209,40 @@ export function hidingAt(profile: Pick<Profile, 'id' | 'house' | 'unlocks' | 'ax
   return todaysSpot(profile, today);
 }
 
-/** Coins and stars for a find: right the first time, or right after a miss. */
-export const FIND_COINS = 15;
-export const FIND_COINS_AFTER_MISS = 10;
-export const FIND_STARS = 1;
+/**
+ * Once found, Lolo asks question after question until a miss (or RUN_MAX right). Each right
+ * answer pays more than the last, straight away, so leaving early keeps what was earned.
+ */
+export const RUN_MAX = 10;
+/** Paid on top for getting all RUN_MAX right. */
+export const JACKPOT = 25;
+/** Paid when the very first question is missed, for finding Lolo. */
+export const THANKS_COINS = 5;
+/** Coins for the 1st, 2nd, ... right answer; the last one repeats. */
+export const RUN_COINS = [10, 10, 15, 15, 20, 20, 25];
+/** Right answers that pay a star: the first, the 5th and the 10th. */
+export const STAR_STEPS = [1, 5, 10];
+
+/** Coins for the `n`th right answer in a row (1-based), with the jackpot on the last. */
+export function coinsFor(n: number): number {
+  const base = RUN_COINS[Math.min(n, RUN_COINS.length) - 1] ?? 0;
+  return base + (n === RUN_MAX ? JACKPOT : 0);
+}
+
+/** All the coins (before the payout setting) and stars a run of `right` in a row pays, ending in a miss or not. */
+export function runTotal(right: number, missed: boolean): { coins: number; stars: number } {
+  if (right === 0) return { coins: missed ? THANKS_COINS : 0, stars: 0 };
+  let coins = 0;
+  for (let n = 1; n <= right; n++) coins += coinsFor(n);
+  return { coins, stars: STAR_STEPS.filter((n) => n <= right).length };
+}
+
+/** How hard question `n` (0-based) is: warm up, just right, challenge, then challenge a grade up. */
+export function levelFor(n: number, grade: Grade): { difficulty: Difficulty; grade: Grade } {
+  const difficulty: Difficulty = n < 2 ? 'easy' : n < 4 ? 'medium' : 'hard';
+  const up = n >= 7 ? Math.min(6, grade + 1) : grade;
+  return { difficulty, grade: up as Grade };
+}
 
 /** Lolo's colours, unlocked by counted finds (never spent). The first is the start colour. */
 export interface AxolotlColor {
@@ -250,34 +282,67 @@ export function unlockAt(finds: number): string | null {
   return color ? `${AXOLOTL_NAME} turned ${color.name.toLowerCase()}!` : null;
 }
 
-/** One question from the player's skill list at their grade (the same pick as the printer check). */
-export function lolosQuestion(profile: Pick<Profile, 'grade' | 'skills'>, rng: Rng): Problem {
-  return printerCheck(profile, rng);
+/** Question `n` (0-based) of today's run, from the player's skill list, harder as the run goes on. */
+export function runQuestion(profile: Pick<Profile, 'grade' | 'skills'>, n: number, rng: Rng): Problem {
+  const level = levelFor(n, profile.grade);
+  const player = { grade: level.grade, skills: profile.skills ?? {} };
+  const [id] = planRound(player, { difficulty: level.difficulty, count: 1, seed: Math.floor(rng() * 2 ** 31) });
+  return findSkill(id)!.make(rng);
 }
 
-export type FindResult =
-  | { ok: true; profile: Profile; coins: number; stars: number; learned: number; unlock: string | null }
-  | { ok: false; reason: 'already' | 'off' };
+export type StartResult = { ok: true; profile: Profile; unlock: string | null } | { ok: false; reason: 'already' | 'off' };
 
-/**
- * Pays for today's find (once a day): coins (scaled by the parent's payout setting) and a
- * star, saves the answers to the skill record, and counts the find for unlocks.
- */
-export function claimFind(profile: Profile, today: string, history: readonly AnswerRecord[], coinPayout = 1): FindResult {
+/** The first question is about to show: today's find is used (and counted for unlocks) from here on. */
+export function startRun(profile: Profile, today: string): StartResult {
   if (axolotlOff(profile)) return { ok: false, reason: 'off' };
   if (foundToday(profile, today)) return { ok: false, reason: 'already' };
-  const firstTry = history.length > 0 && history[0].correct;
-  const coins = Math.round((firstTry ? FIND_COINS : FIND_COINS_AFTER_MISS) * coinPayout);
   const finds = findsOf(profile) + 1;
+  return { ok: true, profile: { ...profile, axolotl: { ...profile.axolotl, day: today, finds, run: 0, over: false } }, unlock: unlockAt(finds) };
+}
+
+export interface AnswerPay {
+  profile: Profile;
+  coins: number;
+  stars: number;
+  learned: number;
+  /** Right answers in a row so far. */
+  run: number;
+  /** The run has ended. */
+  over: boolean;
+  /** A new longest run. */
+  best: boolean;
+}
+
+/**
+ * Pays one answer of today's run as it happens: a right one pays its coins (and a star on
+ * the 1st, 5th and 10th); a miss ends the run (paying the thank-you if it was the first).
+ * Answers after the run has ended, or on another day, pay nothing.
+ */
+export function answerRun(profile: Profile, today: string, record: AnswerRecord, coinPayout = 1): AnswerPay {
+  const state = profile.axolotl;
+  const run = state?.run ?? 0;
+  if (!state || state.day !== today || state.over) return { profile, coins: 0, stars: 0, learned: 0, run, over: true, best: false };
+  const n = record.correct ? run + 1 : run;
+  const over = !record.correct || n >= RUN_MAX;
+  const coins = Math.round((record.correct ? coinsFor(n) : run === 0 ? THANKS_COINS : 0) * coinPayout);
+  const stars = record.correct && STAR_STEPS.includes(n) ? 1 : 0;
+  const best = n > (state.best ?? 0);
   const paid: Profile = {
     ...profile,
     coins: profile.coins + coins,
-    stars: profile.stars + FIND_STARS,
-    axolotl: { ...profile.axolotl, day: today, finds },
+    stars: profile.stars + stars,
+    axolotl: { ...state, run: n, over, best: Math.max(state.best ?? 0, n) },
   };
-  const { profile: next, learned } = recordPrinterCheck(paid, history, today);
-  return { ok: true, profile: next, coins, stars: FIND_STARS, learned, unlock: unlockAt(finds) };
+  const { profile: next, learned } = recordPrinterCheck(paid, [record], today);
+  return { profile: next, coins, stars, learned, run: n, over, best: best && n > 1 };
 }
+
+/** Today's run is under way (started and not over): the panel can pick it up again. */
+export const runGoing = (profile: Pick<Profile, 'axolotl'>, today: string): boolean =>
+  profile.axolotl?.day === today && !profile.axolotl.over;
+
+/** The longest run ever. */
+export const bestRun = (profile: Pick<Profile, 'axolotl'>): number => profile.axolotl?.best ?? 0;
 
 /** Parent area: turns Lolo on or off for a player. */
 export function setAxolotlOff(profile: Profile, off: boolean): Profile {

@@ -1,5 +1,14 @@
 # Change log
 
+## 2026-11-24 (Lolo's question streak)
+
+- **Lolo now keeps asking until you miss.** Questions get harder as you go: two warm-ups, two just right, three challenges, then challenges from the next grade up.
+- **Each right answer is worth more:** 10, 10, 15, 15, 20, 20, then 25 coins each, straight into Lolo's treasure jar. Stars at the 1st, 5th and 10th right answer. **10 in a row** ends with confetti and a 25-coin jackpot (215 coins in all).
+- **A miss ends the run:** Lolo shows how the missed one works and swims off until tomorrow. Missing the very first question still pays 5 coins for finding Lolo.
+- **Stop and keep my coins** after any right answer. Coins are paid as they're earned, so leaving early never loses them, and today's Lolo is used once the first question shows.
+- **Best run** shows on Home under the Lolo clue and in the parent area.
+- No new APK needed: tap Update now (or restart) to get it.
+
 ## 2026-11-24 (Blanket fort)
 
 - **Blanket fort** on the Toys shelf of the buddy home's Shop, 120 coins. It arrives folded up: two chairs and a stack of blankets.

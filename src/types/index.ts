@@ -153,6 +153,12 @@ export interface AxolotlState {
   finds: number;
   /** Switched off in the parent area. */
   off?: boolean;
+  /** Right answers in a row in today's run (the run on `day`). */
+  run?: number;
+  /** Today's run has ended (a miss, or the most right answers). */
+  over?: boolean;
+  /** The longest run ever. */
+  best?: number;
 }
 
 /** A player's car choice for the town (see utils/garage.ts for the defaults). */

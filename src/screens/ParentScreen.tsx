@@ -1,4 +1,4 @@
-import { AXOLOTL_NAME, axolotlOff, FIND_COINS, FIND_COINS_AFTER_MISS, findsOf, foundToday, placeName, todaysSpot } from '@/utils/axolotl';
+import { AXOLOTL_NAME, axolotlOff, bestRun, findsOf, JACKPOT, RUN_COINS, RUN_MAX, THANKS_COINS, foundToday, placeName, todaysSpot } from '@/utils/axolotl';
 import { useEffect, useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 
@@ -268,15 +268,16 @@ function LoloSettings() {
     <View style={styles.card}>
       <Text style={styles.player}>🔎 Where is {AXOLOTL_NAME}?</Text>
       <Text style={styles.line}>
-        {AXOLOTL_NAME} the axolotl hides in a new spot each day for each player. Finding it asks one question and pays{' '}
-        {FIND_COINS} coins and 1 star ({FIND_COINS_AFTER_MISS} coins after a miss), once a day.
+        {AXOLOTL_NAME} the axolotl hides in a new spot each day for each player. Once found, it asks question after
+        question, harder each time, until a miss or {RUN_MAX} right. Each right answer pays more ({RUN_COINS.join(', ')}...
+        coins, +{JACKPOT} at {RUN_MAX}) and stars at 1, 5 and {RUN_MAX} right. Missing the first one pays {THANKS_COINS}. Once a day.
       </Text>
       {profiles.map((p) => {
         const spot = todaysSpot(p, today);
         const status = axolotlOff(p)
           ? 'Turned off'
           : foundToday(p, today)
-            ? `Found today (${findsOf(p)} ${findsOf(p) === 1 ? 'find' : 'finds'} so far)`
+            ? `Found today: ${p.axolotl?.run ?? 0} in a row (best ${bestRun(p)}, ${findsOf(p)} ${findsOf(p) === 1 ? 'find' : 'finds'})`
             : `${spot.name[0].toUpperCase()}${spot.name.slice(1)}, ${placeName(spot)}`;
         return (
           <View key={p.id} style={styles.loloRow}>

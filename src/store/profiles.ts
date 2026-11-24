@@ -1,4 +1,4 @@
-import { claimFind, setAxolotlOff, type FindResult } from '@/utils/axolotl';
+import { answerRun, setAxolotlOff, startRun, type AnswerPay, type StartResult } from '@/utils/axolotl';
 import { buyCar as buyCarFor, garageOf, type CarBuy } from '@/utils/garage';
 import { useSyncExternalStore } from 'react';
 import { create } from 'zustand';
@@ -162,8 +162,10 @@ interface ProfilesState {
   recordPrinterCheck: (id: string, history: AnswerRecord[]) => number;
   /** Sets up a folded blanket fort, or changes a built one's blanket. */
   setFortBlanket: (id: string, key: string, blanket: string) => FortResult;
-  /** Pays for finding Lolo today (once a day) and saves the answers to the skill record. */
-  claimLolo: (id: string, history: AnswerRecord[]) => FindResult;
+  /** Starts today's Lolo run (uses today's find). */
+  startLolo: (id: string) => StartResult;
+  /** Pays one answer of today's Lolo run as it happens and saves it to the skill record. */
+  answerLolo: (id: string, record: AnswerRecord) => AnswerPay | null;
   /** Parent area: turns Lolo on or off for a player. */
   setLoloOff: (id: string, off: boolean) => void;
   /** Takes today's coins from the tree house chest; returns how many (0 if already taken today). */
@@ -360,12 +362,19 @@ export const useProfiles = create<ProfilesState>()(
         set((s) => ({ profiles: s.profiles.map((p) => (p.id === id ? profile : p)) }));
         return learned;
       },
-      claimLolo: (id, history) => {
+      startLolo: (id) => {
         const current = get().profiles.find((p) => p.id === id);
         if (!current) return { ok: false, reason: 'off' };
-        const result = claimFind(current, dateKey(), history, useSettings.getState().coinPayout);
+        const result = startRun(current, dateKey());
         if (result.ok) set((s) => ({ profiles: s.profiles.map((p) => (p.id === id ? result.profile : p)) }));
         return result;
+      },
+      answerLolo: (id, record) => {
+        const current = get().profiles.find((p) => p.id === id);
+        if (!current) return null;
+        const pay = answerRun(current, dateKey(), record, useSettings.getState().coinPayout);
+        set((s) => ({ profiles: s.profiles.map((p) => (p.id === id ? pay.profile : p)) }));
+        return pay;
       },
       setLoloOff: (id, off) =>
         set((s) => ({ profiles: s.profiles.map((p) => (p.id === id ? setAxolotlOff(p, off) : p)) })),

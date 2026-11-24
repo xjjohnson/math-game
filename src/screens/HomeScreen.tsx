@@ -1,5 +1,5 @@
 import { Axolotl } from '@/components/Axolotl';
-import { clueFor, colorOf, foundToday, hasCrown } from '@/utils/axolotl';
+import { bestRun, clueFor, colorOf, foundToday, hasCrown } from '@/utils/axolotl';
 import { router } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { Pressable, StyleSheet, useWindowDimensions, View } from 'react-native';
@@ -97,7 +97,10 @@ export function HomeScreen() {
           {loloClue ? (
             <View style={styles.lolo} accessible accessibilityLabel={loloClue}>
               <Axolotl size={34} pose={loloFound ? 'whole' : 'peek'} mood={loloFound ? 'happy' : 'smile'} color={colorOf(profile)} crown={hasCrown(profile)} alive={!loloFound} />
-              <Text style={styles.loloText}>{loloFound ? `✓ ${loloClue}` : loloClue}</Text>
+              <Text style={styles.loloText}>
+                {loloFound ? `✓ ${loloClue}` : loloClue}
+                {bestRun(profile) > 0 ? ` Best run: ${bestRun(profile)}` : ''}
+              </Text>
             </View>
           ) : null}
         </>
