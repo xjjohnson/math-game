@@ -1,4 +1,4 @@
-import { findRoomItem, MAX_ROOM_THINGS } from '@/constants/room';
+import { findRoomItem, MAX_THINGS_PER_ROOM } from '@/constants/room';
 import { parsePrintId, printId, PRINTER_ITEM, PRINTS_PER_SPOOL, SPOOL_PRICE } from '@/constants/printer';
 import { makeProfile } from '@/test/fixtures';
 import type { Profile, RoomThing } from '@/types';
@@ -57,7 +57,7 @@ describe('3D printer', () => {
     expect(printToy(stocked, 'p1', 'dragon', 'red', 'k')).toEqual({ ok: false, reason: 'locked' });
     expect(printToy({ ...stocked, stars: 175 }, 'p1', 'dragon', 'red', 'k').ok).toBe(true);
     expect(printToy(stocked, 'nope', 'star', 'red', 'k')).toEqual({ ok: false, reason: 'noPrinter' });
-    const things = Array.from({ length: MAX_ROOM_THINGS }, (_, i) => ({ key: `t${i}`, itemId: 'ball', placed: true, x: 0.1, y: 0.9 }));
+    const things = Array.from({ length: MAX_THINGS_PER_ROOM * 5 }, (_, i) => ({ key: `t${i}`, itemId: 'ball', placed: true, x: 0.1, y: 0.9 }));
     things[0] = stocked.room.things[0];
     expect(printToy({ ...stocked, room: { ...stocked.room, things } }, 'p1', 'star', 'red', 'k')).toEqual({ ok: false, reason: 'full' });
   });

@@ -144,12 +144,15 @@ export function placeName(spot: HideSpot): string {
 }
 
 /**
- * The home rooms a player can hide in: the starting rooms plus the ones they bought. None
- * until they have a buddy, since the buddy home only opens once they do.
+ * The home rooms a player can hide in: the rooms in their house that the hiding spots are
+ * written for (the starting rooms and the original backyard, study, garage and bedrooms 2
+ * and 3; rooms built later are skipped). None until they have a buddy, since the buddy home
+ * only opens once they do.
  */
-export function ownedAreas(profile: Pick<Profile, 'homeRooms' | 'unlocks'>): AreaId[] {
+export function ownedAreas(profile: Pick<Profile, 'house' | 'unlocks'>): AreaId[] {
   if (!itemsIn('companion').some((item) => item.price === 0 || profile.unlocks.includes(item.id))) return [];
-  return HOME_AREAS.filter((a) => a.price === undefined || profile.homeRooms.includes(a.id)).map((a) => a.id);
+  const have = new Set((profile.house ?? []).filter((r) => r.id === r.look).map((r) => r.id));
+  return HOME_AREAS.filter((a) => have.has(a.id)).map((a) => a.id);
 }
 
 /** The spots open to a player who owns these home rooms (town spots are open to everyone). */
@@ -185,7 +188,7 @@ export function spotFor(day: string, playerId: string, owned: readonly string[])
 }
 
 /** Today's spot for a profile. */
-export function todaysSpot(profile: Pick<Profile, 'id' | 'homeRooms' | 'unlocks'>, today: string): HideSpot {
+export function todaysSpot(profile: Pick<Profile, 'id' | 'house' | 'unlocks'>, today: string): HideSpot {
   return spotFor(today, profile.id, ownedAreas(profile));
 }
 
@@ -199,7 +202,7 @@ export const foundToday = (profile: Pick<Profile, 'axolotl'>, today: string): bo
 export const findsOf = (profile: Pick<Profile, 'axolotl'>): number => profile.axolotl?.finds ?? 0;
 
 /** Lolo is hiding at this spot for the player right now (not found yet today, not switched off). */
-export function hidingAt(profile: Pick<Profile, 'id' | 'homeRooms' | 'unlocks' | 'axolotl'>, today: string): HideSpot | null {
+export function hidingAt(profile: Pick<Profile, 'id' | 'house' | 'unlocks' | 'axolotl'>, today: string): HideSpot | null {
   if (axolotlOff(profile) || foundToday(profile, today)) return null;
   return todaysSpot(profile, today);
 }
@@ -283,7 +286,7 @@ export function setAxolotlOff(profile: Profile, off: boolean): Profile {
 }
 
 /** The Home clue: where to start looking. Little ones (K to 2nd) also hear the room or building. */
-export function clueFor(profile: Pick<Profile, 'id' | 'homeRooms' | 'unlocks' | 'axolotl' | 'grade'>, today: string): string | null {
+export function clueFor(profile: Pick<Profile, 'id' | 'house' | 'unlocks' | 'axolotl' | 'grade'>, today: string): string | null {
   if (axolotlOff(profile)) return null;
   if (foundToday(profile, today)) return `You found ${AXOLOTL_NAME} today!`;
   const spot = todaysSpot(profile, today);

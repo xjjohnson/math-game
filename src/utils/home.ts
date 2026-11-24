@@ -1,25 +1,25 @@
 import {
-  APPLIANCES,
   BUDDY_SIZE,
   FORT,
-  BUILT_IN_SEATS,
+  type BuiltIns,
+  builtInsOf,
   type BuiltInSeat,
-  CUPBOARDS,
   findBuiltInSeat,
   findCupboard,
+  findSurface,
   type Gadget,
   findRoomItem,
-  HOME_AREAS,
   isSmall,
   ROOM_SPAN,
-  SURFACES,
   type Cupboard,
   type FixtureSpot,
   type RoomItem,
+  type RoomPlace,
   type Surface,
 } from '@/constants/room';
 import type { BuddySpot, Room, RoomThing } from '@/types';
-import { AREA_COUNT, BUDDY_KEY, FIXTURE_KEY, FLOOR_LINE, type Placement } from '@/utils/room';
+import { startingHouse } from '@/utils/room';
+import { BUDDY_KEY, FIXTURE_KEY, FLOOR_LINE, type Placement } from '@/utils/room';
 
 /** The home's size in pixels, worked out from the space it has on screen. */
 export interface HomeSize {
@@ -34,26 +34,31 @@ export interface HomeSize {
   unit: number;
   /** Where the wall meets the floor. */
   floorY: number;
-  /** Area ids left to right; built-ins sit in their room wherever it is. */
+  /** Room ids left to right; built-ins sit in their room wherever it is. */
   order: string[];
+  /** Every built-in in the home, placed in its room. */
+  built: BuiltIns;
 }
 
-export function homeSize(viewWidth: number, viewHeight: number, order: string[] = HOME_AREAS.map((a) => a.id)): HomeSize {
+export function homeSize(viewWidth: number, viewHeight: number, rooms: RoomPlace[] = DEFAULT_ROOMS): HomeSize {
   const unit = Math.round(Math.min(viewHeight, viewWidth * 1.15));
   // Sized from the height, not the width, so a wide tablet shows more of the room rather than
   // stretching it; the room is still far wider than any screen.
   const screen = Math.round(unit * 1.05);
   const areaWidth = Math.round(screen * ROOM_SPAN);
   return {
-    width: areaWidth * AREA_COUNT,
+    width: areaWidth * Math.max(1, rooms.length),
     height: Math.round(viewHeight),
     screen,
     areaWidth,
     unit,
     floorY: Math.round(viewHeight * FLOOR_LINE),
-    order,
+    order: rooms.map((r) => r.id),
+    built: builtInsOf(rooms),
   };
 }
+
+const DEFAULT_ROOMS: RoomPlace[] = startingHouse();
 
 export interface Box {
   left: number;
@@ -178,7 +183,8 @@ export function ledgeOf(p: Piece): number | null {
  * Things in shut cupboards are left out. Sorted back to front.
  */
 export function layoutHome(room: Room, buddies: BuddyAt[], size: HomeSize, open: ReadonlySet<string>): Piece[] {
-  const { width: W, height: H, unit } = size;
+  // Spots are in rooms across the home.
+  const { areaWidth: W, height: H, unit } = size;
   const things = new Map(room.things.filter((t) => t.placed).map((t) => [t.key, t]));
   const buddyAt = new Map(buddies.map((b) => [BUDDY_KEY + b.id, b]));
   const done = new Map<string, Piece | null>();
@@ -239,7 +245,7 @@ export function layoutHome(room: Room, buddies: BuddyAt[], size: HomeSize, open:
     let y = t.y * H;
     let parent: Piece | null = null;
     if (t.on?.startsWith(FIXTURE_KEY)) {
-      const s = SURFACES.find((f) => FIXTURE_KEY + f.id === t.on);
+      const s = findSurface(t.on.slice(FIXTURE_KEY.length));
       if (s) {
         const line = surfaceLine(s, size);
         y = line.y;
@@ -334,11 +340,11 @@ export function dropThing(
 ): Placement {
   const baseX = piece.x + dx;
   const baseY = piece.y + dy;
-  const free = { x: baseX / size.width, y: baseY / size.height };
+  const free = { x: baseX / size.areaWidth, y: baseY / size.height };
   if (!piece.item || !isSmall(piece.item)) return free;
   const midY = baseY - piece.height / 2;
 
-  for (const c of CUPBOARDS) {
+  for (const c of size.built.cupboards) {
     if (!open.has(c.id)) continue;
     const { inner, row, band, capacity } = shelvesOf(c, size);
     if (!inside(baseX, midY, inner)) continue;
@@ -367,7 +373,7 @@ export function dropThing(
     .pop();
   if (rest) return { x: free.x, y: (ledgeOf(rest) ?? baseY) / size.height, on: rest.key };
 
-  for (const s of SURFACES) {
+  for (const s of size.built.surfaces) {
     const line = surfaceLine(s, size);
     if (baseX < line.left || baseX > line.right) continue;
     if (baseY >= line.y - size.unit * 0.12 && baseY <= line.y + size.unit * s.depth) {
@@ -391,10 +397,10 @@ export function dropBuddy(pieces: Piece[], piece: Piece, dx: number, dy: number,
       return Math.abs(baseX - p.x) <= p.width / 2 && baseY >= ledge - size.unit * 0.2 && baseY <= p.y + size.unit * 0.05;
     })
     .pop();
-  if (seat) return { x: baseX / size.width, y: (ledgeOf(seat) ?? baseY) / size.height, on: seat.key };
+  if (seat) return { x: baseX / size.areaWidth, y: (ledgeOf(seat) ?? baseY) / size.height, on: seat.key };
   // Of the built-ins it is over, the one whose rim is nearest (the top or bottom bunk); a swing someone else is on is full.
   let best: { s: BuiltInSeat; line: ReturnType<typeof seatLine>; far: number } | null = null;
-  for (const s of BUILT_IN_SEATS) {
+  for (const s of size.built.seats) {
     const line = seatLine(s, size);
     if (baseX < line.left || baseX > line.right) continue;
     if (baseY < line.rimY - size.unit * 0.25 || baseY > size.floorY + size.unit * 0.04) continue;
@@ -402,9 +408,9 @@ export function dropBuddy(pieces: Piece[], piece: Piece, dx: number, dy: number,
     const far = Math.abs(baseY - line.rimY);
     if (!best || far < best.far) best = { s, line, far };
   }
-  if (best) return { x: baseX / size.width, y: best.line.y / size.height, on: FIXTURE_KEY + best.s.id };
+  if (best) return { x: baseX / size.areaWidth, y: best.line.y / size.height, on: FIXTURE_KEY + best.s.id };
   // Let go in the air (over the wall), it falls down onto the floor.
-  return { x: baseX / size.width, y: Math.max(baseY, size.floorY + size.unit * 0.05) / size.height };
+  return { x: baseX / size.areaWidth, y: Math.max(baseY, size.floorY + size.unit * 0.05) / size.height };
 }
 
 /**
@@ -412,7 +418,7 @@ export function dropBuddy(pieces: Piece[], piece: Piece, dx: number, dy: number,
  * fort's edge to its foot, then where the buddy stands on the grass after.
  */
 export function slideTrip(size: HomeSize): { top: { x: number; y: number }; foot: { x: number; y: number }; off: { x: number; y: number } } {
-  const scape = APPLIANCES.find((a) => a.kind === 'playScape');
+  const scape = size.built.appliances.find((a) => a.kind === 'playScape');
   if (!scape) return { top: { x: 0, y: 0 }, foot: { x: 0, y: 0 }, off: { x: 0, y: 0 } };
   const box = fixtureBox(scape, size);
   const top = { x: box.left + box.width * FORT.width, y: box.top + box.height * FORT.platform };

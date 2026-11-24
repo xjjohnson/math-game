@@ -1,12 +1,13 @@
 import { foundToday, hidingAt, livesInTank } from '@/utils/axolotl';
 import { router, Stack } from 'expo-router';
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
-import { PanResponder, Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { PanResponder, Pressable, ScrollView, StyleSheet, View, type HostInstance } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Text } from '@/components/AppText';
 import { BigButton } from '@/components/BigButton';
 import { BuddyRoom } from '@/components/BuddyRoom';
+import { HouseMap, peekRooms, RoomPill } from '@/components/HouseMap';
 import { ChoiceButtons } from '@/components/ChoiceButtons';
 import { INK } from '@/constants/artStyle';
 import { GridPaper, NewDot, panelFace, pillFace, roundFace, TAB_TINTS } from '@/components/Chrome';
@@ -28,7 +29,6 @@ import {
   FLOOR_COLORS,
   HOME_AREAS,
   inSeason,
-  MAX_ROOM_THINGS,
   MONTH_NAMES,
   PICTURE_ITEM,
   PICTURE_KEY,
@@ -77,7 +77,7 @@ import {
 import { dateKey } from '@/utils/dates';
 import { homeBuddiesOf } from '@/utils/homeVisit';
 import { generate } from '@/utils/mathEngine';
-import { areasOf, BUDDY_KEY, buddiesHome, FIXTURE_KEY, ownsArea } from '@/utils/room';
+import { BUDDY_KEY, buddiesHome, canRemoveRoom, FIXTURE_KEY, nextRoomPrice, roomName, thingLimit } from '@/utils/room';
 import { createRng, pick, randomSeed } from '@/utils/seededRandom';
 import { owns } from '@/utils/shop';
 import { canWear, lookOf, moodOf, MOOD_EMOJI, MOOD_NAME, outfitOf } from '@/utils/wardrobe';
@@ -141,7 +141,7 @@ export function BuddyScreen() {
     for (const p of savedPictures) out[PICTURE_KEY + p.id] = p;
     return out;
   }, [savedPictures]);
-  const { careForBuddy, equip, buyRoomItem, buyHomeRoom, moveInRoom, moveHomeRoom, setPlaced, paintRoom, setBuddyHome, wear, undress, setLook, setMood, takeOff, moveWearable } =
+  const { careForBuddy, equip, buyRoomItem, buildHomeRoom, renameHomeRoom, removeHomeRoom, moveInRoom, moveHomeRoom, setPlaced, paintRoom, setBuddyHome, wear, undress, setLook, setMood, takeOff, moveWearable } =
     useProfiles();
   const { buyFilament, printToy, recordPrinterCheck, claimTreeHouseCoins } = useProfiles();
   /** The 3D printer whose panel is open (its thing key). */
@@ -155,8 +155,13 @@ export function BuddyScreen() {
   );
   const [tab, setTab] = useState<Tab | null>(profile?.equipped.companion ? null : 'buddies');
   const [area, setArea] = useState(0);
-  /** The middle of the screen, as a share of the home's width; new things land there. */
+  /** The middle of the screen, in rooms across the home; new things land there. */
   const viewAt = useRef<number | undefined>(undefined);
+  /** The House map is open; `send` is a thing or buddy (piece key) being sent to another room. */
+  const [map, setMap] = useState<{ send?: string } | null>(null);
+  /** The room name button, where a dragged thing can be dropped to send it to another room. */
+  const pillRef = useRef<HostInstance>(null);
+  const pillBox = useRef<{ x: number; y: number; w: number; h: number } | null>(null);
   const homeTips = useSettings((s) => s.homeTips);
   const updateSettings = useSettings((s) => s.update);
   const [game, setGame] = useState<Game | null>(null);
@@ -238,10 +243,18 @@ export function BuddyScreen() {
   const hearts = buddyHearts(profile, buddyId);
   const level = buddyLevel(hearts);
   const month = new Date().getMonth();
-  const areas = areasOf(profile.homeOrder);
-  const areaName = areas[area]?.name.toLowerCase() ?? 'room';
+  const house = profile.house;
+  const here = Math.min(area, house.length - 1);
+  const areaName = house[here] ? roomName(house[here]).toLowerCase() : 'room';
+
 
   const say = (text: string) => setLine(text);
+  /** What is being sent to another room: "teddy bear", or a buddy's name. */
+  const sendName = (key: string, start = false) => {
+    if (key.startsWith(BUDDY_KEY)) return nameOf(key.slice(BUDDY_KEY.length));
+    const what = findRoomItem(profile.room.things.find((t) => t.key === key)?.itemId ?? '')?.name.toLowerCase() ?? 'thing';
+    return start ? `The ${what}` : what;
+  };
   const home = buddiesHome(profile);
   const homeBuddies = homeBuddiesOf(profile).map((b) => (moment && b.id === moment.buddyId ? { ...b, mood: moment.mood } : b));
 
@@ -251,7 +264,7 @@ export function BuddyScreen() {
     const before = home.find((b) => b.id === buddyId);
     if (before) moveInRoom(profile.id, BUDDY_KEY + before.id, before.spot);
     equip(profile.id, id);
-    setBuddyHome(profile.id, id, true, area, viewAt.current);
+    setBuddyHome(profile.id, id, true, here, viewAt.current);
     say(`${nameOf(id)} is with you now!`);
   };
 
@@ -311,7 +324,7 @@ export function BuddyScreen() {
     if (!thing || !item) return;
     const what = item.name.toLowerCase();
     if (tab === 'toys') {
-      setPlaced(profile.id, key, false, area);
+      setPlaced(profile.id, key, false, here);
       say(`The ${what} went in the toy box.`);
       return;
     }
@@ -343,7 +356,7 @@ export function BuddyScreen() {
 
   const buy = (itemId: string) => {
     const item = findRoomItem(itemId);
-    const result = buyRoomItem(profile.id, itemId, area, viewAt.current);
+    const result = buyRoomItem(profile.id, itemId, here, viewAt.current);
     if (result.ok) {
       playSound('reward');
       say(`${stickerText(item?.emoji ?? '')} New ${item?.name.toLowerCase()} in the ${areaName}! Drag it where you like.`);
@@ -399,18 +412,15 @@ export function BuddyScreen() {
           buddies={homeBuddies}
           lolo={loloHome}
           loloInTank={livesInTank(profile) && foundToday(profile, dateKey())}
-          areas={areas}
-          area={area}
+          house={house}
+          area={here}
           findBuddy={findBuddy}
-          forSale={areas.filter((_, i) => !ownsArea(profile, i)).map((a) => a.id)}
-          coins={profile.coins}
-          onBuyRoom={(areaId) => {
-            const r = buyHomeRoom(profile.id, areaId);
-            const room = HOME_AREAS.find((a) => a.id === areaId);
-            if (r.ok && room) {
-              setParty((n) => n + 1);
-              say(`You bought the ${room.name.toLowerCase()}! ${name} can't wait to decorate it.`);
-            }
+          onDropAway={(key, pageX, pageY) => {
+            const b = pillBox.current;
+            if (!b || pageX < b.x - 8 || pageX > b.x + b.w + 8 || pageY < b.y - 8 || pageY > b.y + b.h + 8) return false;
+            setTab(null);
+            setMap({ send: key });
+            return true;
           }}
           onAreaChange={setArea}
           onView={(at) => {
@@ -542,20 +552,19 @@ export function BuddyScreen() {
             >
               <Text style={styles.roundText}>⬅️</Text>
             </Pressable>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.roomsScroll} contentContainerStyle={styles.rooms}>
-              {areas.map((a, i) => (
-                <Pressable
-                  key={a.id}
-                  onPress={() => setArea(i)}
-                  accessibilityRole="button"
-                  accessibilityLabel={a.name}
-                  accessibilityState={{ selected: area === i }}
-                  style={({ pressed }) => [styles.round, styles.roomButton, area === i && styles.roundOn, pressed && styles.pressed]}
-                >
-                  <Text style={styles.roomText}>{ownsArea(profile, i) ? a.emoji : '🔒'}</Text>
-                </Pressable>
-              ))}
-            </ScrollView>
+            <RoomPill
+              room={house[here]}
+              slot={here}
+              count={house.length}
+              onGo={(i) => setArea(Math.max(0, Math.min(house.length - 1, i)))}
+              onOpen={() => setMap({})}
+              pillRef={pillRef}
+              onPillLayout={() =>
+                pillRef.current?.measureInWindow((x, y, w, h) => {
+                  pillBox.current = { x, y, w, h };
+                })
+              }
+            />
             <View style={styles.coins}>
               <Text style={styles.coinText} numberOfLines={1} accessibilityLabel={`${profile.coins} coins`}>
                 {`🪙 ${profile.coins}`}
@@ -714,8 +723,9 @@ export function BuddyScreen() {
               <ShopDrawer
                 coins={profile.coins}
                 month={month}
-                areaId={areas[area]?.id ?? 'living'}
-                full={profile.room.things.length >= MAX_ROOM_THINGS}
+                areaId={house[here]?.look ?? 'living'}
+                roomTitle={areaName}
+                full={profile.room.things.length >= thingLimit(profile)}
                 onBuy={buy}
               />
             ) : null}
@@ -723,7 +733,7 @@ export function BuddyScreen() {
               <ToyDrawer
                 stored={profile.room.things.filter((t) => !t.placed)}
                 areaName={areaName}
-                onTakeOut={(key) => setPlaced(profile.id, key, true, area, viewAt.current)}
+                onTakeOut={(key) => setPlaced(profile.id, key, true, here, viewAt.current)}
               />
             ) : null}
             {!game && !printerKey && tab === 'buddies' ? (
@@ -734,22 +744,19 @@ export function BuddyScreen() {
                 using={buddyId}
                 onPick={switchTo}
                 onHome={(id, atHome) => {
-                  setBuddyHome(profile.id, id, atHome, area, viewAt.current);
+                  setBuddyHome(profile.id, id, atHome, here, viewAt.current);
                   say(atHome ? `${nameOf(id)} came over to play!` : `${nameOf(id)} went off for a nap. 💤`);
                 }}
               />
             ) : null}
             {!game && !printerKey && tab === 'paint' ? (
               <PaintDrawer
-                paint={profile.room.paint[area] ?? { wall: 0, floor: 0 }}
+                paint={profile.room.paint[here] ?? { wall: 0, floor: 0 }}
                 areaName={areaName}
-                onPaint={(part, color) => paintRoom(profile.id, part, color, area)}
-                canLeft={area > 0}
-                canRight={area < areas.length - 1}
-                onMove={(dir) => {
-                  moveHomeRoom(profile.id, area, dir);
-                  setArea(area + dir);
-                  say(`The ${areaName} moved ${dir < 0 ? 'left' : 'right'}!`);
+                onPaint={(part, color) => paintRoom(profile.id, part, color, here)}
+                onRooms={() => {
+                  setTab(null);
+                  setMap({});
                 }}
               />
             ) : null}
@@ -793,6 +800,56 @@ export function BuddyScreen() {
         >
           <WearableFace item={carried.item} />
         </View>
+      ) : null}
+      {map ? (
+        <HouseMap
+          house={house}
+          paint={profile.room.paint}
+          peeks={peekRooms(house, profile.room, homeBuddies)}
+          current={here}
+          sending={map.send ? sendName(map.send) : undefined}
+          onClose={() => setMap(null)}
+          onPick={(slot) => {
+            const send = map.send;
+            setMap(null);
+            setArea(slot);
+            if (!send) return;
+            // Sent to another room: it stands on that room's floor, near the middle.
+            const x = slot + 0.18 + Math.random() * 0.12;
+            moveInRoom(profile.id, send, { x, y: send.startsWith(BUDDY_KEY) ? 0.92 : 0.88 });
+            say(`${sendName(send, true)} went to the ${house[slot] ? roomName(house[slot]).toLowerCase() : 'room'}!`);
+          }}
+          edit={
+            map.send
+              ? undefined
+              : {
+                  coins: profile.coins,
+                  price: nextRoomPrice(profile),
+                  canRemove: (slot) => canRemoveRoom(profile, slot),
+                  onBuild: (kind, roomTitle) => {
+                    const r = buildHomeRoom(profile.id, kind, roomTitle);
+                    if (!r.ok) return r.reason;
+                    playSound('reward');
+                    setParty((n) => n + 1);
+                    say(`You built the ${roomName(r.room).toLowerCase()}! ${name} can't wait to decorate it.`);
+                    return 'ok';
+                  },
+                  onMove: (from, to) => {
+                    moveHomeRoom(profile.id, from, to);
+                    if (here === from) setArea(to);
+                    else if (from < here && to >= here) setArea(here - 1);
+                    else if (from > here && to <= here) setArea(here + 1);
+                  },
+                  onRename: (slot, roomTitle) => renameHomeRoom(profile.id, slot, roomTitle),
+                  onRemove: (slot) => {
+                    const gone = house[slot];
+                    removeHomeRoom(profile.id, slot);
+                    if (here >= slot) setArea(Math.max(0, here - 1));
+                    if (gone) say(`The ${roomName(gone).toLowerCase()} is gone. Everything in it went to the toy box.`);
+                  },
+                }
+          }
+        />
       ) : null}
     </View>
   );
@@ -1125,11 +1182,13 @@ interface ShopDrawerProps {
   month: number;
   /** The room in view. */
   areaId: string;
+  /** What the room in view is called, for "fits in the ..." lines. */
+  roomTitle: string;
   full: boolean;
   onBuy: (itemId: string) => void;
 }
 
-function ShopDrawer({ coins, month, areaId, full, onBuy }: ShopDrawerProps) {
+function ShopDrawer({ coins, month, areaId, roomTitle, full, onBuy }: ShopDrawerProps) {
   // Shop shelves with something on sale this month; the shelf starts on the room in view.
   const groups = ROOM_ITEM_GROUPS.filter((g) => ROOM_ITEMS.some((i) => i.group === g.id && !i.hidden && inSeason(i, month)));
   const [picked, setShelf] = useState<RoomItemGroup | null>(null);
@@ -1144,7 +1203,7 @@ function ShopDrawer({ coins, month, areaId, full, onBuy }: ShopDrawerProps) {
     garage: 'toys',
   };
   const shelf = picked ?? holiday?.id ?? shelfOf[here] ?? (here as RoomItemGroup);
-  const areaName = HOME_AREAS.find((a) => a.id === areaId)?.name.toLowerCase() ?? 'room';
+  const areaName = roomTitle;
   return (
     <>
       <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chips}>
@@ -1272,13 +1331,11 @@ interface PaintDrawerProps {
   paint: { wall: number; floor: number };
   areaName: string;
   onPaint: (part: 'wall' | 'floor', color: number) => void;
-  canLeft: boolean;
-  canRight: boolean;
-  /** Swaps this room with its neighbor: -1 left, 1 right. */
-  onMove: (dir: -1 | 1) => void;
+  /** Opens the House map, to move, rename, build or take away rooms. */
+  onRooms: () => void;
 }
 
-function PaintDrawer({ paint, areaName, onPaint, canLeft, canRight, onMove }: PaintDrawerProps) {
+function PaintDrawer({ paint, areaName, onPaint, onRooms }: PaintDrawerProps) {
   const swatches = (part: 'wall' | 'floor', list: string[]) => (
     <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chips}>
       <Text style={styles.paintLabel}>{part === 'wall' ? '🎨 Walls' : '🟫 Floor'}</Text>
@@ -1306,9 +1363,8 @@ function PaintDrawer({ paint, areaName, onPaint, canLeft, canRight, onMove }: Pa
       {swatches('wall', WALL_COLORS)}
       {swatches('floor', FLOOR_COLORS)}
       <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chips}>
-        <Text style={styles.paintLabel}>↔️ Move</Text>
-        {canLeft ? <Chip label={`⬅️ ${areaName} left`} on={false} onPress={() => onMove(-1)} /> : null}
-        {canRight ? <Chip label={`${areaName} right ➡️`} on={false} onPress={() => onMove(1)} /> : null}
+        <Text style={styles.paintLabel}>🏠 Rooms</Text>
+        <Chip label="Move, name or build rooms" on={false} onPress={onRooms} />
       </ScrollView>
     </>
   );

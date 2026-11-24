@@ -17,10 +17,13 @@ import { dateKey } from '@/utils/dates';
 import { applyRound, type RoundOutcome, type RoundResult } from '@/utils/progress';
 import { careForBuddy as applyCare, heartForRound, type CareAction, type CareResult } from '@/utils/buddy';
 import {
-  moveRoom,
-  buyRoom,
+  moveRoomTo,
+  buildRoom,
   buyRoomItem,
   emptyRoom,
+  removeRoom,
+  renameRoom,
+  startingHouse,
   hangPicture,
   removePicture,
   moveInRoom,
@@ -28,7 +31,7 @@ import {
   setPlaced,
   setPaint,
   type Placement,
-  type HomeRoomBuyResult,
+  type BuildRoomResult,
   type RoomBuyResult,
 } from '@/utils/room';
 import { claimTreeHouseCoins } from '@/utils/treeHouse';
@@ -39,6 +42,7 @@ import { buyItem, equipItem, freeAvatars, type BuyResult } from '@/utils/shop';
 import { moveWearable, setLook, setMood, takeOff, undress, wear, type MoveResult, type WearResult } from '@/utils/wardrobe';
 import type { Mood } from '@/components/PersonFigure';
 import type { PersonLook } from '@/constants/wardrobe';
+import type { RoomKind } from '@/constants/room';
 
 function emptyStats(): Profile['stats'] {
   return {
@@ -86,7 +90,7 @@ export function createProfile(
     wardrobe: [],
     outfits: {},
     looks: {},
-    homeRooms: [],
+    house: startingHouse(),
     town: { date: '', done: [] },
     skills: {},
     filament: {},
@@ -114,13 +118,16 @@ interface ProfilesState {
   setGarage: (id: string, change: Partial<Garage>) => void;
   /** Pets, feeds or plays with the buddy in use. */
   careForBuddy: (id: string, action: CareAction) => CareResult;
-  /** Buys a thing for the buddies' home and sets it down in `area` (an index into HOME_AREAS). */
-  /** `at` is where new things land, as a share of the home's width (the middle of the screen). */
+  /** Buys a thing for the buddies' home and sets it down in `area` (a room's place in the home). */
+  /** `at` is where new things land, in rooms across the home (the middle of the screen). */
   buyRoomItem: (id: string, itemId: string, area: number, at?: number) => RoomBuyResult;
-  /** Buys an extra room (an area id) for the buddies' home with coins. */
-  buyHomeRoom: (id: string, areaId: string) => HomeRoomBuyResult;
-  /** Swaps the room in `slot` with the one to its left (-1) or right (1). */
-  moveHomeRoom: (id: string, slot: number, dir: -1 | 1) => void;
+  /** Builds a new room of a kind on the end of the buddies' home, with coins. */
+  buildHomeRoom: (id: string, kind: RoomKind, name?: string) => BuildRoomResult;
+  /** Moves the room in slot `from` to slot `to`. */
+  moveHomeRoom: (id: string, from: number, to: number) => void;
+  renameHomeRoom: (id: string, slot: number, name: string) => void;
+  /** Takes a built room away; what was in it goes to the toy box. */
+  removeHomeRoom: (id: string, slot: number) => void;
   /** Moves a thing in the home, or a buddy when `key` is BUDDY_KEY plus its id. */
   moveInRoom: (id: string, key: string, place: Placement) => void;
   setPlaced: (id: string, key: string, placed: boolean, area: number, at?: number) => void;
@@ -250,17 +257,21 @@ export const useProfiles = create<ProfilesState>()(
         }
         return result;
       },
-      buyHomeRoom: (id, areaId) => {
+      buildHomeRoom: (id, kind, name) => {
         const current = get().profiles.find((p) => p.id === id);
         if (!current) return { ok: false, reason: 'unknown' };
-        const result = buyRoom(current, areaId);
+        const result = buildRoom(current, kind, name);
         if (result.ok) {
           set((s) => ({ profiles: s.profiles.map((p) => (p.id === id ? result.profile : p)) }));
         }
         return result;
       },
-      moveHomeRoom: (id, slot, dir) =>
-        set((s) => ({ profiles: s.profiles.map((p) => (p.id === id ? moveRoom(p, slot, dir) : p)) })),
+      moveHomeRoom: (id, from, to) =>
+        set((s) => ({ profiles: s.profiles.map((p) => (p.id === id ? moveRoomTo(p, from, to) : p)) })),
+      renameHomeRoom: (id, slot, name) =>
+        set((s) => ({ profiles: s.profiles.map((p) => (p.id === id ? renameRoom(p, slot, name) : p)) })),
+      removeHomeRoom: (id, slot) =>
+        set((s) => ({ profiles: s.profiles.map((p) => (p.id === id ? removeRoom(p, slot) : p)) })),
       moveInRoom: (id, key, spot) =>
         set((s) => ({
           profiles: s.profiles.map((p) => (p.id === id ? moveInRoom(p, key, spot) : p)),

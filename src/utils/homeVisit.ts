@@ -2,10 +2,10 @@ import type { Dressed } from '@/components/BuddyFigure';
 import type { HomeBuddy } from '@/components/BuddyRoom';
 import { BODY_COLORS, DEFAULT_BODY, findWearable } from '@/constants/wardrobe';
 import { itemsIn } from '@/constants/shop';
-import type { Profile, Room, RoomThing } from '@/types';
+import type { AreaPaint, HouseRoom, Profile, Room, RoomThing } from '@/types';
 import { buddyHearts, buddyLevel, giftForLevel } from '@/utils/buddy';
-import { ROOM_SPAN } from '@/constants/room';
-import { AREA_COUNT, buddiesHome } from '@/utils/room';
+import { findArea, findCupboard, MAX_ROOMS, MAX_THINGS_PER_ROOM, ROOM_SPAN } from '@/constants/room';
+import { areaAt, BUDDY_KEY, buddiesHome, stripToHouse } from '@/utils/room';
 import { owns } from '@/utils/shop';
 import { clothOf, lookOf, moodOf, outfitOf } from '@/utils/wardrobe';
 
@@ -82,7 +82,7 @@ export function guestsOf(profile: Profile, brought: string[], chosen: boolean): 
     : owned.filter((o) => o.id === profile.equipped.companion);
   const avatarItem = owned.find((o) => o.category === 'companion' && o.companion.emoji === profile.avatar);
   const meBody = (avatarItem && BODY_COLORS[avatarItem.id]) ?? DEFAULT_BODY;
-  const screen = 1 / (AREA_COUNT * ROOM_SPAN);
+  const screen = 1 / ROOM_SPAN;
   const spot = (n: number) => ({ x: (0.28 + 0.14 * n) * screen, y: 0.92 });
   const me: HomeBuddy = { id: GUEST_ME, emoji: profile.avatar, gift: null, name: 'You', spot: spot(0), ...meBody, dressed: {} };
   const pals = items.flatMap((item, i): HomeBuddy[] => {
@@ -103,35 +103,112 @@ export function guestsOf(profile: Profile, brought: string[], chosen: boolean): 
   return [me, ...pals];
 }
 
-/** Everything a friend's phone needs to show this player's buddy home. */
+/** A friend's buddy home, put together from the parts their phone sent. */
 export interface HomeSnapshot {
   name: string;
+  house: HouseRoom[];
   room: Room;
   buddies: HomeBuddy[];
-  /** Extra rooms bought, so the friend sees the same rooms open. */
-  homeRooms: string[];
-  /** The order the rooms are in, left to right. */
-  homeOrder?: string[];
+  /** Room ids whose things haven't come yet. */
+  arriving: string[];
 }
 
-/** Nearby sends at most 32 KB in one go; stay well under it. */
-export const MAX_HOME_BYTES = 28000;
+/** The home itself without its things: sent first, so the friend can walk in straight away. */
+export interface HomePlan {
+  name: string;
+  house: HouseRoom[];
+  paint: AreaPaint[];
+  /** Buddies at home, with where they stand. */
+  buddies: HomeBuddy[];
+}
+
+/**
+ * One piece of a home sent over Nearby (protocol v12): the first carries the plan, and
+ * each carries the things of some rooms, so a home of any size fits.
+ */
+export interface HomePart {
+  part: number;
+  parts: number;
+  plan?: HomePlan;
+  /** Rooms whose things are all in this part (some may have none). */
+  rooms: string[];
+  things: RoomThing[];
+}
+
+/** Nearby sends at most 32 KB in one go; each part stays well under it. */
+export const MAX_HOME_BYTES = 20000;
 
 const round = (v: number) => Math.round(v * 10000) / 10000;
 
-/** This player's home, small enough to send. Things in the toy box are left out. */
-export function homeSnapshot(profile: Profile): HomeSnapshot | null {
-  const things: RoomThing[] = profile.room.things
-    .filter((t) => t.placed)
-    .map((t) => ({ ...t, x: round(t.x), y: round(t.y) }));
-  const snap: HomeSnapshot = {
+/** Which room a thing belongs to, for sending it with that room. */
+function roomOfThing(profile: Profile, t: RoomThing): number {
+  const count = profile.house.length;
+  if (t.in) {
+    const area = findCupboard(t.in)?.area;
+    const i = profile.house.findIndex((r) => r.id === area);
+    return i < 0 ? 0 : i;
+  }
+  if (t.on?.startsWith(BUDDY_KEY)) {
+    const b = buddiesHome(profile).find((x) => BUDDY_KEY + x.id === t.on);
+    if (b) return areaAt(b.spot.x, count);
+  }
+  return areaAt(t.x, count);
+}
+
+/** This player's home in parts small enough to send, rooms in order from the front door. Things in the toy box are left out. */
+export function homeParts(profile: Profile): HomePart[] {
+  const plan: HomePlan = {
     name: profile.name,
-    room: { ...profile.room, things },
+    house: profile.house,
+    paint: profile.house.map((r, i) => profile.room.paint[i] ?? findArea(r.look)?.paint ?? { wall: 0, floor: 0 }),
     buddies: homeBuddiesOf(profile),
-    homeRooms: profile.homeRooms,
-    homeOrder: profile.homeOrder,
   };
-  return JSON.stringify(snap).length <= MAX_HOME_BYTES ? snap : null;
+  const byRoom: RoomThing[][] = profile.house.map(() => []);
+  for (const t of profile.room.things) {
+    if (!t.placed) continue;
+    byRoom[roomOfThing(profile, t)]?.push({ ...t, x: round(t.x), y: round(t.y) });
+  }
+  const parts: Omit<HomePart, 'parts'>[] = [];
+  let current: Omit<HomePart, 'parts'> = { part: 0, plan, rooms: [], things: [] };
+  const sizeOf = (p: object) => JSON.stringify(p).length + 40;
+  if (sizeOf(current) > MAX_HOME_BYTES) return [];
+  profile.house.forEach((r, i) => {
+    const things = byRoom[i];
+    const next = { ...current, rooms: [...current.rooms, r.id], things: [...current.things, ...things] };
+    if (sizeOf(next) <= MAX_HOME_BYTES || current.rooms.length === 0) {
+      current = next;
+    } else {
+      parts.push(current);
+      current = { part: parts.length, rooms: [r.id], things };
+    }
+  });
+  parts.push(current);
+  // A room too full to send on its own is sent without its things rather than not at all.
+  const fitted = parts.map((p) => (sizeOf(p) <= MAX_HOME_BYTES ? p : { ...p, things: [] }));
+  return fitted.map((p) => ({ ...p, parts: fitted.length }));
+}
+
+/** Puts the parts that came so far together; null until the first part (with the plan) is here. */
+export function assembleHome(parts: ReadonlyMap<number, HomePart>): HomeSnapshot | null {
+  const first = parts.get(0);
+  const plan = first?.plan;
+  if (!first || !plan) return null;
+  const got = new Set<string>();
+  const things: RoomThing[] = [];
+  for (const p of parts.values()) {
+    if (p.parts !== first.parts) continue;
+    p.rooms.forEach((r) => got.add(r));
+    things.push(...p.things);
+  }
+  const buddies: Room['buddies'] = {};
+  for (const b of plan.buddies) buddies[b.id] = b.spot;
+  return {
+    name: plan.name,
+    house: plan.house,
+    room: { paint: plan.paint, buddies, things },
+    buddies: plan.buddies,
+    arriving: plan.house.map((r) => r.id).filter((id) => !got.has(id)),
+  };
 }
 
 // --- reading one from another phone ---
@@ -152,8 +229,84 @@ function plain(v: unknown, depth = 0): boolean {
 
 const isSpot = (v: unknown) => isObj(v) && isNum(v.x) && isNum(v.y);
 
+const isPaint = (p: unknown) => isObj(p) && isNum(p.wall) && isNum(p.floor);
+const LOOKS = new Set(['living', 'kitchen', 'bedroom', 'bathroom', 'playroom', 'backyard', 'study', 'garage', 'bedroom2', 'bedroom3']);
+
+function thingsOk(things: unknown, most: number): things is RoomThing[] {
+  return (
+    Array.isArray(things) &&
+    things.length <= most &&
+    things.every((t) => isObj(t) && isStr(t.key) && isStr(t.itemId) && typeof t.placed === 'boolean' && isNum(t.x) && isNum(t.y))
+  );
+}
+
+function buddiesOk(buddies: unknown): buddies is HomeBuddy[] {
+  return (
+    Array.isArray(buddies) &&
+    buddies.length <= 60 &&
+    buddies.every(
+      (b) =>
+        isObj(b) &&
+        isStr(b.id) &&
+        isStr(b.emoji) &&
+        isStr(b.name, 40) &&
+        isSpot(b.spot) &&
+        isStr(b.fur) &&
+        isStr(b.belly) &&
+        isObj(b.dressed) &&
+        (b.gift === null || isStr(b.gift)) &&
+        (b.person === undefined || (isObj(b.person) && isObj(b.person.look) && isObj(b.person.dressed))),
+    )
+  );
+}
+
+/** Checks a part of a home sent by another phone, or returns null if it doesn't look right. */
+export function parseHomePart(v: unknown): HomePart | null {
+  if (!isObj(v)) return null;
+  // A phone on protocol v11 or older sends its whole home in one go, the old way.
+  if (!('part' in v)) return parseOldHome(v);
+  const { part, parts, rooms, things, plan } = v;
+  if (!isNum(part) || !isNum(parts) || part < 0 || parts < 1 || part >= parts || parts > MAX_ROOMS) return null;
+  if (!Array.isArray(rooms) || rooms.length > MAX_ROOMS || !rooms.every((r) => isStr(r))) return null;
+  if (!thingsOk(things, MAX_THINGS_PER_ROOM * MAX_ROOMS)) return null;
+  if (!things.every((t) => plain(t))) return null;
+  if (plan !== undefined) {
+    if (!isObj(plan) || !isStr(plan.name, 40)) return null;
+    const { house, paint, buddies } = plan;
+    if (!Array.isArray(house) || house.length < 1 || house.length > MAX_ROOMS) return null;
+    if (!house.every((r) => isObj(r) && isStr(r.id, 24) && isStr(r.look) && LOOKS.has(r.look) && (r.name === undefined || isStr(r.name, 40)))) return null;
+    if (!Array.isArray(paint) || paint.length > MAX_ROOMS || !paint.every(isPaint)) return null;
+    if (!buddiesOk(buddies) || !buddies.every((b) => plain(b))) return null;
+  }
+  return v as unknown as HomePart;
+}
+
+/** A whole home in the old way (one message, spots as shares of a ten-room strip), as a one-part home. */
+function parseOldHome(v: Record<string, unknown>): HomePart | null {
+  const old = parseHomeSnapshot(v);
+  if (!old) return null;
+  const { house, room } = stripToHouse({ room: old.room, homeRooms: old.homeRooms, homeOrder: old.homeOrder });
+  const buddies = old.buddies.map((b) => ({ ...b, spot: room.buddies[b.id] ?? b.spot }));
+  return {
+    part: 0,
+    parts: 1,
+    plan: { name: old.name, house, paint: room.paint, buddies },
+    rooms: house.map((r) => r.id),
+    things: room.things,
+  };
+}
+
+/** A whole home as phones on protocol v11 and older send it. */
+interface OldHomeSnapshot {
+  name: string;
+  room: Room;
+  buddies: HomeBuddy[];
+  homeRooms: string[];
+  homeOrder?: string[];
+}
+
 /** Checks a home sent by another phone, or returns null if it doesn't look right. */
-export function parseHomeSnapshot(v: unknown): HomeSnapshot | null {
+function parseHomeSnapshot(v: unknown): OldHomeSnapshot | null {
   if (!isObj(v) || !plain(v)) return null;
   const { name, room, buddies, homeRooms } = v;
   if (!isStr(name, 40) || !isObj(room) || !Array.isArray(buddies) || !Array.isArray(homeRooms)) return null;
@@ -181,5 +334,8 @@ export function parseHomeSnapshot(v: unknown): HomeSnapshot | null {
       (b.person === undefined || (isObj(b.person) && isObj(b.person.look) && isObj(b.person.dressed))),
   );
   if (!buddiesOk) return null;
-  return v as unknown as HomeSnapshot;
+  // The old home's buddies stood on its strip; turn them along with everything else.
+  const old = v as unknown as OldHomeSnapshot;
+  const strip = stripToHouse({ room: { ...old.room, buddies: Object.fromEntries(old.buddies.map((b) => [b.id, b.spot])) }, homeRooms: old.homeRooms, homeOrder: old.homeOrder });
+  return { ...old, buddies: old.buddies.map((b) => ({ ...b, spot: strip.room.buddies[b.id] ?? b.spot })) };
 }

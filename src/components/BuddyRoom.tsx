@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import Animated, { cancelAnimation, Easing, useAnimatedStyle, useSharedValue, withRepeat, withTiming } from 'react-native-reanimated';
 import {
   Pressable,
@@ -28,14 +28,9 @@ import { ApplianceView } from '@/components/Appliance';
 import { TreeHouseInside, type TreeHouseEvent } from '@/components/TreeHouse';
 import { useMotion } from '@/hooks/useAccessibility';
 import {
-  APPLIANCES,
-  BUILT_IN_SEATS,
+  builtInId,
   CHALK_DRAWINGS,
-  CUPBOARDS,
   FLOOR_COLORS,
-  GADGETS,
-  HOME_AREAS,
-  type HomeArea,
   WALL_COLORS,
   type Appliance,
   type AreaId,
@@ -43,13 +38,14 @@ import {
   type Cupboard,
   findBuiltInSeat,
   type FixtureSpot,
+  type RoomPlace,
   type Gadget,
   type Season,
   PICTURE_ITEM,
 } from '@/constants/room';
 import type { Mood } from '@/components/PersonFigure';
 import { findWearable, type PersonLook } from '@/constants/wardrobe';
-import type { BuddySpot, Outfit, Room } from '@/types';
+import type { BuddySpot, HouseRoom, Outfit, Room } from '@/types';
 import { outfitChange, SLOT_HEIGHT, type OutfitSlot } from '@/utils/wardrobe';
 import {
   dropBuddy,
@@ -67,7 +63,7 @@ import {
   type Piece,
 } from '@/utils/home';
 import type { Picture } from '@/utils/easel';
-import { AREA_COUNT, BUDDY_KEY, FIXTURE_KEY, paintOf, type Placement } from '@/utils/room';
+import { BUDDY_KEY, FIXTURE_KEY, paintOf, startingHouse, type Placement } from '@/utils/room';
 import { INK, shade, SHADOW, tint } from '@/constants/artStyle';
 import { GroundShadow } from '@/components/GroundShadow';
 import { Axolotl } from '@/components/Axolotl';
@@ -103,12 +99,12 @@ interface Props {
   lolo?: HomeHideSpot | null;
   /** Lolo swims in the living room fish tank (found today, and moved in after enough finds). */
   loloInTank?: boolean;
-  /** Rooms left to right in the player's order; the starting order when missing. */
-  areas?: HomeArea[];
-  /** Area in view, a place along `areas`. Changing it scrolls there. */
+  /** The home's rooms left to right; the starting rooms when missing. */
+  house?: HouseRoom[];
+  /** Room in view, a place along `house`. Changing it scrolls there. Only it and its neighbors are drawn. */
   area: number;
   onAreaChange: (area: number) => void;
-  /** The middle of the screen, as a share of the home's width, as the home scrolls. */
+  /** The middle of the screen, in rooms across the home, as the home scrolls. */
   onView?: (at: number) => void;
   /** Put-away mode: tapping a thing sends it to the toy box instead. */
   tidying: boolean;
@@ -130,11 +126,13 @@ interface Props {
   findBuddy?: { current: ((pageX: number, pageY: number) => string | null) | null };
   /** Change `n` to have that buddy hop and wave, as when it levels up. */
   cheer?: { buddyId: string; n: number };
-  /** Extra rooms not bought yet; each shows a for-sale sign instead of the room. */
-  forSale?: AreaId[];
-  coins?: number;
-  /** The Buy button of a for-sale room was confirmed. */
-  onBuyRoom?: (areaId: AreaId) => void;
+  /**
+   * A dragged thing or buddy was let go: return true to take it (when it was dropped on
+   * something outside the home, like the House map button), and it is not set down.
+   */
+  onDropAway?: (key: string, pageX: number, pageY: number) => boolean;
+  /** Rooms still on their way from a friend's phone: drawn bare with a "moving in" sign. */
+  arriving?: ReadonlySet<string>;
   /** Pictures from the School easel hanging in the home, by thing key. A friend's home leaves them out (empty frames show). */
   pictures?: Record<string, Picture>;
   /** Something happened up in the tree house (or it was climbed into); `inside` are the buddies up there. */
@@ -148,6 +146,7 @@ interface Props {
 }
 
 const TRIM = '#A86B45';
+const DEFAULT_HOUSE: HouseRoom[] = startingHouse();
 const OUTLINE = INK;
 const DOOR = '#C68B5E';
 /** Below this many pixels of movement a touch counts as a tap. */
@@ -161,15 +160,20 @@ const POP_MS = 1300;
 const WASH_MS = 6000;
 
 /** Built-ins that are only drawn, plus the front door and windows that open and shut. */
-const FRONT_DOOR: FixtureSpot = { area: 'living', left: 0.06, width: 0.2, bottom: 0, height: 0.56 };
-const LIVING_WINDOW: FixtureSpot = { area: 'living', left: 0.5, width: 0.44, bottom: 0.27, height: 0.34 };
-const BED_WINDOW: FixtureSpot = { area: 'bedroom', left: 0.06, width: 0.3, bottom: 0.33, height: 0.3 };
-const WALL_SHELF: FixtureSpot = { area: 'bedroom', left: 0.41, width: 0.19, bottom: 0.415, height: 0.025 };
-const COUNTER: FixtureSpot = { area: 'kitchen', left: 0.06, width: 0.54, bottom: 0, height: 0.26 };
-const TAP: FixtureSpot = { area: 'kitchen', left: 0.2, width: 0.03, bottom: 0.26, height: 0.06 };
-const FRIDGE: FixtureSpot = { area: 'kitchen', left: 0.68, width: 0.24, bottom: 0, height: 0.58 };
+interface Drawn {
+  id: string;
+  spot: FixtureSpot;
+  night?: boolean;
+}
+const FRONT_DOOR: Drawn[] = [{ id: 'frontDoor', spot: { area: 'living', left: 0.06, width: 0.2, bottom: 0, height: 0.56 } }];
+const LIVING_WINDOW: Drawn[] = [{ id: 'livingCurtains', spot: { area: 'living', left: 0.5, width: 0.44, bottom: 0.27, height: 0.34 } }];
+const BED_WINDOW: Drawn[] = [{ id: 'bedCurtains', spot: { area: 'bedroom', left: 0.06, width: 0.3, bottom: 0.33, height: 0.3 }, night: true }];
+const WALL_SHELF: Drawn[] = [{ id: 'wallShelf', spot: { area: 'bedroom', left: 0.41, width: 0.19, bottom: 0.415, height: 0.025 } }];
+const COUNTER: Drawn[] = [{ id: 'counter', spot: { area: 'kitchen', left: 0.06, width: 0.54, bottom: 0, height: 0.26 } }];
+const TAP: Drawn[] = [{ id: 'tap', spot: { area: 'kitchen', left: 0.2, width: 0.03, bottom: 0.26, height: 0.06 } }];
+const FRIDGE: Drawn[] = [{ id: 'fridgeBack', spot: { area: 'kitchen', left: 0.68, width: 0.24, bottom: 0, height: 0.58 } }];
 /** More windows, in the wider parts of each room; the bedroom's and bathroom's look out at night and day. */
-const MORE_WINDOWS: { id: string; spot: FixtureSpot; night?: boolean }[] = [
+const MORE_WINDOWS: Drawn[] = [
   { id: 'livingCurtains2', spot: { area: 'living', left: 1.7, width: 0.42, bottom: 0.27, height: 0.34 } },
   { id: 'kitchenCurtains', spot: { area: 'kitchen', left: 1.25, width: 0.4, bottom: 0.36, height: 0.28 } },
   { id: 'bedCurtains2', spot: { area: 'bedroom', left: 1.28, width: 0.4, bottom: 0.38, height: 0.26 }, night: true },
@@ -180,16 +184,27 @@ const MORE_WINDOWS: { id: string; spot: FixtureSpot; night?: boolean }[] = [
   { id: 'bed3Curtains', spot: { area: 'bedroom3', left: 1.05, width: 0.4, bottom: 0.36, height: 0.26 }, night: true },
 ];
 /** Built-in tables, under the dining table and desk ledges. */
-const TABLES: FixtureSpot[] = [
-  { area: 'kitchen', left: 1.2, width: 0.5, bottom: 0, height: 0.2 },
-  { area: 'bedroom', left: 1.25, width: 0.45, bottom: 0, height: 0.2 },
-  { area: 'study', left: 1.05, width: 0.5, bottom: 0, height: 0.2 },
+const TABLES: Drawn[] = [
+  { id: 'kitchenTable', spot: { area: 'kitchen', left: 1.2, width: 0.5, bottom: 0, height: 0.2 } },
+  { id: 'bedDesk', spot: { area: 'bedroom', left: 1.25, width: 0.45, bottom: 0, height: 0.2 } },
+  { id: 'studyDesk', spot: { area: 'study', left: 1.05, width: 0.5, bottom: 0, height: 0.2 } },
 ];
 /** How long a buddy takes to go down the backyard slide. */
 const SLIDE_MS = 1300;
 /** The tree house's seat, for climbing up. */
 const TREE_SEAT = 'inTreeHouse';
-const PLAY_SHELF: FixtureSpot = { area: 'playroom', left: 1.1, width: 0.4, bottom: 0.395, height: 0.025 };
+const PLAY_SHELF: Drawn[] = [{ id: 'playShelf', spot: { area: 'playroom', left: 1.1, width: 0.4, bottom: 0.395, height: 0.025 } }];
+
+/** The drawn built-ins of each room in a home, with their own ids in built rooms. */
+function drawnIn(list: Drawn[], rooms: RoomPlace[]): Drawn[] {
+  const out: Drawn[] = [];
+  for (const r of rooms) {
+    for (const d of list) {
+      if (d.spot.area === r.look) out.push(r.id === r.look ? d : { ...d, id: builtInId(r.id, d.id), spot: { ...d.spot, area: r.id } });
+    }
+  }
+  return out;
+}
 const DARK = 'rgba(16, 18, 52, 0.55)';
 /** Sizes of the rings in a pool of light, as shares of how far it reaches. */
 const POOL_RINGS = Array.from({ length: 16 }, (_, i) => 1 - i * 0.055);
@@ -234,12 +249,14 @@ interface Pop {
  */
 export function BuddyRoom(props: Props) {
   const { room, buddies, area, onAreaChange, onView, tidying, season, onPlaceThing, onPlaceBuddy } = props;
-  const { onTapThing, onTapBuddy, onToggle, onTapGadget, onTapAppliance, onWash, cheer, forSale = [], coins = 0, onBuyRoom } = props;
-  const areas = props.areas ?? HOME_AREAS;
+  const { onTapThing, onTapBuddy, onToggle, onTapGadget, onTapAppliance, onWash, cheer, onDropAway, arriving } = props;
+  const areas = props.house ?? DEFAULT_HOUSE;
+  const count = areas.length;
   const [view, setView] = useState({ width: 0, height: 0 });
   const [open, setOpen] = useState<ReadonlySet<string>>(new Set());
   const [lit, setLit] = useState<ReadonlySet<string>>(new Set());
-  const [dark, setDark] = useState<ReadonlySet<AreaId>>(new Set());
+  /** Rooms with their lights off, by room id. */
+  const [dark, setDark] = useState<ReadonlySet<string>>(new Set());
   const [looks, setLooks] = useState<Record<string, number>>({});
   /** Appliances switched on, and each chalkboard's drawing. */
   const [running, setRunning] = useState<ReadonlySet<string>>(new Set());
@@ -272,7 +289,27 @@ export function BuddyRoom(props: Props) {
   const edgeTimer = useRef<ReturnType<typeof setInterval> | null>(null);
   const scrollX = useRef(0);
   const reported = useRef(area);
-  const size: HomeSize | null = view.width > 0 && view.height > 0 ? homeSize(view.width, view.height, areas.map((a) => a.id)) : null;
+  const size: HomeSize | null = useMemo(
+    () => (view.width > 0 && view.height > 0 ? homeSize(view.width, view.height, areas) : null),
+    [view.width, view.height, areas],
+  );
+  const drawnSpots = useMemo(
+    () => ({
+      frontDoors: drawnIn(FRONT_DOOR, areas),
+      livingWindows: drawnIn(LIVING_WINDOW, areas),
+      bedWindows: drawnIn(BED_WINDOW, areas),
+      wallShelves: drawnIn(WALL_SHELF, areas),
+      counters: drawnIn(COUNTER, areas),
+      taps: drawnIn(TAP, areas),
+      fridges: drawnIn(FRIDGE, areas),
+      windows: drawnIn(MORE_WINDOWS, areas),
+      tables: drawnIn(TABLES, areas),
+      playShelves: drawnIn(PLAY_SHELF, areas),
+    }),
+    [areas],
+  );
+  /** Keys of the pieces at the last draw, so only things just added pop in (not ones scrolled into view). */
+  const seen = useRef<Set<string> | null>(null);
 
   useEffect(
     () => () => {
@@ -286,11 +323,12 @@ export function BuddyRoom(props: Props) {
 
   // Going to another room climbs back down.
   useEffect(() => {
-    if (areas[area]?.id !== 'backyard') setTreeOpen(false);
+    if (areas[area]?.look !== 'backyard') setTreeOpen(false);
   }, [area, areas]);
 
   useEffect(() => {
     if (size) drawn.current = true;
+    seen.current = new Set(latestPieces.current.map((p) => p.key));
   });
 
   const bump = (key: string, kind: BounceKind) =>
@@ -335,14 +373,16 @@ export function BuddyRoom(props: Props) {
   /** Scroll position that shows an area from its left wall, where its built-ins start. */
   const areaScroll = (i: number) => (size ? Math.min(size.width - view.width, Math.max(0, i * size.areaWidth)) : 0);
   const areaInView = (x: number) =>
-    size ? Math.min(AREA_COUNT - 1, Math.max(0, Math.floor((x + view.width / 2) / size.areaWidth))) : 0;
+    size ? Math.min(count - 1, Math.max(0, Math.floor((x + view.width / 2) / size.areaWidth))) : 0;
 
   // Scroll to the area picked outside (the room buttons), but not to one we just reported.
   useEffect(() => {
     if (!size) return;
     if (area !== reported.current || areaInView(scrollX.current) !== area || scrollX.current === 0) {
       reported.current = area;
-      scroll.current?.scrollTo({ x: areaScroll(area), animated: scrollX.current !== 0 });
+      // A short hop slides there; a jump from the House map goes straight there.
+      const to = areaScroll(area);
+      scroll.current?.scrollTo({ x: to, animated: scrollX.current !== 0 && Math.abs(to - scrollX.current) <= size.areaWidth * 1.5 });
     }
     // Only when the area or the home's width changes; a drawer opening only changes its height.
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -350,7 +390,7 @@ export function BuddyRoom(props: Props) {
 
   const onScroll = (e: NativeSyntheticEvent<NativeScrollEvent>) => {
     scrollX.current = e.nativeEvent.contentOffset.x;
-    if (size) onView?.((scrollX.current + view.width / 2) / size.width);
+    if (size) onView?.((scrollX.current + view.width / 2) / size.areaWidth);
     const now = areaInView(scrollX.current);
     if (now !== reported.current) {
       reported.current = now;
@@ -454,7 +494,13 @@ export function BuddyRoom(props: Props) {
   };
 
   /** Where light shines in a dark room: lit fires, candles and lamps, with how far it reaches. */
-  const inDark = (x: number) => dark.has(areas[Math.min(AREA_COUNT - 1, Math.floor(x / size.areaWidth))]?.id);
+  const inDark = (x: number) => dark.has(areas[Math.min(count - 1, Math.max(0, Math.floor(x / size.areaWidth)))]?.id ?? '');
+  /** Only the room in view and the ones beside it are drawn; the rest of the home waits until it's near. */
+  const near = (slot: number) => Math.abs(slot - area) <= 1;
+  const nearX = (x: number) => near(Math.floor(x / size.areaWidth));
+  const nearSpot = (f: FixtureSpot) => near(size.order.indexOf(f.area));
+  const nearGadget = (g: Gadget) => near(size.order.indexOf(g.area));
+  const { cupboards, appliances, gadgets, seats } = size.built;
   const lightPools = () => {
     const pools: { key: string; x: number; y: number; r: number }[] = [];
     for (const p of pieces) {
@@ -462,19 +508,19 @@ export function BuddyRoom(props: Props) {
       // Glow-in-the-dark prints shine softly once the lights are off.
       else if (p.item && parsePrintId(p.item.id)?.filament.id === 'glow' && inDark(p.x)) pools.push({ key: p.key, x: p.x, y: p.y - p.height * 0.5, r: size.unit * 0.12 });
     }
-    for (const g of GADGETS) {
+    for (const g of gadgets) {
       if (g.glow && lit.has(g.id)) {
         const b = gadgetBox(g, size);
         pools.push({ key: g.id, x: b.left + b.width / 2, y: b.top + b.height * 0.4, r: size.unit * 0.3 });
       }
     }
-    for (const a of APPLIANCES) {
+    for (const a of appliances) {
       if (a.kind === 'fireplace' && running.has(a.id)) {
         const b = fixtureBox(a, size);
         pools.push({ key: a.id, x: b.left + b.width / 2, y: b.top + b.height * 0.75, r: size.unit * 0.55 });
       }
     }
-    return pools.filter((l) => inDark(l.x));
+    return pools.filter((l) => inDark(l.x) && nearX(l.x));
   };
 
   const setRun = (id: string, on: boolean) =>
@@ -528,7 +574,7 @@ export function BuddyRoom(props: Props) {
         return next;
       });
       bump(p.key, 'land');
-      onPlaceBuddy(id, { x: trip.off.x / size.width, y: trip.off.y / size.height });
+      onPlaceBuddy(id, { x: trip.off.x / size.areaWidth, y: trip.off.y / size.height });
     };
     if (!animate) return land();
     setSliding((set) => new Set(set).add(p.key));
@@ -539,8 +585,10 @@ export function BuddyRoom(props: Props) {
   const callUp = () => {
     const seat = findBuiltInSeat(TREE_SEAT);
     if (!seat) return;
-    const left = (size.order.indexOf('backyard') * size.areaWidth + seat.left * size.screen) / size.width;
-    const span = (seat.width * size.screen) / size.width;
+    const yard = size.order.indexOf(seat.area);
+    if (yard < 0) return;
+    const left = (yard * size.areaWidth + seat.left * size.screen) / size.areaWidth;
+    const span = (seat.width * size.screen) / size.areaWidth;
     buddies.forEach((b, i) => {
       const x = left + span * (buddies.length === 1 ? 0.5 : i / (buddies.length - 1));
       onPlaceBuddy(b.id, { x, y: (size.floorY - seat.bottom * size.unit) / size.height, on: FIXTURE_KEY + TREE_SEAT });
@@ -548,7 +596,7 @@ export function BuddyRoom(props: Props) {
   };
 
   const tapAppliance = (a: Appliance) => {
-    const riders = pieces.filter((p) => p.buddyId && p.builtIn && BUILT_IN_SEATS.find((s) => s.id === p.builtIn)?.appliance === a.id);
+    const riders = pieces.filter((p) => p.buddyId && p.builtIn && seats.find((s) => s.id === p.builtIn)?.appliance === a.id);
     const inside = riders.map((p) => p.buddyId as string);
     if (a.kind === 'treeHouse') {
       setTreeOpen(true);
@@ -705,6 +753,7 @@ export function BuddyRoom(props: Props) {
     showMoving();
     if (!t.piece) return;
     if (!t.moved) return tapPiece(t.piece);
+    if (onDropAway?.(t.piece.key, t.pageX, t.pageY)) return;
     const at = toHome(t.pageX, t.pageY);
     dropPiece(t.piece, at.x - t.startX, at.y - t.startY);
   };
@@ -726,49 +775,29 @@ export function BuddyRoom(props: Props) {
         style={{ height: size.height }}
         contentContainerStyle={{ width: size.width, height: size.height }}
       >
-        {areas.map((a, i) => (
-          <Area
-            key={a.id}
-            id={a.id}
-            index={i}
-            size={size}
-            wall={WALL_COLORS[paintOf(room, i).wall] ?? WALL_COLORS[0]}
-            floor={FLOOR_COLORS[paintOf(room, i).floor] ?? FLOOR_COLORS[0]}
+        {areas.map((a, i) =>
+          near(i) ? (
+            <Area
+              key={a.id}
+              id={a.look}
+              index={i}
+              size={size}
+              wall={WALL_COLORS[paintOf(room, i, a.look).wall] ?? WALL_COLORS[0]}
+              floor={FLOOR_COLORS[paintOf(room, i, a.look).floor] ?? FLOOR_COLORS[0]}
+            />
+          ) : null,
+        )}
+
+        {drawnSpots.frontDoors.filter((d) => nearSpot(d.spot)).map((d) => (
+          <FrontDoor
+            key={d.id}
+            box={fixtureBox(d.spot, size)}
+            open={open.has(d.id)}
+            season={season}
+            onPress={() => toggle(d.id, 'door')}
           />
         ))}
-
-        <FrontDoor
-          box={fixtureBox(FRONT_DOOR, size)}
-          open={open.has('frontDoor')}
-          season={season}
-          onPress={() => toggle('frontDoor', 'door')}
-        />
-        <Window
-          box={fixtureBox(LIVING_WINDOW, size)}
-          shut={open.has('livingCurtains')}
-          season={season}
-          onPress={() => toggle('livingCurtains', 'curtains')}
-        />
-        <Window
-          box={fixtureBox(BED_WINDOW, size)}
-          shut={open.has('bedCurtains')}
-          night
-          season={season}
-          onPress={() => toggle('bedCurtains', 'curtains')}
-        />
-        <View style={[styles.wallShelf, boxStyle(fixtureBox(WALL_SHELF, size))]} />
-        <Counter box={fixtureBox(COUNTER, size)} />
-        <Pressable
-          onPress={() => {
-            const tap = fixtureBox(TAP, size);
-            pop(tap.left + tap.width / 2, tap.top, '💧');
-          }}
-          accessibilityRole="button"
-          accessibilityLabel="Kitchen tap"
-          style={[styles.tap, boxStyle(fixtureBox(TAP, size))]}
-        />
-        <View style={[styles.fridge, boxStyle(fixtureBox(FRIDGE, size))]} />
-        {MORE_WINDOWS.map((w) => (
+        {[...drawnSpots.livingWindows, ...drawnSpots.bedWindows, ...drawnSpots.windows].filter((w) => nearSpot(w.spot)).map((w) => (
           <Window
             key={w.id}
             box={fixtureBox(w.spot, size)}
@@ -778,11 +807,31 @@ export function BuddyRoom(props: Props) {
             onPress={() => toggle(w.id, 'curtains')}
           />
         ))}
-        {TABLES.map((t) => (
-          <TableFixture key={t.area} box={fixtureBox(t, size)} />
+        {[...drawnSpots.wallShelves, ...drawnSpots.playShelves].filter((d) => nearSpot(d.spot)).map((d) => (
+          <View key={d.id} style={[styles.wallShelf, boxStyle(fixtureBox(d.spot, size))]} />
         ))}
-        <View style={[styles.wallShelf, boxStyle(fixtureBox(PLAY_SHELF, size))]} />
-        {GADGETS.map((g) => (
+        {drawnSpots.counters.filter((d) => nearSpot(d.spot)).map((d) => (
+          <Counter key={d.id} box={fixtureBox(d.spot, size)} />
+        ))}
+        {drawnSpots.taps.filter((d) => nearSpot(d.spot)).map((d) => (
+          <Pressable
+            key={d.id}
+            onPress={() => {
+              const tap = fixtureBox(d.spot, size);
+              pop(tap.left + tap.width / 2, tap.top, '💧');
+            }}
+            accessibilityRole="button"
+            accessibilityLabel="Kitchen tap"
+            style={[styles.tap, boxStyle(fixtureBox(d.spot, size))]}
+          />
+        ))}
+        {drawnSpots.fridges.filter((d) => nearSpot(d.spot)).map((d) => (
+          <View key={d.id} style={[styles.fridge, boxStyle(fixtureBox(d.spot, size))]} />
+        ))}
+        {drawnSpots.tables.filter((d) => nearSpot(d.spot)).map((t) => (
+          <TableFixture key={t.id} box={fixtureBox(t.spot, size)} />
+        ))}
+        {gadgets.filter(nearGadget).map((g) => (
           <GadgetView
             key={g.id}
             gadget={g}
@@ -792,7 +841,7 @@ export function BuddyRoom(props: Props) {
             onPress={() => tapGadget(g)}
           />
         ))}
-        {CUPBOARDS.map((c) => (
+        {cupboards.filter(nearSpot).map((c) => (
           <CupboardView
             key={c.id}
             cupboard={c}
@@ -807,7 +856,7 @@ export function BuddyRoom(props: Props) {
             onWash={() => wash(c)}
           />
         ))}
-        {APPLIANCES.map((a) => {
+        {appliances.filter(nearSpot).map((a) => {
           const box = fixtureBox(a, size);
           const on = running.has(a.id);
           const step = steps[a.id] ?? 0;
@@ -847,6 +896,8 @@ export function BuddyRoom(props: Props) {
           {pieces.map((piece) => {
             if (props.printing && piece.key === props.printing.toyKey) return null;
             const offset = moving[piece.key];
+            // Far rooms aren't drawn, but anything being carried is, wherever it goes.
+            if (!offset && !nearX(piece.x)) return null;
             const buddy = piece.buddyId ? buddyById.get(piece.buddyId) : undefined;
             const parent = piece.parent ? byKey.get(piece.parent) : undefined;
             const seat = piece.builtIn ? findBuiltInSeat(piece.builtIn) : undefined;
@@ -886,7 +937,7 @@ export function BuddyRoom(props: Props) {
                 ) : null}
                 <Ride piece={piece} seat={seat} on={seatOn} size={size} sliding={sliding.has(piece.key)}>
                 <Sunk piece={piece} running={seatOn}>
-                  <PopIn skip={!drawn.current} damping={9} style={styles.fill}>
+                  <PopIn skip={!drawn.current || !!seen.current?.has(piece.key)} damping={9} style={styles.fill}>
                     <Lively
                       height={tall}
                       seed={piece.key}
@@ -973,7 +1024,7 @@ export function BuddyRoom(props: Props) {
         </View>
 
         {areas.map((a, i) =>
-          dark.has(a.id) ? (
+          near(i) && dark.has(a.id) ? (
             <View
               key={a.id}
               pointerEvents="none"
@@ -983,7 +1034,7 @@ export function BuddyRoom(props: Props) {
         )}
         {areas.map((a, i) => {
           // The backyard's sky: birds by day, and the sun to tap for night (then stars and fireflies).
-          if (a.id !== 'backyard' || forSale.includes(a.id)) return null;
+          if (a.look !== 'backyard' || !near(i)) return null;
           const night = dark.has(a.id);
           const left = i * size.areaWidth;
           const sun = Math.round(size.floorY * 0.13);
@@ -1008,13 +1059,11 @@ export function BuddyRoom(props: Props) {
             </View>
           );
         })}
-        {APPLIANCES.filter((a) => a.kind === 'starLamp' && running.has(a.id)).map((a) => (
+        {appliances.filter((a) => a.kind === 'starLamp' && running.has(a.id) && nearSpot(a)).map((a) => (
           <StarsOnWall key={`stars-${a.id}`} left={size.order.indexOf(a.area) * size.areaWidth} width={size.areaWidth} height={size.floorY} />
         ))}
         {areas.map((a, i) =>
-          forSale.includes(a.id) ? (
-            <ForSale key={a.id} index={i} size={size} name={a.name} emoji={a.emoji} price={a.price ?? 0} coins={coins} onBuy={() => onBuyRoom?.(a.id)} />
-          ) : null,
+          near(i) && arriving?.has(a.id) ? <MovingIn key={`in-${a.id}`} index={i} size={size} /> : null,
         )}
         {/* Fires, candles and lamps light up the dark around them. */}
         {lightPools().map((l) => (
@@ -1278,45 +1327,19 @@ function Area({ id, index, size, wall, floor }: AreaProps) {
   );
 }
 
-interface ForSaleProps {
+interface MovingInProps {
   index: number;
   size: HomeSize;
-  name: string;
-  emoji: string;
-  price: number;
-  coins: number;
-  onBuy: () => void;
 }
 
-/** Covers a room that is not bought yet with a sign; the first tap on Buy asks, the second buys. */
-function ForSale({ index, size, name, emoji, price, coins, onBuy }: ForSaleProps) {
-  const [sure, setSure] = useState(false);
-  const can = coins >= price;
+/** A friend's room whose things are still on their way: a soft sign until they land. */
+function MovingIn({ index, size }: MovingInProps) {
   return (
-    <View style={[styles.forSale, { left: index * size.areaWidth, width: size.areaWidth }]}>
-      <View style={[styles.saleCard, { top: size.height * 0.2 }]}>
-        <Text style={styles.saleEmoji}>{emoji}</Text>
-        <Text style={styles.saleTitle}>{`${name} for sale!`}</Text>
-        <Text style={styles.saleText}>
-          {can ? 'A new room for your buddies to play in.' : `Earn ${price - coins} more coins to buy it.`}
-        </Text>
-        <Pressable
-          onPress={() => {
-            if (!can) return;
-            if (sure) {
-              setSure(false);
-              onBuy();
-            } else {
-              setSure(true);
-            }
-          }}
-          accessibilityRole="button"
-          accessibilityLabel={`Buy the ${name.toLowerCase()} for ${price} coins`}
-          accessibilityState={{ disabled: !can }}
-          style={({ pressed }) => [styles.saleButton, !can && styles.saleLocked, pressed && { opacity: 0.8 }]}
-        >
-          <Text style={styles.saleButtonText}>{sure ? 'Tap again to buy' : `Buy for 🪙 ${price}`}</Text>
-        </Pressable>
+    <View pointerEvents="none" style={[styles.movingIn, { left: index * size.areaWidth, width: size.areaWidth }]}>
+      <View style={[styles.saleCard, { top: size.height * 0.25 }]}>
+        <Text style={styles.saleEmoji}>📦</Text>
+        <Text style={styles.saleTitle}>Moving in...</Text>
+        <Text style={styles.saleText}>This room is on its way from your friend's phone.</Text>
       </View>
     </View>
   );
@@ -1919,7 +1942,7 @@ const styles = StyleSheet.create({
   dark: { position: 'absolute', top: 0, bottom: 0, backgroundColor: DARK },
   skyLayer: { position: 'absolute', top: 0 },
   wallStar: { flex: 1, backgroundColor: '#FFF59D', shadowColor: '#FFF59D', shadowOpacity: 1, shadowRadius: 5 },
-  forSale: { position: 'absolute', top: 0, bottom: 0, backgroundColor: '#8F8A9E', alignItems: 'center', borderLeftWidth: 10, borderLeftColor: TRIM },
+  movingIn: { position: 'absolute', top: 0, bottom: 0, backgroundColor: 'rgba(255,255,255,0.35)', alignItems: 'center' },
   saleCard: {
     width: 260,
     maxWidth: '80%',
@@ -1934,9 +1957,6 @@ const styles = StyleSheet.create({
   saleEmoji: { fontSize: 44 },
   saleTitle: { fontSize: 20, fontWeight: '800', color: OUTLINE, textAlign: 'center' },
   saleText: { fontSize: 14, color: OUTLINE, textAlign: 'center' },
-  saleButton: { marginTop: 6, paddingVertical: 12, paddingHorizontal: 18, borderRadius: 16, backgroundColor: '#2E9E5B', minHeight: 48, justifyContent: 'center' },
-  saleLocked: { backgroundColor: '#9AA0A6' },
-  saleButtonText: { fontSize: 16, fontWeight: '800', color: '#FFFFFF' },
   pool: { position: 'absolute', backgroundColor: 'rgba(255, 205, 120, 0.05)' },
   poolBox: { position: 'absolute' },
   gadget: { position: 'absolute', alignItems: 'center', justifyContent: 'flex-end' },
@@ -1999,7 +2019,7 @@ function loloPlace(spot: HomeHideSpot, size: HomeSize): { left: number; top: num
 /** Lolo at home in the living room fish tank, swimming slowly back and forth. */
 function TankLolo({ size }: { size: HomeSize }) {
   const profile = useActiveProfile();
-  const tank = APPLIANCES.find((a) => a.kind === 'aquarium');
+  const tank = size.built.appliances.find((a) => a.kind === 'aquarium' && a.area === 'living');
   const { animate } = useMotion();
   const t = useSharedValue(0);
   useEffect(() => {

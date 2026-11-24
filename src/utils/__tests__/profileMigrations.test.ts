@@ -1,5 +1,6 @@
+import { STARTING_ROOMS } from '@/constants/room';
 import { migrateProfiles, PROFILES_VERSION } from '@/store/profileMigrations';
-import { AREA_COUNT } from '@/utils/room';
+import { STRIP_AREAS } from '@/utils/room';
 
 /**
  * A profile as each older version of the app saved it: the fields every
@@ -57,7 +58,7 @@ function savedAt(version: number): Record<string, unknown> {
     // Version 13: every area, extra rooms included.
     const room = p.room as { paint: unknown[]; buddies: Record<string, { x: number }>; things: { x: number }[] };
     p.room = {
-      paint: Array.from({ length: AREA_COUNT }, (_, i) => room.paint[i] ?? { wall: 0, floor: 0 }),
+      paint: Array.from({ length: STRIP_AREAS }, (_, i) => room.paint[i] ?? { wall: 0, floor: 0 }),
       buddies: { pup: { ...room.buddies.pup, x: 0.02 } },
       things: room.things.map((t) => ({ ...t, x: 0.01 })),
     };
@@ -65,6 +66,17 @@ function savedAt(version: number): Record<string, unknown> {
   }
   if (version >= 14) p.skills = {};
   if (version >= 15) p.filament = { red: 2 };
+  if (version >= 17) {
+    // Version 17: the rooms are a list, and spots are in rooms across the home.
+    const room = p.room as { paint: unknown[]; buddies: Record<string, { x: number }>; things: { x: number }[] };
+    p.room = {
+      paint: room.paint.slice(0, 5),
+      buddies: { pup: { ...room.buddies.pup, x: 0.2 } },
+      things: room.things.map((t) => ({ ...t, x: 0.1 })),
+    };
+    delete p.homeRooms;
+    p.house = STARTING_ROOMS.map((id) => ({ id, look: id }));
+  }
   return p;
 }
 
@@ -86,7 +98,7 @@ const FIELDS = [
   'outfits',
   'looks',
   'town',
-  'homeRooms',
+  'house',
   'skills',
   'filament',
 ];
@@ -105,12 +117,15 @@ describe('upgrading saved profiles', () => {
     expect(p.stars).toBe(9);
     expect(p.stats.add).toEqual({ attempted: 10, correct: 8 });
     // The home has every area, and anything they had in it is still there.
-    expect(p.room.paint).toHaveLength(AREA_COUNT);
+    expect(p.house.map((r) => r.id)).toEqual(STARTING_ROOMS);
+    expect(p.room.paint).toHaveLength(p.house.length);
+    expect(p).not.toHaveProperty('homeRooms');
     if (version >= 6) {
       expect(p.room.things.map((t) => t.itemId)).toEqual(['rug']);
       expect(p.room.paint[0]).toEqual({ wall: 2, floor: 1 });
+      // Still in the first room, the living room.
       for (const t of p.room.things) expect(t.x).toBeGreaterThanOrEqual(0);
-      for (const t of p.room.things) expect(t.x).toBeLessThanOrEqual(1);
+      for (const t of p.room.things) expect(t.x).toBeLessThan(1);
     }
     if (version >= 8) expect(Object.keys(p.room.buddies)).toEqual(['pup']);
     // Version 16 added voices: everyone has one, and older players start on Classic.

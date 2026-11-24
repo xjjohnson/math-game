@@ -1,18 +1,19 @@
 import { router, Stack } from 'expo-router';
 import { useEffect, useMemo, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { Pressable, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Text } from '@/components/AppText';
 import { BigButton } from '@/components/BigButton';
 import { BuddyRoom } from '@/components/BuddyRoom';
+import { HouseMap, peekRooms, RoomPill } from '@/components/HouseMap';
 import { seasonOf } from '@/constants/room';
 import { colors, radius, spacing } from '@/constants/theme';
 import { townSession, useTownState } from '@/services/townSession';
 import { useActiveProfile } from '@/store/profiles';
 import type { Profile, Room } from '@/types';
 import { GUEST_ME, guestsOf } from '@/utils/homeVisit';
-import { areasOf, BUDDY_KEY, moveInRoom } from '@/utils/room';
+import { BUDDY_KEY, moveInRoom } from '@/utils/room';
 
 /**
  * A friend's buddy home, sent over Nearby while visiting in the community.
@@ -27,18 +28,32 @@ export function HomeVisitScreen() {
   const [room, setRoom] = useState<Room | null>(null);
   const [area, setArea] = useState(0);
   const [line, setLine] = useState('');
+  const [map, setMap] = useState(false);
 
   // You and the buddies you brought.
   const guests = useMemo(() => (me ? guestsOf(me, look.buddies, look.chosen) : []), [me, look.buddies, look.chosen]);
   const pals = guests.length - 1;
 
+  // The first part of the home sets everything out; rooms that come after add their things.
+  const arrived = home?.snap ? home.snap.house.length - home.snap.arriving.length : 0;
+  useEffect(() => {
+    if (home?.status !== 'ready' || !home.snap) return;
+    const snap = home.snap;
+    setRoom((now) => {
+      if (!now) return snap.room;
+      const mine = new Set(now.things.map((t) => t.key));
+      return { ...now, things: [...now.things, ...snap.room.things.filter((t) => !mine.has(t.key))] };
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [home?.status, arrived]);
+
   useEffect(() => {
     if (home?.status === 'ready' && home.snap) {
-      setRoom(home.snap.room);
       const came = pals === 0 ? 'You came over' : pals === 1 ? 'You and your buddy came over' : `You and ${pals} buddies came over`;
       setLine(`Welcome to ${home.name}'s home! ${came}. Move things around to play. It all goes back when you leave.`);
     }
-  }, [home?.status, home?.snap, home?.name]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [home?.status, home?.name]);
 
   // Leaving this screen closes the visit to the home.
   useEffect(() => () => townSession().closeHome(), []);
@@ -64,12 +79,8 @@ export function HomeVisitScreen() {
 
   const snap = home.snap;
   // Moves happen on a copy, through the same rules as your own home.
-  const pretend = { ...me, room, homeRooms: snap.homeRooms, homeOrder: snap.homeOrder } as Profile;
-  const areas = areasOf(snap.homeOrder);
-  const owned = (i: number) => {
-    const a = areas[i];
-    return !!a && (a.price === undefined || snap.homeRooms.includes(a.id));
-  };
+  const pretend = { ...me, room, house: snap.house } as Profile;
+  const here = Math.min(area, snap.house.length - 1);
   const buddies = [...snap.buddies, ...guests].map((b) => ({ ...b, spot: room.buddies[b.id] ?? b.spot }));
 
   return (
@@ -78,9 +89,9 @@ export function HomeVisitScreen() {
       <BuddyRoom
         room={room}
         buddies={buddies}
-        areas={areas}
-        area={area}
-        forSale={areas.filter((_, i) => !owned(i)).map((a) => a.id)}
+        house={snap.house}
+        area={here}
+        arriving={new Set(snap.arriving)}
         onAreaChange={setArea}
         season={seasonOf(new Date().getMonth())}
         tidying={false}
@@ -98,20 +109,7 @@ export function HomeVisitScreen() {
           <Pressable onPress={back} accessibilityRole="button" accessibilityLabel="Back" style={({ pressed }) => [styles.round, pressed && { opacity: 0.7 }]}>
             <Text style={styles.roundText}>⬅️</Text>
           </Pressable>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.rooms}>
-            {areas.map((a, i) => (
-              <Pressable
-                key={a.id}
-                onPress={() => setArea(i)}
-                accessibilityRole="button"
-                accessibilityLabel={a.name}
-                accessibilityState={{ selected: area === i }}
-                style={({ pressed }) => [styles.round, area === i && styles.roundOn, pressed && { opacity: 0.7 }]}
-              >
-                <Text style={styles.roundText}>{owned(i) ? a.emoji : '🔒'}</Text>
-              </Pressable>
-            ))}
-          </ScrollView>
+          <RoomPill room={snap.house[here]} slot={here} count={snap.house.length} onGo={(i) => setArea(Math.max(0, Math.min(snap.house.length - 1, i)))} onOpen={() => setMap(true)} />
         </View>
         <View style={styles.tag}>
           <Text style={styles.tagText} numberOfLines={1}>🏠 {snap.name}'s home</Text>
@@ -122,6 +120,19 @@ export function HomeVisitScreen() {
           </Pressable>
         ) : null}
       </View>
+      {map ? (
+        <HouseMap
+          house={snap.house}
+          paint={room.paint}
+          peeks={peekRooms(snap.house, room, buddies)}
+          current={here}
+          onClose={() => setMap(false)}
+          onPick={(slot) => {
+            setMap(false);
+            setArea(slot);
+          }}
+        />
+      ) : null}
     </View>
   );
 }

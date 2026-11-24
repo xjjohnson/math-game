@@ -146,7 +146,7 @@ describe('my pictures', () => {
   });
 
   it("hangs a picture in the buddy's home once, and takes it down when it is thrown away", () => {
-    const profile = { room: { paint: [], buddies: {}, things: [] } } as unknown as Profile;
+    const profile = { room: { paint: [], buddies: {}, things: [] }, house: [{ id: 'living', look: 'living' }] } as unknown as Profile;
     const hung = hangPicture(profile, 'abc');
     if (!hung.ok) throw new Error('should hang');
     expect(hung.profile.room.things).toEqual([expect.objectContaining({ key: `${PICTURE_KEY}abc`, itemId: PICTURE_ITEM, placed: true })]);

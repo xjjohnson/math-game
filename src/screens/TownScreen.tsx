@@ -4,7 +4,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { CommunityView } from '@/components/community/CommunityView';
 import { townSession } from '@/services/townSession';
 import { useActiveProfile, useProfiles } from '@/store/profiles';
-import { homeSnapshot } from '@/utils/homeVisit';
+import { homeParts } from '@/utils/homeVisit';
 import { allGranted, checkPermissions, devicePermissions } from '@/utils/nearbyPermissions';
 import { Nearby } from '../../modules/math-nearby';
 
@@ -32,7 +32,7 @@ export function TownScreen() {
     townSession().setHomeSource(() => {
       const s = useProfiles.getState();
       const me = s.profiles.find((p) => p.id === s.activeProfileId);
-      return me ? homeSnapshot(me) : null;
+      return me ? homeParts(me) : [];
     });
     return () => {
       townSession().setHomeSource(null);

@@ -1,17 +1,21 @@
 import { APPLIANCES, BUILT_IN_SEATS, CUPBOARDS, findRoomItem, GADGETS, HOME_AREAS, MONTH_NAMES, ROOM_SPAN, seasonOf, SURFACES } from '@/constants/room';
 import { makeProfile } from '@/test/fixtures';
-import type { Profile, RoomThing } from '@/types';
+import type { HouseRoom, Profile, RoomThing } from '@/types';
 import { dropBuddy, dropThing, fixtureBox, gadgetBox, homeSize, layoutHome, pieceAt, ridersOf, seatLine, shelvesOf, slideTrip, surfaceLine, type Piece } from '@/utils/home';
 import { BUDDY_KEY, buddiesHome, buyRoomItem, FIXTURE_KEY, placeBuddy, placeThing, setBuddyHome, setPlaced } from '@/utils/room';
 
 const NOVEMBER = 10;
 const MARCH = 2;
+/** A home with a room of every look, in the order they're written. */
+const ALL: HouseRoom[] = HOME_AREAS.map((a) => ({ id: a.id, look: a.id }));
 /** A phone held upright. */
-const size = homeSize(400, 760);
+const size = homeSize(400, 760, ALL);
+/** The spots below were written as shares of all the rooms; spots are now in rooms across the home. */
+const ROOMS = ALL.length;
 
 function withThings(things: Omit<RoomThing, 'placed'>[], companion = 'puppy'): Profile {
-  const p = makeProfile({ equipped: { ...makeProfile().equipped, companion } });
-  return { ...p, room: { ...p.room, things: things.map((t) => ({ ...t, placed: true })) } };
+  const p = makeProfile({ equipped: { ...makeProfile().equipped, companion }, house: ALL });
+  return { ...p, room: { ...p.room, things: things.map((t) => ({ ...t, x: t.in ? t.x : t.x * ROOMS, placed: true })) } };
 }
 
 function layout(p: Profile, open: string[] = []): Piece[] {
@@ -191,7 +195,7 @@ describe('dropping things', () => {
     const fell = dropBuddy(pieces, buddy, ax, ay, size);
     expect(fell.on).toBeUndefined();
     expect(fell.y * size.height).toBeGreaterThan(size.floorY);
-    expect(fell.x * size.width).toBeCloseTo(x);
+    expect(fell.x * size.areaWidth).toBeCloseTo(x);
     const low = size.floorY + (size.height - size.floorY) * 0.6;
     const [fx, fy] = to(buddy, x, low);
     expect(dropBuddy(pieces, buddy, fx, fy, size).y * size.height).toBeCloseTo(low);
@@ -220,7 +224,7 @@ describe('the backyard and the bought rooms', () => {
   const yard = HOME_AREAS.findIndex((a) => a.id === 'backyard');
 
   it('gives every bought room built-in things to play with', () => {
-    for (const area of HOME_AREAS.filter((a) => a.price !== undefined)) {
+    for (const area of HOME_AREAS.filter((a) => !['living', 'kitchen', 'bedroom', 'bathroom', 'playroom'].includes(a.id))) {
       expect(APPLIANCES.some((a) => a.area === area.id)).toBe(true);
     }
     expect(APPLIANCES.map((a) => a.kind)).toEqual(expect.arrayContaining(['treeHouse', 'swingSet', 'playScape', 'trampoline']));

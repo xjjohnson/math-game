@@ -21,6 +21,7 @@ import {
 } from '@/utils/axolotl';
 import { addDays } from '@/utils/dates';
 import { createRng } from '@/utils/seededRandom';
+import { startingHouse } from '@/utils/room';
 
 const DAY = '2026-11-24';
 const BUDDY = itemsIn('companion').find((i) => i.price > 0)!.id;
@@ -61,17 +62,22 @@ describe('Lolo the hidden axolotl', () => {
   });
 
   it('only hides in home rooms the player owns, and only in town before they have a buddy', () => {
-    expect(ownedAreas(makeProfile({ homeRooms: [], unlocks: [BUDDY] }))).toEqual(BASE);
-    expect(ownedAreas(makeProfile({ homeRooms: [], unlocks: [] }))).toEqual([]);
+    expect(ownedAreas(makeProfile({ unlocks: [BUDDY] }))).toEqual(BASE);
+    expect(ownedAreas(makeProfile({ unlocks: [] }))).toEqual([]);
     for (let i = 0; i < 20; i++) expect(todaysSpot(makeProfile({ unlocks: [] }), addDays(DAY, i)).kind).toBe('town');
     const open = openSpots(BASE);
     expect(open.some((s) => s.kind === 'home' && s.area === 'backyard')).toBe(false);
     expect(open.some((s) => s.kind === 'town')).toBe(true);
     for (let i = 0; i < 60; i++) {
-      const s = todaysSpot(makeProfile({ homeRooms: [], unlocks: [BUDDY] }), addDays(DAY, i));
+      const s = todaysSpot(makeProfile({ unlocks: [BUDDY] }), addDays(DAY, i));
       if (s.kind === 'home') expect(BASE).toContain(s.area);
     }
     expect(openSpots([...BASE, 'backyard']).some((s) => s.kind === 'home' && s.area === 'backyard')).toBe(true);
+  });
+
+  it('hides in the original rooms of the house, not in rooms built later', () => {
+    const house = [...startingHouse(), { id: 'backyard', look: 'backyard' as const }, { id: 'r1', look: 'kitchen' as const, name: 'Snack room' }];
+    expect(ownedAreas(makeProfile({ house, unlocks: [BUDDY] }))).toEqual([...BASE, 'backyard']);
   });
 
   it('pays once a day: 15 coins and a star first try, 10 after a miss', () => {
