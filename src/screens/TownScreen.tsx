@@ -1,9 +1,7 @@
-import { router, useFocusEffect } from 'expo-router';
+import { useFocusEffect } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
 
-import { BigButton } from '@/components/BigButton';
-import { CommunityView, goInside } from '@/components/community/CommunityView';
-import { colors } from '@/constants/theme';
+import { CommunityView } from '@/components/community/CommunityView';
 import { townSession } from '@/services/townSession';
 import { useActiveProfile, useProfiles } from '@/store/profiles';
 import { homeSnapshot } from '@/utils/homeVisit';
@@ -56,12 +54,7 @@ export function TownScreen() {
       place="street"
       tab="town"
       needsPermission={needsPermission}
-      actions={
-        <>
-          <BigButton style={{ flex: 1, paddingHorizontal: 8 }} label="🏫 School" color={colors.primary} onPress={() => goInside('school')} />
-          <BigButton style={{ flex: 1, paddingHorizontal: 8 }} label="🐾 Buddy home" color={colors.text} onPress={() => router.push('/buddy')} />
-        </>
-      }
+      actions={null}
     />
   );
 }

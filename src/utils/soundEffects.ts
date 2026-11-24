@@ -2,7 +2,7 @@ import { Platform } from 'react-native';
 
 import { useSettings } from '@/store/settings';
 
-export type SoundName = 'correct' | 'wrong' | 'streak' | 'reward';
+export type SoundName = 'correct' | 'wrong' | 'streak' | 'reward' | 'horn' | 'jingle';
 
 /**
  * Note sequences (frequency in Hz, length in seconds) for each sound. These are
@@ -22,6 +22,17 @@ const TONES: Record<SoundName, [number, number][]> = {
     [660, 0.07],
     [880, 0.07],
     [1100, 0.14],
+  ],
+  horn: [
+    [392, 0.12],
+    [0, 0.05],
+    [392, 0.2],
+  ],
+  jingle: [
+    [784, 0.1],
+    [659, 0.1],
+    [784, 0.1],
+    [988, 0.2],
   ],
   reward: [
     [523, 0.1],
@@ -45,7 +56,8 @@ function playTones(notes: [number, number][]) {
     const osc = context.createOscillator();
     const gain = context.createGain();
     osc.type = 'triangle';
-    osc.frequency.value = frequency;
+    osc.frequency.value = frequency || 1;
+    if (!frequency) gain.gain.value = 0;
     gain.gain.setValueAtTime(0.15, at);
     gain.gain.exponentialRampToValueAtTime(0.001, at + length);
     osc.connect(gain).connect(context.destination);
