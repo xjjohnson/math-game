@@ -1,5 +1,17 @@
 # Change log
 
+## 2026-11-24 (Blanket fort)
+
+- **Blanket fort** on the Toys shelf of the buddy home's Shop, 120 coins. It arrives folded up: two chairs and a stack of blankets.
+- **Build it once.** Tap the folded fort, then **Build the fort**, and answer one **fort check** question from the child's own skill list. A wrong answer shows how it works and gives another question. Answers count toward learning skills (+5 ⭐ for a newly learned one). Then the blanket goes up with confetti, and it never needs building again.
+- **Crawl in.** Drag buddies and people to the fort's doorway and they sit in it. Tap the fort to go inside.
+- **Inside the fort:** a cozy, dim hideout under the blanket, wider than the screen. Bounce on the pillow pile, read a story by flashlight, sip hot cocoa, and drag buddies around. The 🔦 button turns on a flashlight; drag on the blanket wall to shine it about. "Call the buddies in" brings everyone inside.
+- **Oops!** Poke the tent pole three times quickly and the blanket falls down on everyone. They wiggle underneath, then **Put the fort back up!**
+- **6 blankets, free to swap** with the 🎨 button inside: starry night, stripes, plaid, polka dots, rainbow and patchwork quilt.
+- **Stars unlock more** (never spent): string lights (25 ⭐), shadow puppets of a dog, bird and bunny in the flashlight (50 ⭐), glow-in-the-dark stars and a sleepover moon that puts everyone to sleep (100 ⭐), and a flag on top plus a tunnel to a second room (175 ⭐). Inside, a sign shows what's next.
+- With the room lights off, a built fort glows from inside.
+- No new save data version and no Nearby protocol change: the blanket is kept in the fort's item id, and friends' phones with this update see your fort when they visit.
+
 ## 2026-11-24 (Unlimited rooms)
 
 - **Build as many rooms as you like.** Tap the room name at the top of the buddy home to open the **House map**, then tap **Build a room**. Pick a bedroom, playroom, kitchen, bathroom, living room, study or garage (any number of each) or the backyard (one), give it a name, and tap Build twice. The first new room costs 80 coins and each one after costs 20 more, never more than 300.

@@ -1,3 +1,4 @@
+import { builtFortItem, FORT_ITEM, FORT_PRICE, FORT_SHAPE } from '@/constants/fort';
 import { PRINTER_ITEM, printedItem } from '@/constants/printer';
 
 /** The looks a room in the buddy's home can have. The home scrolls sideways through its rooms. */
@@ -321,6 +322,8 @@ export const ROOM_ITEMS: RoomItem[] = [
   { id: 'yoyo', name: 'Yo-yo', emoji: '🪀', price: 10, size: 0.1, group: 'toys', fx: '🌀' },
   { id: 'game', name: 'Video game', emoji: '🎮', price: 30, size: 0.11, group: 'toys', fx: '👾', says: 'plays a game' },
   { id: 'drum', name: 'Drum', emoji: '🥁', price: 25, size: 0.14, group: 'toys', fx: '💥', says: 'plays the drum' },
+  // Bought folded up: tap it to set it up, then crawl inside (constants/fort.ts).
+  { id: FORT_ITEM, name: 'Blanket fort', emoji: '⛺', price: FORT_PRICE, size: 0.26, wide: FORT_SHAPE.wide, group: 'toys' },
   { id: 'robot', name: 'Robot', emoji: '🤖', price: 30, size: 0.14, group: 'toys', fx: '⚡', says: 'dances like a robot' },
   { id: 'puzzle', name: 'Puzzle', emoji: '🧩', price: 15, size: 0.1, group: 'toys', fx: '🎉', says: 'finishes the puzzle' },
   { id: 'unicorn', name: 'Unicorn', emoji: '🦄', price: 25, size: 0.15, group: 'toys', fx: '🌈', says: 'rides the unicorn' },
@@ -377,7 +380,7 @@ export const MAX_THINGS_PER_ROOM = 40;
 export const BUDDY_SIZE = 0.38;
 
 export function findRoomItem(id: string): RoomItem | undefined {
-  return ROOM_ITEMS.find((item) => item.id === id) ?? printedItem(id);
+  return ROOM_ITEMS.find((item) => item.id === id) ?? printedItem(id) ?? builtFortItem(id);
 }
 
 /** True when the shop sells the item in this month (0 = January). */

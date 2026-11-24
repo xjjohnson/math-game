@@ -34,6 +34,7 @@ import {
   type BuildRoomResult,
   type RoomBuyResult,
 } from '@/utils/room';
+import { setFortBlanket, type FortResult } from '@/utils/fort';
 import { claimTreeHouseCoins } from '@/utils/treeHouse';
 import { buyFilament, printToy, recordPrinterCheck, type FilamentBuyResult, type PrintResult } from '@/utils/printer';
 import { grantStarRewards } from '@/utils/starLevels';
@@ -159,6 +160,8 @@ interface ProfilesState {
   printToy: (id: string, printerKey: string, toy: string, filament: string) => PrintResult;
   /** Saves printer check answers to the skill record; returns how many skills were newly learned. */
   recordPrinterCheck: (id: string, history: AnswerRecord[]) => number;
+  /** Sets up a folded blanket fort, or changes a built one's blanket. */
+  setFortBlanket: (id: string, key: string, blanket: string) => FortResult;
   /** Pays for finding Lolo today (once a day) and saves the answers to the skill record. */
   claimLolo: (id: string, history: AnswerRecord[]) => FindResult;
   /** Parent area: turns Lolo on or off for a player. */
@@ -340,6 +343,13 @@ export const useProfiles = create<ProfilesState>()(
         const current = get().profiles.find((p) => p.id === id);
         if (!current) return { ok: false, reason: 'unknown' };
         const result = printToy(current, printerKey, toy, filament, newId());
+        if (result.ok) set((s) => ({ profiles: s.profiles.map((p) => (p.id === id ? result.profile : p)) }));
+        return result;
+      },
+      setFortBlanket: (id, key, blanket) => {
+        const current = get().profiles.find((p) => p.id === id);
+        if (!current) return { ok: false, reason: 'unknown' };
+        const result = setFortBlanket(current, key, blanket);
         if (result.ok) set((s) => ({ profiles: s.profiles.map((p) => (p.id === id ? result.profile : p)) }));
         return result;
       },
