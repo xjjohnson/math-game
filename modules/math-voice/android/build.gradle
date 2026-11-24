@@ -20,6 +20,8 @@ android {
 
 dependencies {
   // sherpa-onnx (offline neural speech). The Android workflow downloads the
-  // release .aar into libs/ before building; it isn't kept in git.
-  implementation fileTree(dir: 'libs', include: ['*.aar'])
+  // release .aar, then puts its classes in libs/sherpa-onnx.jar and its native
+  // .so files in src/main/jniLibs/ (a library module can't depend on a local
+  // .aar). None of it is kept in git.
+  implementation fileTree(dir: 'libs', include: ['*.jar'])
 }
