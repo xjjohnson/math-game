@@ -17,6 +17,7 @@ import {
   PROTOCOL_VERSION,
   FARM_VERSION,
   TOWN_MARK,
+  type CarSpot,
   type ChalkStroke,
   type GameMessage,
   type PlayerInfo,
@@ -48,6 +49,10 @@ export interface TownState {
   reconnecting: boolean;
   /** Visits nearby the player said "Not now" to (advertised names), so they aren't asked again. */
   skipped: string[];
+  /** Friends' cars on the town roads, by player id (never this phone's own). */
+  cars: Record<string, CarSpot>;
+  /** The last honk at this player: who honked and when. */
+  honked: { from: string; at: number } | null;
 }
 
 /** A visit nearby that this player can join. */
@@ -104,6 +109,8 @@ const OFF: TownState = {
   joining: null,
   reconnecting: false,
   skipped: [],
+  cars: {},
+  honked: null,
 };
 
 /** How long a wave stays on screen. */
@@ -379,7 +386,7 @@ export class TownSession {
     this.spots = kept;
     this.roster = [this.me];
     this.looking = false;
-    this.set({ myId: HOST_ID, found: [], reconnecting: false, joining: null, ...(notice ? { notice } : {}) });
+    this.set({ myId: HOST_ID, found: [], reconnecting: false, joining: null, cars: {}, ...(notice ? { notice } : {}) });
     try {
       await t.host(advertName(TOWN_MARK, this.token, `${stickerText(this.me.avatar)} ${this.me.name}`));
     } catch (e) {
@@ -446,6 +453,29 @@ export class TownSession {
     } else if (this.state.status === 'joined') {
       this.send({ type: 'move', id, x, y });
     }
+  }
+
+  // --- cars on the town roads ---
+  /** This phone's car moved: tell the friends (the host passes it on). */
+  sendCar(car: CarSpot) {
+    if (this.state.status === 'hosting') this.sendToGuests({ type: 'car', id: HOST_ID, car });
+    else if (this.state.status === 'joined') this.send({ type: 'car', car });
+  }
+
+  /** Honk at a friend's car. */
+  honkAt(to: string) {
+    if (to === this.state.myId) return;
+    if (this.state.status === 'hosting') this.send({ type: 'honk', to, from: HOST_ID }, to);
+    else if (this.state.status === 'joined') this.send({ type: 'honk', to });
+  }
+
+  private gotCar(id: string, car: CarSpot) {
+    if (id === this.state.myId) return;
+    this.set({ cars: { ...this.state.cars, [id]: car } });
+  }
+
+  private gotHonk(from: string) {
+    this.set({ honked: { from, at: Date.now() } });
   }
 
   // --- the school chalkboard ---
@@ -708,6 +738,16 @@ export class TownSession {
         else this.easel.reset(message.page, message.lv);
         this.sendToGuests(message, id);
         break;
+      case 'car':
+        if (!this.roster.some((p) => p.id === id)) return;
+        this.gotCar(id, message.car);
+        this.sendToGuests({ type: 'car', id, car: message.car }, id);
+        break;
+      case 'honk':
+        if (!this.roster.some((p) => p.id === id)) return;
+        if (message.to === HOST_ID) this.gotHonk(id);
+        else if (message.to !== id && this.roster.some((p) => p.id === message.to)) this.send({ type: 'honk', to: message.to, from: id }, message.to);
+        break;
       case 'hi':
         if (!this.roster.some((p) => p.id === id)) return;
         this.markWave(id);
@@ -763,7 +803,9 @@ export class TownSession {
         // Only this phone moves its own pieces, so its copy wins until the host has caught up.
         const me = this.state.myId;
         for (const [id, spot] of Object.entries(this.state.spots)) if (!isSharedPiece(id) && ownerOf(id) === me && !spots[id]) spots[id] = spot;
-        this.set({ people: message.people, spots });
+        const here = new Set(message.people.map((p) => p.id));
+        const cars = Object.fromEntries(Object.entries(this.state.cars).filter(([id]) => here.has(id)));
+        this.set({ people: message.people, spots, cars });
         break;
       }
       case 'move':
@@ -771,6 +813,12 @@ export class TownSession {
         break;
       case 'hi':
         if (message.playerId) this.markWave(message.playerId);
+        break;
+      case 'car':
+        if (message.id) this.gotCar(message.id, message.car);
+        break;
+      case 'honk':
+        if (message.to === this.state.myId && message.from) this.gotHonk(message.from);
         break;
       case 'home-ask':
         if (message.of === this.state.myId) {
@@ -805,6 +853,10 @@ export class TownSession {
   }
 
   private drop(id: string) {
+    if (this.state.cars[id]) {
+      const { [id]: _gone, ...cars } = this.state.cars;
+      this.set({ cars });
+    }
     this.roster = this.roster.filter((p) => p.id !== id);
     this.places.delete(id);
     this.clearSpots(id);
