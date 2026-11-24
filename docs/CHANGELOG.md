@@ -1,5 +1,14 @@
 # Change log
 
+## 2026-11-24 (Lolo the hidden axolotl)
+
+- **Lolo, a little pink axolotl, hides somewhere new every day**, a different spot for each player: by built-in things in the buddy home and backyard (top of the fridge, in the bathtub, in the tree house window...) or inside a town building (the shop counter, the park pond, the hen house roof...). Only part of Lolo shows, blinking and wiggling its gills. Lolo only hides in rooms you own, and only in town until you have a buddy.
+- **A clue on Home** says where to start: at home, in the backyard or in town. K to 2nd also hear the room or building.
+- **Tap Lolo** and it pops out: "You found me!" One question from your own skill list (with Help), then **15 coins and 1 star** (10 coins after a miss). Once a day per player; after that Lolo naps until tomorrow.
+- **Finds add up:** at 5 Lolo moves into the living room fish tank (swims there after you find it), 10 golden, 20 wild green, 30 a tiny crown, 50 sparkly blue.
+- **Parent area:** "Where is Lolo?" shows each player's spot today, with a switch to turn Lolo off.
+- No new APK needed: tap Update now (or restart) to get it.
+
 ## 2026-11-24 (Drive around the town)
 
 - **The Town is now a place you drive.** It is drawn from above in the game's own style: roofs, signs, roads with lines and zebra crossings, a roundabout with a fountain, trees, street lamps, a duck pond, chimney smoke, someone out for a walk, birds and drifting cloud shadows. At night (8 PM to 6 AM on the phone's clock) the lamps and windows light up.

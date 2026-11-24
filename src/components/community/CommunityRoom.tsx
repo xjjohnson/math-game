@@ -1,3 +1,6 @@
+import { HiddenLolo } from '@/components/AxolotlFind';
+import { hidingAt } from '@/utils/axolotl';
+import { dateKey } from '@/utils/dates';
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import {
   ScrollView,
@@ -153,6 +156,9 @@ type Piece =
   | { key: string; kind: 'pal'; person: TownPerson; spot: Spot; figure: FigureLook; size: number }
   | { key: string; kind: 'prop'; prop: PropDef; spot: Spot; baked: boolean; shown: string; badge?: string; caption?: string; batter?: boolean };
 
+/** Lolo the axolotl's size in a town building, as a share of the room's height. */
+const LOLO_SIZE = 0.1;
+
 /** How big a room thing is drawn, compared with the usual size. */
 const scaleOf = (prop: PropDef): number => prop.scale ?? (prop.big ? 1.4 : 1);
 
@@ -165,6 +171,8 @@ const scaleOf = (prop: PropDef): number => prop.scale ?? (prop.big ? 1.4 : 1);
 export function CommunityRoom({ place, onDoor, onExit }: Props) {
   const profile = useActiveProfile();
   const { people, spots, myId, waves, status, look } = useTownState();
+  const hiding = profile ? hidingAt(profile, dateKey()) : null;
+  const lolo = hiding?.kind === 'town' && hiding.place === place ? hiding : null;
   const [size, setSize] = useState({ w: 0, h: 0 });
   const [soloSpots, setSoloSpots] = useState<Record<string, Spot>>(() => ({ ...soloMemory }));
   const [soloWave, setSoloWave] = useState(0);
@@ -614,6 +622,13 @@ export function CommunityRoom({ place, onDoor, onExit }: Props) {
                 />
               );
             })}
+            {lolo ? (
+              <HiddenLolo
+                spot={lolo}
+                size={Math.round(h * LOLO_SIZE)}
+                style={{ left: lolo.x * roomW - (h * LOLO_SIZE) / 2, top: lolo.y * h - h * LOLO_SIZE * (lolo.pose === 'tail' ? 0.97 : lolo.pose === 'water' ? 0.84 : 0.86) }}
+              />
+            ) : null}
           </View>
         </ScrollView>
       ) : null}

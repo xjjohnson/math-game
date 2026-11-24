@@ -140,6 +140,18 @@ export interface Profile {
   filament: Record<string, number>;
   /** The car driven round the town, its paint and how it is steered. Missing until first changed. */
   garage?: Garage;
+  /** Lolo the hidden axolotl: the last day found, how many days found, and if a parent switched it off. Missing until first found. */
+  axolotl?: AxolotlState;
+}
+
+/** A player's Lolo record (see utils/axolotl.ts). */
+export interface AxolotlState {
+  /** The last day Lolo was found ("YYYY-MM-DD"): one find a day. */
+  day?: string;
+  /** How many days Lolo has been found, for the unlocks. */
+  finds: number;
+  /** Switched off in the parent area. */
+  off?: boolean;
 }
 
 /** A player's car choice for the town (see utils/garage.ts for the defaults). */
