@@ -13,6 +13,10 @@ import { DrawnItem, hasDrawing } from '@/components/DrawnItem';
 import { Furniture } from '@/components/Furniture';
 import { PrintedToy, Printer3D, type PrintJob } from '@/components/Printer3D';
 import { PrinterPanel } from '@/components/PrinterPanel';
+import { BlanketFort } from '@/components/BlanketFort';
+import { FortPanel } from '@/components/FortPanel';
+import { FORT_EXTRAS, FORT_ITEM, isFort, parseFortId } from '@/constants/fort';
+import { hasFortExtra, nextFortExtra } from '@/utils/fort';
 import { parsePrintId, printId, PRINT_MS, PRINTER_ITEM, SPOOL_PRICE, findFilament, type FilamentId, type PrintToyId } from '@/constants/printer';
 import { Confetti, Picked, SlideIn } from '@/components/Motion';
 import { PopIn } from '@/components/PopIn';
@@ -141,7 +145,11 @@ export function BuddyScreen() {
   }, [savedPictures]);
   const { careForBuddy, equip, buyRoomItem, buyHomeRoom, moveInRoom, moveHomeRoom, setPlaced, paintRoom, setBuddyHome, wear, undress, setLook, setMood, takeOff, moveWearable } =
     useProfiles();
-  const { buyFilament, printToy, recordPrinterCheck } = useProfiles();
+  const { buyFilament, printToy, recordPrinterCheck, setFortBlanket } = useProfiles();
+  /** A folded blanket fort being set up (its thing key), and a built one open to play inside. */
+  const [fortSetup, setFortSetup] = useState<string | null>(null);
+  const [fortOpen, setFortOpen] = useState<string | null>(null);
+  const fortExtras = useMemo(() => new Set(FORT_EXTRAS.filter((x) => hasFortExtra({ stars: profile?.stars ?? 0 }, x.id)).map((x) => x.id)), [profile?.stars]);
   /** The 3D printer whose panel is open (its thing key). */
   const [printerKey, setPrinterKey] = useState<string | null>(null);
   /** A print in progress: the toy is already in the room, hidden until the printer finishes it. */
@@ -313,9 +321,23 @@ export function BuddyScreen() {
       say(`The ${what} went in the toy box.`);
       return;
     }
+    if (isFort(item.id)) {
+      if (game) return;
+      setTab(null);
+      setPrinterKey(null);
+      if (item.id === FORT_ITEM) {
+        setFortSetup(key);
+        say(`${name} found chairs and a big blanket. Let's build a fort!`);
+      } else {
+        setFortSetup(null);
+        setFortOpen(key);
+      }
+      return;
+    }
     if (item.id === PRINTER_ITEM) {
       if (game) return;
       setTab(null);
+      setFortSetup(null);
       setPrinterKey(key);
       if (printing?.printerKey === key) say('Whirr, whirr! The printer is still printing. Watch it build!');
       else say(`${name} looks at the 3D printer. What should we print?`);
@@ -489,6 +511,31 @@ export function BuddyScreen() {
                     say(lines[a.kind][on ? 0 : 1]);
           }}
           onNight={(night) => say(night ? 'Night time in the backyard. Look, fireflies! ✨' : 'Good morning, sunshine! ☀️')}
+          fort={fortOpen ? { key: fortOpen, extras: fortExtras, next: nextFortExtra(profile) } : null}
+          fortFlag={fortExtras.has('tunnel')}
+          onCloseFort={() => setFortOpen(null)}
+          onFortBlanket={(key, blanket) => {
+            if (setFortBlanket(profile.id, key, blanket).ok) playSound('reward');
+          }}
+          onFort={(e, inside) => {
+            const who = inside.length ? nameOf(inside[0]) : name;
+            if (e.kind === 'open') say(inside.length ? `Welcome to the fort, ${who}! Shh, it's a secret hideout. 🤫` : 'The blanket fort! Tap "Call the buddies in" to bring everyone inside.');
+            else if (e.kind === 'callIn') say('Everybody crawl in! 🧸');
+            else if (e.kind === 'pillows') say(`${who} jumps into the pillow pile! Floomp! 🪶`);
+            else if (e.kind === 'book') say(`${who} reads ${e.story} by flashlight. 📖`);
+            else if (e.kind === 'cocoa') say(`${who} sips hot cocoa. Mmm, cozy! ☕`);
+            else if (e.kind === 'flashlight') say(e.on ? 'Click! Drag on the blanket to shine the flashlight around. 🔦' : 'Flashlight off.');
+            else if (e.kind === 'puppet') say(`Look! A shadow puppet of ${e.name}! 🤚`);
+            else if (e.kind === 'lights') say(e.on ? 'Twinkle, twinkle! ✨' : 'Lights off. Extra cozy! 🌙');
+            else if (e.kind === 'sleep') say(e.on ? 'Sleepover time! Night night, everyone. 💤' : 'Good morning, fort friends! ☀️');
+            else if (e.kind === 'wobble') say('The tent pole wobbles... careful! 😬');
+            else if (e.kind === 'collapse') {
+              playSound('wrong');
+              say(`Oh no! The blanket fell down on ${inside.length ? 'everyone' : 'the pillows'}! 😂`);
+            } else if (e.kind === 'rebuild') say('Clip, clip! The fort is back up. 🧷');
+            else if (e.kind === 'blanket') say(`New blanket: ${e.name}! 🎨`);
+            else if (e.kind === 'out') say(`${who} crawls out of the fort.`);
+          }}
           onTreeHouse={(e, inside) => {
             const who = inside.length ? nameOf(inside[0]) : name;
             if (e.kind === 'open') say(inside.length ? `Welcome to the tree house, ${who}! 🌳` : 'The tree house! Tap "Call the buddies up" to bring everyone in.');
@@ -574,8 +621,8 @@ export function BuddyScreen() {
           ) : null}
         </View>
 
-        {game || tab || printerKey ? (
-          <SlideIn key={game ? 'game' : printerKey ? 'printer' : tab ?? ''} style={styles.drawer}>
+        {game || tab || printerKey || fortSetup ? (
+          <SlideIn key={game ? 'game' : printerKey ? 'printer' : fortSetup ? 'fort' : tab ?? ''} style={styles.drawer}>
             <GridPaper />
             {game ? (
               <View style={styles.game}>
@@ -591,7 +638,24 @@ export function BuddyScreen() {
                 />
               </View>
             ) : null}
-            {!game && printerKey ? (
+            {!game && fortSetup ? (
+              <FortPanel
+                profile={profile}
+                say={say}
+                onClose={() => setFortSetup(null)}
+                onBuilt={(history) => {
+                  const key = fortSetup;
+                  setFortSetup(null);
+                  const learned = recordPrinterCheck(profile.id, history);
+                  if (!setFortBlanket(profile.id, key, 'stars').ok) return say('Take the fort out of the toy box first.');
+                  setParty((n) => n + 1);
+                  playSound('reward');
+                  const stars = learned > 0 ? ` You learned a new skill too: +${learned * 5} ⭐!` : '';
+                  say(`Ta-da! The blanket fort is up! Drag a buddy to the door, then tap the fort to go inside.${stars}`);
+                }}
+              />
+            ) : null}
+            {!game && !fortSetup && printerKey ? (
               <PrinterPanel
                 profile={profile}
                 busy={!!printing}
@@ -608,7 +672,7 @@ export function BuddyScreen() {
                 onPrint={startPrint}
               />
             ) : null}
-            {!game && !printerKey && tab === 'care' ? (
+            {!game && !printerKey && !fortSetup && tab === 'care' ? (
               <CareDrawer
                 profile={profile}
                 name={name}
@@ -628,7 +692,7 @@ export function BuddyScreen() {
                 }}
               />
             ) : null}
-            {!game && !printerKey && tab === 'dress' ? (
+            {!game && !printerKey && !fortSetup && tab === 'dress' ? (
               <DressDrawer
                 profile={profile}
                 name={name}
@@ -680,7 +744,7 @@ export function BuddyScreen() {
                 }}
               />
             ) : null}
-            {!game && !printerKey && tab === 'shop' ? (
+            {!game && !printerKey && !fortSetup && tab === 'shop' ? (
               <ShopDrawer
                 coins={profile.coins}
                 month={month}
@@ -689,14 +753,14 @@ export function BuddyScreen() {
                 onBuy={buy}
               />
             ) : null}
-            {!game && !printerKey && tab === 'toys' ? (
+            {!game && !printerKey && !fortSetup && tab === 'toys' ? (
               <ToyDrawer
                 stored={profile.room.things.filter((t) => !t.placed)}
                 areaName={areaName}
                 onTakeOut={(key) => setPlaced(profile.id, key, true, area, viewAt.current)}
               />
             ) : null}
-            {!game && !printerKey && tab === 'buddies' ? (
+            {!game && !printerKey && !fortSetup && tab === 'buddies' ? (
               <BuddiesDrawer
                 profile={profile}
                 buddies={owned}
@@ -709,7 +773,7 @@ export function BuddyScreen() {
                 }}
               />
             ) : null}
-            {!game && !printerKey && tab === 'paint' ? (
+            {!game && !printerKey && !fortSetup && tab === 'paint' ? (
               <PaintDrawer
                 paint={profile.room.paint[area] ?? { wall: 0, floor: 0 }}
                 areaName={areaName}
@@ -737,6 +801,7 @@ export function BuddyScreen() {
               onPress={() => {
                 if (game) return;
                 setPrinterKey(null);
+                setFortSetup(null);
                 setTab(on ? null : t.id);
               }}
               accessibilityRole="tab"
@@ -1150,6 +1215,7 @@ function ShopDrawer({ coins, month, areaId, full, onBuy }: ShopDrawerProps) {
 /** An emoji, or a small drawing for furniture without one. */
 function ItemPicture({ item }: { item: RoomItem }) {
   if (item.id === PRINTER_ITEM) return <Printer3D width={40} height={44} job={null} />;
+  if (isFort(item.id)) return <BlanketFort width={48} height={34} blanket={parseFortId(item.id)?.id ?? 'stars'} />;
   const print = parsePrintId(item.id);
   if (print) return <PrintedToy toy={print.toy.id} filament={print.filament.id} width={40} height={40} />;
   if (hasDrawing(item.id)) return <DrawnItem id={item.id} width={40} height={40} />;

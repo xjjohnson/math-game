@@ -46,6 +46,7 @@ import {
   type Gadget,
   type Season,
   PICTURE_ITEM,
+  BUDDY_SIZE,
 } from '@/constants/room';
 import type { Mood } from '@/components/PersonFigure';
 import { findWearable, type PersonLook } from '@/constants/wardrobe';
@@ -58,6 +59,7 @@ import {
   gadgetBox,
   homeSize,
   layoutHome,
+  ledgeOf,
   pieceAt,
   ridersOf,
   shelvesOf,
@@ -73,6 +75,9 @@ import { GroundShadow } from '@/components/GroundShadow';
 import { DrawnItem, hasDrawing } from '@/components/DrawnItem';
 import { PrintedToy, Printer3D, type PrintJob } from '@/components/Printer3D';
 import { parsePrintId, PRINTER_ITEM, type FilamentId, type PrintToyId } from '@/constants/printer';
+import { BlanketFort } from '@/components/BlanketFort';
+import { FortInside, type FortEvent } from '@/components/FortInside';
+import { FORT_ITEM, parseFortId, type BlanketId, type FortExtra, type FortExtraId } from '@/constants/fort';
 
 export interface HomeBuddy {
   /** Shop item id. */
@@ -135,6 +140,14 @@ interface Props {
   onNight?: (night: boolean) => void;
   /** A 3D print in progress: the printer prints it, and the new toy (already in the room) stays hidden until it's done. */
   printing?: { printerKey: string; toyKey: string; job: PrintJob } | null;
+  /** The blanket fort that's open to play inside (its thing key), with what stars unlock in there. */
+  fort?: { key: string; extras: ReadonlySet<FortExtraId>; next: FortExtra | null } | null;
+  /** Stars put a flag on top of every fort. */
+  fortFlag?: boolean;
+  /** Something happened inside the open fort; `inside` are the buddies in it. */
+  onFort?: (e: FortEvent, inside: string[]) => void;
+  onFortBlanket?: (key: string, blanket: BlanketId) => void;
+  onCloseFort?: () => void;
 }
 
 const TRIM = '#A86B45';
@@ -451,6 +464,8 @@ export function BuddyRoom(props: Props) {
       if (p.item?.light && lit.has(p.key)) pools.push({ key: p.key, x: p.x, y: p.y - p.height * 0.6, r: size.unit * 0.3 });
       // Glow-in-the-dark prints shine softly once the lights are off.
       else if (p.item && parsePrintId(p.item.id)?.filament.id === 'glow' && inDark(p.x)) pools.push({ key: p.key, x: p.x, y: p.y - p.height * 0.5, r: size.unit * 0.12 });
+      // A blanket fort glows from inside, as if someone's reading by flashlight in there.
+      else if (p.item && parseFortId(p.item.id)) pools.push({ key: p.key, x: p.x, y: p.y - p.height * 0.3, r: size.unit * 0.2 });
     }
     for (const g of GADGETS) {
       if (g.glow && lit.has(g.id)) {
@@ -523,6 +538,19 @@ export function BuddyRoom(props: Props) {
     if (!animate) return land();
     setSliding((set) => new Set(set).add(p.key));
     slideTimers.current.set(p.key, setTimeout(land, SLIDE_MS));
+  };
+
+  /** The open blanket fort, and the buddies sitting in it. */
+  const openFort = props.fort ? byKey.get(props.fort.key) : undefined;
+  const fortRiders = openFort ? pieces.filter((p) => p.buddyId && p.parent === openFort.key) : [];
+  /** Everyone into the blanket fort, side by side in its doorway. */
+  const callIn = (fort: Piece) => {
+    const ledge = ledgeOf(fort) ?? fort.y;
+    const span = Math.max(0, fort.width - BUDDY_SIZE * size.unit * 0.6);
+    buddies.forEach((b, i) => {
+      const x = fort.x - span / 2 + span * (buddies.length === 1 ? 0.5 : i / (buddies.length - 1));
+      onPlaceBuddy(b.id, { x: x / size.width, y: ledge / size.height, on: fort.key });
+    });
   };
 
   /** Everyone into the tree house, side by side. */
@@ -916,6 +944,14 @@ export function BuddyRoom(props: Props) {
                           height={piece.height}
                           job={props.printing?.printerKey === piece.key ? props.printing.job : null}
                         />
+                      ) : piece.item && (piece.item.id === FORT_ITEM || parseFortId(piece.item.id)) ? (
+                        <BlanketFort
+                          width={piece.width}
+                          height={piece.height}
+                          blanket={(parseFortId(piece.item.id)?.id as BlanketId | undefined) ?? null}
+                          flag={props.fortFlag}
+                          glowing={!!parseFortId(piece.item.id) && inDark(piece.x)}
+                        />
                       ) : piece.item && parsePrintId(piece.item.id) ? (
                         <PrintedToy
                           toy={parsePrintId(piece.item.id)!.toy.id as PrintToyId}
@@ -1053,6 +1089,23 @@ export function BuddyRoom(props: Props) {
           </FloatUp>
         ))}
       </ScrollView>
+      {props.fort && openFort?.item && parseFortId(openFort.item.id) ? (
+        <FortInside
+          width={view.width}
+          height={view.height}
+          blanket={parseFortId(openFort.item.id)!.id as BlanketId}
+          buddies={fortRiders.flatMap((p) => buddyById.get(p.buddyId as string) ?? [])}
+          extras={props.fort.extras}
+          next={props.fort.next}
+          onTapBuddy={onTapBuddy}
+          onBlanket={(b) => props.onFortBlanket?.(openFort.key, b)}
+          onClose={() => props.onCloseFort?.()}
+          onEvent={(e) => {
+            if (e.kind === 'callIn') callIn(openFort);
+            props.onFort?.(e, fortRiders.map((p) => p.buddyId as string));
+          }}
+        />
+      ) : null}
       {treeOpen ? (
         <TreeHouseInside
           width={view.width}
