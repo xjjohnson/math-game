@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, View, type GestureResponderEvent, type ViewStyle } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, View, type ScrollViewInstance, type ViewStyle } from 'react-native';
 import Animated, { Easing, useAnimatedStyle, useSharedValue, withSequence, withTiming } from 'react-native-reanimated';
 
 import { Text } from '@/components/AppText';
@@ -10,6 +10,7 @@ import { Drifting, Flicker, FloatUp, Glide, Lively, type BounceKind } from '@/co
 import { PersonFigure } from '@/components/PersonFigure';
 import { BUDDY_SIZE } from '@/constants/room';
 import { useMotion } from '@/hooks/useAccessibility';
+import { useMultiDrag } from '@/hooks/useMultiDrag';
 import { INK, shade, tint } from '@/constants/artStyle';
 import { GroundShadow } from '@/components/GroundShadow';
 
@@ -63,8 +64,6 @@ const POP_MS = 1300;
 const BAG_COLORS = ['#E53935', '#1E88E5', '#43A047'];
 /** How many phone screens wide the tree house is (a room in the home is 2.5). */
 const SPAN = 1.8;
-/** Below this many pixels a touch on a buddy is a tap, not a drag. */
-const TAP_SLOP = 6;
 
 interface Props {
   width: number;
@@ -102,8 +101,9 @@ export function TreeHouseInside({ width: w, height: h, buddies, coinsReady, onEv
   const [pop, setPop] = useState<{ id: number; x: number; y: number; emoji: string } | null>(null);
   const [bumps, setBumps] = useState<Record<string, { n: number; kind: BounceKind }>>({});
   const [spots, setSpots] = useState<Record<string, Spot>>({});
-  const [dragging, setDragging] = useState<string | null>(null);
-  const drag = useRef<{ id: string; pageX: number; pageY: number; from: Spot; moved: boolean; fromBag: boolean } | null>(null);
+  const scroller = useRef<ScrollViewInstance>(null);
+  /** Buddies who were just helped out of a sleeping bag: a tap on them isn't a "hi". */
+  const climbed = useRef(new Set<string>());
   /** Which sleeping bags are rolled out on the floor. */
   const [bags, setBags] = useState<boolean[]>(() => BAG_COLORS.map(() => false));
   /** Who is in which sleeping bag, by buddy id. */
@@ -205,50 +205,14 @@ export function TreeHouseInside({ width: w, height: h, buddies, coinsReady, onEv
   };
   const bucketLook = useAnimatedStyle(() => ({ transform: [{ translateY: bucket.value }] }));
 
-  // Dragging a buddy around the floor; a touch that doesn't move is a tap.
-  const grab = (id: string, from: Spot, e: GestureResponderEvent, fromBag = false) => {
-    drag.current = { id, pageX: e.nativeEvent.pageX, pageY: e.nativeEvent.pageY, from, moved: false, fromBag };
-    return true;
-  };
   /** Touching someone in a sleeping bag: they climb out, standing in front of it, and can be dragged on. */
-  const climbOut = (id: string, i: number, e: GestureResponderEvent) => {
+  const climbOut = (id: string, i: number): Spot => {
     const spot = clampSpot({ x: bagX(i), y: bagFloorY + fig * 0.12 });
     setInBag(({ [id]: _gone, ...rest }) => rest);
     setSpots((all) => ({ ...all, [id]: spot }));
     onEvent({ kind: 'bag', action: 'out', who: id });
-    grab(id, spot, e, true);
-  };
-  const move = (e: GestureResponderEvent) => {
-    const d = drag.current;
-    if (!d) return;
-    const dx = e.nativeEvent.pageX - d.pageX;
-    const dy = e.nativeEvent.pageY - d.pageY;
-    if (!d.moved && Math.abs(dx) < TAP_SLOP && Math.abs(dy) < TAP_SLOP) return;
-    if (!d.moved) setDragging(d.id);
-    d.moved = true;
-    setSpots((all) => ({ ...all, [d.id]: { x: d.from.x + dx, y: d.from.y + dy } }));
-  };
-  const letGo = () => {
-    const d = drag.current;
-    drag.current = null;
-    setDragging(null);
-    if (!d) return;
-    if (!d.moved) {
-      setBumps((all) => ({ ...all, [d.id]: { n: (all[d.id]?.n ?? 0) + 1, kind: 'hop' } }));
-      if (!d.fromBag) onTapBuddy(d.id);
-      return;
-    }
-    // Let go over a rolled-out sleeping bag, it climbs in; anywhere else it drops to the floor and squashes there (Glide).
-    const at = spots[d.id] ?? d.from;
-    const bag = bagAt(at);
-    if (bag >= 0) {
-      const tucked = { ...inBag, [d.id]: bag };
-      setInBag(tucked);
-      onEvent({ kind: 'bag', action: 'in', who: d.id });
-      checkSleepover(lights, tucked);
-      return;
-    }
-    setSpots((all) => ({ ...all, [d.id]: clampSpot(all[d.id] ?? d.from) }));
+    climbed.current.add(id);
+    return spot;
   };
 
   const bulbs = Math.max(8, Math.round(cw / 45));
@@ -260,11 +224,45 @@ export function TreeHouseInside({ width: w, height: h, buddies, coinsReady, onEv
     ...BAG_COLORS.map((_, i) => ({ y: bags[i] ? bagFloorY : rollY, buddy: null, bag: i })),
   ].sort((a, c) => a.y - c.y);
 
+  // Everyone a finger can pick up, back to front: standing buddies and whoever is in a sleeping bag.
+  const touch = useMultiDrag({
+    items: onFloor.flatMap(({ buddy, bag }) => {
+      if (buddy) return [{ id: buddy.b.id, left: buddy.spot.x - fig / 2, top: buddy.spot.y - fig, width: fig, height: fig, spot: buddy.spot }];
+      const who = bag >= 0 && bags[bag] ? occupant(bag) : undefined;
+      return who ? [{ id: who.id, left: bagX(bag) - bagLen / 2, top: bagFloorY - bagH, width: bagLen, height: bagH, spot: { x: bagX(bag), y: bagFloorY } }] : [];
+    }),
+    roomW: cw,
+    viewW: w,
+    scroller,
+    onPick: (id) => (inBag[id] !== undefined ? climbOut(id, inBag[id]) : undefined),
+    onLetGo: (id, moved, spot) => {
+      const fromBag = climbed.current.delete(id);
+      if (!moved) {
+        setBumps((all) => ({ ...all, [id]: { n: (all[id]?.n ?? 0) + 1, kind: 'hop' } }));
+        if (!fromBag) onTapBuddy(id);
+        return;
+      }
+      // Let go over a rolled-out sleeping bag, it climbs in; anywhere else it drops to the floor and squashes there (Glide).
+      const bag = bagAt(spot);
+      if (bag >= 0) {
+        const tucked = { ...inBag, [id]: bag };
+        setInBag(tucked);
+        onEvent({ kind: 'bag', action: 'in', who: id });
+        checkSleepover(lights, tucked);
+        return;
+      }
+      setSpots((all) => ({ ...all, [id]: clampSpot(spot) }));
+    },
+  });
+
   return (
-    <View style={[StyleSheet.absoluteFill, styles.inside]} accessibilityLabel="Inside the tree house">
+    <View ref={touch.frameRef as never} onLayout={touch.measure} style={[StyleSheet.absoluteFill, styles.inside]} accessibilityLabel="Inside the tree house">
       <ScrollView
+        ref={scroller}
         horizontal
-        scrollEnabled={!dragging}
+        scrollEnabled={!touch.holding}
+        onScroll={touch.onScroll}
+        scrollEventThrottle={16}
         showsHorizontalScrollIndicator={false}
         style={StyleSheet.absoluteFill}
         contentContainerStyle={{ width: cw, height: h }}
@@ -379,6 +377,7 @@ export function TreeHouseInside({ width: w, height: h, buddies, coinsReady, onEv
         </Pressable>
 
         {/* The buddies who climbed up, as big as at home: drag them about, tap to say hi. */}
+        <View style={at(0, 0, cw, h)} pointerEvents="box-none" {...touch.handlers}>
         {onFloor.map(({ buddy, bag }) => {
           if (bag >= 0) {
             const who = occupant(bag);
@@ -417,12 +416,6 @@ export function TreeHouseInside({ width: w, height: h, buddies, coinsReady, onEv
                 key={`bag-${bag}`}
                 accessible
                 accessibilityLabel={`${who.name} in a sleeping bag. Tap to climb out`}
-                onStartShouldSetResponder={() => true}
-                onResponderGrant={(e) => climbOut(who.id, bag, e)}
-                onResponderMove={move}
-                onResponderRelease={letGo}
-                onResponderTerminate={letGo}
-                onResponderTerminationRequest={() => false}
                 style={box}
               >
                 <OpenBag color={color} length={bagLen} height={bagH} under />
@@ -446,9 +439,10 @@ export function TreeHouseInside({ width: w, height: h, buddies, coinsReady, onEv
             );
           }
           if (!buddy) return null;
-          const { b, spot } = buddy;
+          const { b, spot: home } = buddy;
           const bump = bumps[b.id];
-          const held = dragging === b.id;
+          const held = !!touch.dragAt[b.id];
+          const spot = touch.dragAt[b.id] ? clampSpot(touch.dragAt[b.id]) : home;
           return (
             <Glide
               key={b.id}
@@ -463,12 +457,6 @@ export function TreeHouseInside({ width: w, height: h, buddies, coinsReady, onEv
               <View
                 accessible
                 accessibilityLabel={`${b.name}. Drag to move`}
-                onStartShouldSetResponder={() => true}
-                onResponderGrant={(e) => grab(b.id, spot, e)}
-                onResponderMove={move}
-                onResponderRelease={letGo}
-                onResponderTerminate={letGo}
-                onResponderTerminationRequest={() => false}
                 style={StyleSheet.absoluteFill}
               >
                 <GroundShadow width={fig * 0.42} hidden={held} style={{ left: fig / 2 - fig * 0.21, bottom: -fig * 0.035 }} />
@@ -483,6 +471,7 @@ export function TreeHouseInside({ width: w, height: h, buddies, coinsReady, onEv
             </Glide>
           );
         })}
+        </View>
 
         {pop ? (
           <FloatUp key={pop.id} rise={unit * 0.14} duration={POP_MS} style={at(pop.x - 24, pop.y - 50, 48, 50)}>

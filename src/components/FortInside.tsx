@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, View, type GestureResponderEvent, type ViewStyle } from 'react-native';
+import { Pressable, ScrollView, type ScrollViewInstance, StyleSheet, View, type ViewStyle } from 'react-native';
 import Animated, { Easing, useAnimatedStyle, useSharedValue, withSequence, withSpring, withTiming } from 'react-native-reanimated';
 import Svg, { Circle, Ellipse, Path, Polygon } from 'react-native-svg';
 
@@ -14,6 +14,7 @@ import { INK } from '@/constants/artStyle';
 import { BLANKETS, findBlanket, type BlanketId, type FortExtra, type FortExtraId } from '@/constants/fort';
 import { BUDDY_SIZE } from '@/constants/room';
 import { useMotion } from '@/hooks/useAccessibility';
+import { useMultiDrag } from '@/hooks/useMultiDrag';
 
 /** What happened inside the fort, for the buddy's speech bubble. */
 export type FortEvent =
@@ -49,7 +50,6 @@ const POP_MS = 1300;
 /** How many phone screens wide the fort is inside; the tunnel room adds one more. */
 const SPAN = 1.5;
 const TUNNEL_SPAN = 1;
-const TAP_SLOP = 6;
 /** Pokes at the tent pole, close together, that bring the blanket down. */
 const POKES_TO_FALL = 3;
 const POKE_GAP_MS = 2500;
@@ -128,8 +128,7 @@ export function FortInside({ width: w, height: h, blanket, buddies, extras, next
   const [pop, setPop] = useState<{ id: number; x: number; y: number; emoji: string } | null>(null);
   const [bumps, setBumps] = useState<Record<string, { n: number; kind: BounceKind }>>({});
   const [spots, setSpots] = useState<Record<string, Spot>>({});
-  const [dragging, setDragging] = useState<string | null>(null);
-  const drag = useRef<{ id: string; pageX: number; pageY: number; from: Spot; moved: boolean } | null>(null);
+  const scroller = useRef<ScrollViewInstance>(null);
   const turns = useRef({ story: 0, puppet: 0, pop: 0, pokes: [] as number[] });
   const timers = useRef<ReturnType<typeof setTimeout>[]>([]);
   const pole = useSharedValue(0);
@@ -236,46 +235,41 @@ export function FortInside({ width: w, height: h, blanket, buddies, extras, next
   const poleLook = useAnimatedStyle(() => ({ transform: [{ rotate: `${pole.value * 4}deg` }] }));
   const sheetLook = useAnimatedStyle(() => ({ transform: [{ translateY: (sheet.value - 1) * h }] }));
 
-  const grab = (id: string, from: Spot, e: GestureResponderEvent) => {
-    drag.current = { id, pageX: e.nativeEvent.pageX, pageY: e.nativeEvent.pageY, from, moved: false };
-    return true;
-  };
-  const move = (e: GestureResponderEvent) => {
-    const d = drag.current;
-    if (!d) return;
-    const dx = e.nativeEvent.pageX - d.pageX;
-    const dy = e.nativeEvent.pageY - d.pageY;
-    if (!d.moved && Math.abs(dx) < TAP_SLOP && Math.abs(dy) < TAP_SLOP) return;
-    if (!d.moved) setDragging(d.id);
-    d.moved = true;
-    setSpots((all) => ({ ...all, [d.id]: { x: d.from.x + dx, y: d.from.y + dy } }));
-  };
-  const letGo = () => {
-    const d = drag.current;
-    drag.current = null;
-    setDragging(null);
-    if (!d) return;
-    if (!d.moved) {
-      setBumps((all) => ({ ...all, [d.id]: { n: (all[d.id]?.n ?? 0) + 1, kind: 'hop' } }));
-      onTapBuddy(d.id);
-      return;
-    }
-    setSpots((all) => ({ ...all, [d.id]: clampSpot(all[d.id] ?? d.from) }));
-  };
-
   const dim = asleep ? 0.55 : lights && extras.has('lights') ? 0.18 : 0.35;
   const bulbs = Math.max(8, Math.round(mainW / 45));
   const beamR = unit * 0.26;
   const placed = buddies.map((b, i) => ({ b, i, spot: spotOf(b.id, i) })).sort((a, c) => a.spot.y - c.spot.y);
+  const touch = useMultiDrag({
+    items: placed.map(({ b, spot }) => ({ id: b.id, left: spot.x - fig / 2, top: spot.y - fig, width: fig, height: fig, spot })),
+    roomW: cw,
+    viewW: w,
+    scroller,
+    onLetGo: (id, moved, spot) => {
+      if (!moved) {
+        setBumps((all) => ({ ...all, [id]: { n: (all[id]?.n ?? 0) + 1, kind: 'hop' } }));
+        onTapBuddy(id);
+        return;
+      }
+      setSpots((all) => ({ ...all, [id]: clampSpot(spot) }));
+    },
+  });
   const glowStars = extras.has('sleepover')
     ? Array.from({ length: Math.round(cw / 60) }, (_, i) => ({ x: ((i + 0.3) * cw) / Math.round(cw / 60), y: top + unit * 0.04 + ((i * 37) % 5) * unit * 0.035 }))
     : [];
 
   return (
-    <View style={[StyleSheet.absoluteFill, styles.inside]} accessibilityLabel="Inside the blanket fort">
+    <View
+      ref={touch.frameRef as never}
+      onLayout={touch.measure}
+      style={[StyleSheet.absoluteFill, styles.inside]}
+      accessibilityLabel="Inside the blanket fort"
+    >
       <ScrollView
+        ref={scroller}
         horizontal
-        scrollEnabled={!dragging}
+        scrollEnabled={!touch.holding}
+        onScroll={touch.onScroll}
+        scrollEventThrottle={16}
         showsHorizontalScrollIndicator={false}
         style={StyleSheet.absoluteFill}
         contentContainerStyle={{ width: cw, height: h }}
@@ -398,9 +392,11 @@ export function FortInside({ width: w, height: h, blanket, buddies, extras, next
           </View>
         ) : null}
 
-        {placed.map(({ b, i, spot }) => {
+        <View style={at(0, 0, cw, h)} pointerEvents="box-none" {...touch.handlers}>
+        {placed.map(({ b, i, spot: home }) => {
           const bump = bumps[b.id];
-          const held = dragging === b.id;
+          const held = !!touch.dragAt[b.id];
+          const spot = touch.dragAt[b.id] ? clampSpot(touch.dragAt[b.id]) : home;
           const sleeping = asleep && !held;
           return (
             <Glide
@@ -416,12 +412,6 @@ export function FortInside({ width: w, height: h, blanket, buddies, extras, next
               <View
                 accessible
                 accessibilityLabel={`${b.name}. Drag to move`}
-                onStartShouldSetResponder={() => true}
-                onResponderGrant={(e) => grab(b.id, spot, e)}
-                onResponderMove={move}
-                onResponderRelease={letGo}
-                onResponderTerminate={letGo}
-                onResponderTerminationRequest={() => false}
                 style={StyleSheet.absoluteFill}
               >
                 <GroundShadow width={fig * 0.42} hidden={held} style={{ left: fig / 2 - fig * 0.21, bottom: -fig * 0.035 }} />
@@ -441,6 +431,7 @@ export function FortInside({ width: w, height: h, blanket, buddies, extras, next
             </Glide>
           );
         })}
+        </View>
 
         {pop ? (
           <FloatUp key={pop.id} rise={unit * 0.14} duration={POP_MS} style={at(pop.x - 24, pop.y - 50, 48, 50)}>

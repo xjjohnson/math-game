@@ -1,5 +1,12 @@
 # Change log
 
+## 2026-11-25 (Smoother dragging, two fingers)
+
+- **Two fingers at once now work everywhere you move people:** the buddy home, the Community rooms, the tree house, the blanket fort, and the car (hold GO with one finger and steer with another).
+- **Dragging a person to the edge of the screen is smooth:** the room slides along at a steady speed instead of stuttering, and only the people you are holding are redrawn while you move them. On a slowed-down test phone the average frame time at the edge dropped from about 74 ms to about 20 ms.
+- **The room's own scroller no longer grabs a drag** on Android, so a held person doesn't get dropped when the room starts to scroll.
+- No new APK needed: tap Update now (or restart) to get it.
+
 ## 2026-11-24 (Lolo's question streak)
 
 - **Lolo now keeps asking until you miss.** Questions get harder as you go: two warm-ups, two just right, three challenges, then challenges from the next grade up.
