@@ -22,7 +22,7 @@ import { accuracy } from '@/utils/progress';
 import { trickiest } from '@/utils/weakSpots';
 import { speakInVoice } from '@/utils/feedback';
 import { loadVoices, type DeviceVoice } from '@/utils/voices';
-import { clearStoryVoiceLog, speakStory, storyVoiceLog, storyVoices } from '../../modules/math-voice';
+import { clearStoryVoiceLog, setStoryOptions, speakStory, storySelfCheck, storyVoiceLog, storyVoices } from '../../modules/math-voice';
 
 const PIN_LENGTH = 4;
 
@@ -251,6 +251,27 @@ function StoryVoiceLog() {
           setTimeout(show, 4000);
         }}
       />
+      <BigButton
+        label="Test with 1 thread"
+        color={colors.text}
+        outline
+        onPress={() => {
+          setStoryOptions(1, false);
+          speakStory('hfc_female', 'What is 7 times 8?', 1, show);
+          setTimeout(show, 5000);
+        }}
+      />
+      <BigButton
+        label="Test with details on"
+        color={colors.text}
+        outline
+        onPress={() => {
+          setStoryOptions(2, true);
+          speakStory('hfc_female', 'What is 7 times 8?', 1, show);
+          setTimeout(show, 5000);
+        }}
+      />
+      <BigButton label="Check speech files" color={colors.text} outline onPress={() => setText(storySelfCheck())} />
       <BigButton label="Show log" color={colors.text} outline onPress={show} />
       {text !== null ? (
         <>

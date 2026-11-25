@@ -35,6 +35,8 @@ class MathVoiceModule : Module() {
   private var loadedId: String? = null
   private var track: AudioTrack? = null
   @Volatile private var generation = 0
+  @Volatile private var optThreads = 2
+  @Volatile private var optDebug = false
 
   private val context: Context
     get() = appContext.reactContext ?: throw IllegalStateException("No context")
@@ -53,6 +55,16 @@ class MathVoiceModule : Module() {
 
     /** What happened to the app lately (why it closed) and what Story Voice was doing. */
     Function("readLog") { readLog() }
+
+    /** For finding the crash: how many threads the speech engine uses, and whether it prints its own details. */
+    Function("setOptions") { threads: Int, debug: Boolean ->
+      optThreads = threads
+      optDebug = debug
+      log("options: threads=$threads, debug=$debug")
+    }
+
+    /** Checks the copied speech files are all there. */
+    Function("selfCheck") { selfCheck() }
 
     Function("clearLog") {
       try {
@@ -127,12 +139,12 @@ class MathVoiceModule : Module() {
           tokens = "$voiceDir/tokens.txt",
           dataDir = dataDir,
         ),
-        numThreads = 2,
-        debug = false,
+        numThreads = optThreads,
+        debug = optDebug,
         provider = "cpu",
       ),
     )
-    log("creating the speech engine from files")
+    log("creating the speech engine from files (threads=$optThreads, debug=$optDebug)")
     return OfflineTts(config = config).also {
       tts = it
       loadedId = voiceId
@@ -259,14 +271,39 @@ class MathVoiceModule : Module() {
   /** The app's own system log lines (the speech library writes its error here before it aborts). */
   private fun systemLog(): String {
     return try {
-      val process = Runtime.getRuntime().exec(arrayOf("logcat", "-d", "-t", "400"))
-      val keep = Regex("(?i)(sherpa|onnx|espeak|abort|fatal|signal|libc|mathvoice|story)")
-      val lines = process.inputStream.bufferedReader().readLines().filter { keep.containsMatchIn(it) }
-      process.destroy()
-      if (lines.isEmpty()) "(nothing)" else lines.takeLast(25).joinToString("\n") { it.take(200) }
+      val keep = Regex("(?i)(sherpa|onnx|espeak|abort|fatal|sigabrt|terminat|exception|mathvoice|story-voice|assert|cannot|symbol)")
+      val found = mutableListOf<String>()
+      for (args in listOf(
+        arrayOf("logcat", "-d", "-b", "main,crash,system"),
+        arrayOf("logcat", "-d"),
+      )) {
+        val process = Runtime.getRuntime().exec(args)
+        process.inputStream.bufferedReader().useLines { lines -> lines.filter { keep.containsMatchIn(it) }.forEach { found.add(it) } }
+        process.destroy()
+        if (found.isNotEmpty()) break
+      }
+      if (found.isEmpty()) "(nothing)" else found.takeLast(40).joinToString("\n") { it.take(220) }
     } catch (e: Throwable) {
       "(couldn't read: ${e.message})"
     }
+  }
+
+  private fun selfCheck(): String {
+    val sb = StringBuilder()
+    try {
+      val espeak = File(context.filesDir, "espeak-ng-data")
+      val files = espeak.walkTopDown().filter { it.isFile }.toList()
+      sb.append("speech data: ${files.size} files, ${files.sumOf { it.length() }} bytes (should be 355 files, 17991651 bytes)\n")
+      for (name in listOf("phontab", "phonindex", "phondata", "intonations", "en_dict")) {
+        sb.append("  $name: ${File(espeak, name).length()} bytes\n")
+      }
+      val voices = File(context.filesDir, "story-voice")
+      voices.walkTopDown().filter { it.isFile }.forEach { sb.append("${it.relativeTo(voices.parentFile!!)}: ${it.length()} bytes\n") }
+      sb.append("(model.onnx should be 63149198 bytes, tokens.txt 954)\n")
+    } catch (e: Throwable) {
+      sb.append("(couldn't check: ${e.message})\n")
+    }
+    return sb.toString()
   }
 
   /** Android keeps the reasons this app's recent processes ended, with a crash report for native crashes. */
@@ -300,14 +337,15 @@ class MathVoiceModule : Module() {
     }
   }
 
-  /** Pulls the readable lines (signal, library names, call stack) out of a native crash report. */
+  /** Pulls the lines that name the problem (abort message, signal, library, call stack) out of a native crash report. */
   private fun nativeCrashLines(info: ApplicationExitInfo): String {
     return try {
       val bytes = info.traceInputStream?.use { it.readBytes() } ?: return "  (no crash report kept)\n"
-      val runs = Regex("[ -~]{8,}").findAll(String(bytes, Charsets.ISO_8859_1)).map { it.value }
-      val keep = Regex("(?i)(signal|abort|fault|#[0-9]+ pc|\\.so|sherpa|onnx|espeak|\\.kt|java\\.|exception|cause)")
-      val lines = runs.filter { keep.containsMatchIn(it) }.distinct().take(30).toList()
-      if (lines.isEmpty()) "  (crash report had nothing readable)\n" else lines.joinToString("") { "  ${it.take(160)}\n" }
+      val runs = Regex("[ -~]{6,}").findAll(String(bytes, Charsets.ISO_8859_1)).map { it.value }
+      val keep = Regex("(?i)(abort|sigabrt|signal|terminat|exception|assert|cannot|symbol|sherpa|onnx|espeak|story-voice|mathvoice|__cxa|pthread_kill|tgkill|raise|libc\\+\\+|std::)")
+      val lines = runs.filter { keep.containsMatchIn(it) }.distinct().take(60).toList()
+      "  (crash report is ${bytes.size} bytes)\n" +
+        if (lines.isEmpty()) "  (nothing readable)\n" else lines.joinToString("") { "  ${it.take(200)}\n" }
     } catch (e: Throwable) {
       "  (couldn't read the crash report: ${e.message})\n"
     }
