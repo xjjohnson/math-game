@@ -105,8 +105,9 @@ jobs:
           set -euo pipefail
           mod=modules/math-voice/android
           mkdir -p "$mod/libs" "$mod/src/main/jniLibs" "$mod/src/main/assets/voices"
-          aar=$(gh api repos/k2-fsa/sherpa-onnx/releases/latest \
-            --jq '[.assets[] | select(.name | test("^sherpa-onnx-[0-9.]+\\.aar$"))][0].browser_download_url')
+          # Pinned: version 2.x stopped reading these Piper voices (it makes no
+          # sound, then the app crashes), 1.12.40 is the one tested with them.
+          aar="https://github.com/k2-fsa/sherpa-onnx/releases/download/v1.12.40/sherpa-onnx-1.12.40.aar"
           echo "sherpa-onnx library: $aar"
           curl -fsSL -o /tmp/sherpa-onnx.aar "$aar"
           rm -rf /tmp/sherpa-aar && mkdir /tmp/sherpa-aar

@@ -48,6 +48,8 @@ class MathVoiceModule : Module() {
           val engine = engineFor(voiceId)
           val audio = engine.generate(text, 0, speed.toFloat())
           if (mine != generation) return@execute promise.resolve(null)
+          // An empty result would make a zero-size audio buffer, which crashes.
+          if (audio.samples.isEmpty()) throw IllegalStateException("Story Voice made no sound")
           play(audio.samples, audio.sampleRate)
           promise.resolve(null)
         } catch (e: Throwable) {
