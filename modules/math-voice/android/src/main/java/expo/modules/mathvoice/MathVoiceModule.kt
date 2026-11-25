@@ -1,10 +1,14 @@
 package expo.modules.mathvoice
 
+import android.app.ActivityManager
+import android.app.ApplicationExitInfo
 import android.content.Context
 import android.content.res.AssetManager
 import android.media.AudioAttributes
 import android.media.AudioFormat
 import android.media.AudioTrack
+import android.os.Build
+import android.util.Log
 import com.k2fsa.sherpa.onnx.OfflineTts
 import com.k2fsa.sherpa.onnx.OfflineTtsConfig
 import com.k2fsa.sherpa.onnx.OfflineTtsModelConfig
@@ -12,6 +16,10 @@ import com.k2fsa.sherpa.onnx.OfflineTtsVitsModelConfig
 import expo.modules.kotlin.modules.Module
 import expo.modules.kotlin.modules.ModuleDefinition
 import java.io.File
+import java.io.FileOutputStream
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 import java.util.concurrent.Executors
 
 /**
@@ -21,7 +29,8 @@ import java.util.concurrent.Executors
  * without Story Voice never pay for it.
  */
 class MathVoiceModule : Module() {
-  private val worker = Executors.newSingleThreadExecutor()
+  // A big stack (16 MB): the speech engine does deep native work on this thread.
+  private val worker = Executors.newSingleThreadExecutor { r -> Thread(null, r, "story-voice", 16L * 1024 * 1024) }
   private var tts: OfflineTts? = null
   private var loadedId: String? = null
   private var track: AudioTrack? = null
@@ -33,6 +42,25 @@ class MathVoiceModule : Module() {
   override fun definition() = ModuleDefinition {
     Name("MathVoice")
 
+    OnCreate {
+      val before = Thread.getDefaultUncaughtExceptionHandler()
+      Thread.setDefaultUncaughtExceptionHandler { thread, error ->
+        log("APP CRASH in thread ${thread.name}: ${Log.getStackTraceString(error)}")
+        before?.uncaughtException(thread, error)
+      }
+      log("--- app started, Android ${Build.VERSION.SDK_INT}, ${Build.MODEL}")
+    }
+
+    /** What happened to the app lately (why it closed) and what Story Voice was doing. */
+    Function("readLog") { readLog() }
+
+    Function("clearLog") {
+      try {
+        logFile.delete()
+      } catch (_: Throwable) {
+      }
+    }
+
     /** Ids of the voices built into this APK, e.g. ["hfc_female", "hfc_male"]. */
     Function("voices") {
       context.assets.list("voices")?.filter { it != "espeak-ng-data" }?.toList() ?: emptyList<String>()
@@ -42,17 +70,24 @@ class MathVoiceModule : Module() {
     AsyncFunction("speak") { voiceId: String, text: String, speed: Double, promise: expo.modules.kotlin.Promise ->
       val mine = ++generation
       stopTrack()
+      log("speak: voice=$voiceId, ${text.length} letters, speed=$speed")
       worker.execute {
         try {
           if (mine != generation) return@execute promise.resolve(null)
           val engine = engineFor(voiceId)
+          log("generating sound")
+          val t0 = System.currentTimeMillis()
           val audio = engine.generate(text, 0, speed.toFloat())
+          log("generated ${audio.samples.size} samples at ${audio.sampleRate} Hz in ${System.currentTimeMillis() - t0} ms")
           if (mine != generation) return@execute promise.resolve(null)
           // An empty result would make a zero-size audio buffer, which crashes.
           if (audio.samples.isEmpty()) throw IllegalStateException("Story Voice made no sound")
+          log("playing")
           play(audio.samples, audio.sampleRate)
+          log("finished playing")
           promise.resolve(null)
         } catch (e: Throwable) {
+          log("ERROR: ${Log.getStackTraceString(e)}")
           promise.reject("ERR_VOICE", e.message ?: "Story Voice couldn't speak", e)
         }
       }
@@ -78,7 +113,10 @@ class MathVoiceModule : Module() {
     tts?.let { if (loadedId == voiceId) return it }
     tts?.release()
     tts = null
+    log("loading voice $voiceId")
+    val t0 = System.currentTimeMillis()
     val dataDir = copyEspeakData(context.assets)
+    log("speech data ready at $dataDir")
     val config = OfflineTtsConfig(
       model = OfflineTtsModelConfig(
         vits = OfflineTtsVitsModelConfig(
@@ -91,9 +129,11 @@ class MathVoiceModule : Module() {
         provider = "cpu",
       ),
     )
+    log("creating the speech engine")
     return OfflineTts(assetManager = context.assets, config = config).also {
       tts = it
       loadedId = voiceId
+      log("voice loaded in ${System.currentTimeMillis() - t0} ms")
     }
   }
 
@@ -102,8 +142,10 @@ class MathVoiceModule : Module() {
     val target = File(context.filesDir, "espeak-ng-data")
     val done = File(target, ".copied")
     if (!done.exists()) {
+      log("copying speech data out of the app")
       copyAssetDir(assets, "voices/espeak-ng-data", target)
       done.writeText("1")
+      log("copied ${target.walkTopDown().count { it.isFile }} files")
     }
     return target.absolutePath
   }
@@ -156,6 +198,85 @@ class MathVoiceModule : Module() {
         track?.stop()
       } catch (_: IllegalStateException) {
       }
+    }
+  }
+
+  // ---- Story Voice log: kept in a file so it survives a crash ----
+
+  private val logFile: File
+    get() = File(context.filesDir, "story-voice.log")
+
+  private fun stamp(time: Long = System.currentTimeMillis()): String =
+    SimpleDateFormat("MMM d HH:mm:ss", Locale.US).format(Date(time))
+
+  @Synchronized
+  private fun log(message: String) {
+    try {
+      val file = logFile
+      if (file.length() > 60_000) file.delete()
+      FileOutputStream(file, true).use { out ->
+        out.write("${stamp()} $message\n".toByteArray())
+        out.fd.sync()
+      }
+    } catch (_: Throwable) {
+    }
+  }
+
+  private fun readLog(): String {
+    val out = StringBuilder()
+    out.append("WHY THE APP CLOSED LATELY\n").append(exitReasons()).append("\n")
+    out.append("STORY VOICE STEPS (newest last)\n")
+    out.append(
+      try {
+        logFile.readText().takeLast(6000).ifBlank { "(nothing yet)" }
+      } catch (_: Throwable) {
+        "(nothing yet)"
+      },
+    )
+    return out.toString()
+  }
+
+  /** Android keeps the reasons this app's recent processes ended, with a crash report for native crashes. */
+  private fun exitReasons(): String {
+    if (Build.VERSION.SDK_INT < Build.VERSION_CODES.R) return "(needs Android 11 or newer)\n"
+    return try {
+      val manager = context.getSystemService(Context.ACTIVITY_SERVICE) as ActivityManager
+      val infos = manager.getHistoricalProcessExitReasons(context.packageName, 0, 4)
+      if (infos.isEmpty()) return "(none recorded)\n"
+      val sb = StringBuilder()
+      for (info in infos) {
+        val reason = when (info.reason) {
+          ApplicationExitInfo.REASON_CRASH -> "CRASH (Java)"
+          ApplicationExitInfo.REASON_CRASH_NATIVE -> "CRASH (native)"
+          ApplicationExitInfo.REASON_ANR -> "NOT RESPONDING"
+          ApplicationExitInfo.REASON_LOW_MEMORY -> "OUT OF MEMORY"
+          ApplicationExitInfo.REASON_EXIT_SELF -> "closed itself"
+          ApplicationExitInfo.REASON_SIGNALED -> "KILLED by signal"
+          ApplicationExitInfo.REASON_USER_REQUESTED -> "closed by you"
+          ApplicationExitInfo.REASON_USER_STOPPED -> "force stopped"
+          ApplicationExitInfo.REASON_DEPENDENCY_DIED -> "dependency died"
+          ApplicationExitInfo.REASON_PERMISSION_CHANGE -> "permission change"
+          else -> "reason ${info.reason}"
+        }
+        sb.append("${stamp(info.timestamp)}: $reason, status ${info.status}, ${info.description ?: ""}\n")
+        if (info.reason == ApplicationExitInfo.REASON_CRASH_NATIVE) sb.append(nativeCrashLines(info))
+      }
+      sb.toString()
+    } catch (e: Throwable) {
+      "(couldn't read: ${e.message})\n"
+    }
+  }
+
+  /** Pulls the readable lines (signal, library names, call stack) out of a native crash report. */
+  private fun nativeCrashLines(info: ApplicationExitInfo): String {
+    return try {
+      val bytes = info.traceInputStream?.use { it.readBytes() } ?: return "  (no crash report kept)\n"
+      val runs = Regex("[ -~]{8,}").findAll(String(bytes, Charsets.ISO_8859_1)).map { it.value }
+      val keep = Regex("(?i)(signal|abort|fault|#[0-9]+ pc|\\.so|sherpa|onnx|espeak|\\.kt|java\\.|exception|cause)")
+      val lines = runs.filter { keep.containsMatchIn(it) }.distinct().take(30).toList()
+      if (lines.isEmpty()) "  (crash report had nothing readable)\n" else lines.joinToString("") { "  ${it.take(160)}\n" }
+    } catch (e: Throwable) {
+      "  (couldn't read the crash report: ${e.message})\n"
     }
   }
 }

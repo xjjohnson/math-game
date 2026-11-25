@@ -5,6 +5,8 @@ interface NativeVoice {
   voices(): string[];
   speak(voiceId: string, text: string, speed: number): Promise<void>;
   stop(): void;
+  readLog(): string;
+  clearLog(): void;
 }
 
 // Missing on the web, on PC, and on APKs built before Story Voice was added.
@@ -39,5 +41,22 @@ export function stopStory() {
     native?.stop();
   } catch {
     // Nothing playing.
+  }
+}
+
+/** Why the app closed lately and the steps Story Voice took (for the Parents area). */
+export function storyVoiceLog(): string {
+  try {
+    return native?.readLog() ?? "Story Voice isn't built into this app.";
+  } catch (e) {
+    return `Couldn't read the log: ${String(e)}`;
+  }
+}
+
+export function clearStoryVoiceLog() {
+  try {
+    native?.clearLog();
+  } catch {
+    // Nothing to clear.
   }
 }

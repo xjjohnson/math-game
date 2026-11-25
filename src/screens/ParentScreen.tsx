@@ -1,6 +1,6 @@
 import { AXOLOTL_NAME, axolotlOff, bestRun, findsOf, JACKPOT, RUN_COINS, RUN_MAX, THANKS_COINS, foundToday, placeName, todaysSpot } from '@/utils/axolotl';
 import { useEffect, useState } from 'react';
-import { Pressable, StyleSheet, View } from 'react-native';
+import { Pressable, ScrollView, Share, StyleSheet, View } from 'react-native';
 
 import { Text } from '@/components/AppText';
 import { BigButton } from '@/components/BigButton';
@@ -22,6 +22,7 @@ import { accuracy } from '@/utils/progress';
 import { trickiest } from '@/utils/weakSpots';
 import { speakInVoice } from '@/utils/feedback';
 import { loadVoices, type DeviceVoice } from '@/utils/voices';
+import { clearStoryVoiceLog, speakStory, storyVoiceLog, storyVoices } from '../../modules/math-voice';
 
 const PIN_LENGTH = 4;
 
@@ -55,6 +56,7 @@ export function ParentScreen() {
       <PayoutSettings />
       <LoloSettings />
       <VoiceCheck />
+      <StoryVoiceLog />
       <ParentReport />
       <View style={styles.actions}>
         <BigButton label="🔒 Lock" color={colors.text} onPress={() => setOpen(false)} />
@@ -225,6 +227,50 @@ function VoiceCheck() {
           />
         ))
       )}
+    </View>
+  );
+}
+
+/** Shows what Story Voice did and why the app closed, to find out why it stops. Only where Story Voice is built in. */
+function StoryVoiceLog() {
+  const [text, setText] = useState<string | null>(null);
+  if (storyVoices().length === 0) return null;
+  const show = () => setText(storyVoiceLog());
+  return (
+    <View style={styles.card}>
+      <Text style={styles.player}>🪵 Story Voice log</Text>
+      <Text style={styles.line}>
+        If Story Voice closes the app, open the app again, come here, tap Show log, then Share log and send it to Claude.
+      </Text>
+      <BigButton
+        label="▶ Test Story Voice (woman)"
+        color={colors.text}
+        outline
+        onPress={() => {
+          speakStory('hfc_female', 'What is 7 times 8?', 1, () => setText(storyVoiceLog()));
+          setTimeout(show, 4000);
+        }}
+      />
+      <BigButton label="Show log" color={colors.text} outline onPress={show} />
+      {text !== null ? (
+        <>
+          <ScrollView style={styles.logBox} nestedScrollEnabled>
+            <Text style={styles.logText} selectable>
+              {text}
+            </Text>
+          </ScrollView>
+          <BigButton label="Share log" color={colors.text} outline onPress={() => void Share.share({ message: text })} />
+          <BigButton
+            label="Clear log"
+            color={colors.text}
+            outline
+            onPress={() => {
+              clearStoryVoiceLog();
+              setText(storyVoiceLog());
+            }}
+          />
+        </>
+      ) : null}
     </View>
   );
 }
@@ -438,6 +484,8 @@ const styles = StyleSheet.create({
   loloWhere: { flex: 1 },
   heading: { fontSize: fontSizes.body, fontWeight: '800', color: colors.text, marginTop: spacing.sm },
   line: { fontSize: 16, color: colors.text },
+  logBox: { maxHeight: 260, borderWidth: 1, borderColor: colors.text, borderRadius: radius.md, padding: 8 },
+  logText: { fontSize: 12, color: colors.text, fontFamily: 'monospace' },
   warn: { fontWeight: '800', color: colors.primary },
   adjustRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs },
   adjustLabel: { flex: 1, fontSize: 16, fontWeight: '700', color: colors.text },
