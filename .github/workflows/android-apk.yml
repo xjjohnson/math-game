@@ -136,6 +136,15 @@ jobs:
         env:
           EXPO_NO_TELEMETRY: 1
 
+      # Release builds shrink the app's code (R8). The sherpa-onnx native
+      # library looks up its Kotlin classes and fields by name, so shrinking
+      # them made it abort ("fid == null") when loading a voice. Keep them.
+      - name: Keep the Story Voice library from being shrunk
+        if: steps.plan.outputs.mode == 'apk'
+        run: |
+          printf '\n-keep class com.k2fsa.sherpa.onnx.** { *; }\n-keepclasseswithmembernames class * { native <methods>; }\n' >> android/app/proguard-rules.pro
+          tail -5 android/app/proguard-rules.pro
+
       # The app compares this number with version.json on the release to offer
       # updates. The fingerprint override bakes in exactly the runtime version
       # written to version.json, so later over-the-air updates match it.
