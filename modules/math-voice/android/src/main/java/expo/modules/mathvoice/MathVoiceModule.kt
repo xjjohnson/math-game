@@ -117,11 +117,14 @@ class MathVoiceModule : Module() {
     val t0 = System.currentTimeMillis()
     val dataDir = copyEspeakData(context.assets)
     log("speech data ready at $dataDir")
+    // Load from real files (copied out of the app once), not straight from the app's
+    // assets: the assets route aborts inside the speech library on this tablet.
+    val voiceDir = copyVoiceFiles(context.assets, voiceId)
     val config = OfflineTtsConfig(
       model = OfflineTtsModelConfig(
         vits = OfflineTtsVitsModelConfig(
-          model = "voices/$voiceId/model.onnx",
-          tokens = "voices/$voiceId/tokens.txt",
+          model = "$voiceDir/model.onnx",
+          tokens = "$voiceDir/tokens.txt",
           dataDir = dataDir,
         ),
         numThreads = 2,
@@ -129,12 +132,28 @@ class MathVoiceModule : Module() {
         provider = "cpu",
       ),
     )
-    log("creating the speech engine")
-    return OfflineTts(assetManager = context.assets, config = config).also {
+    log("creating the speech engine from files")
+    return OfflineTts(config = config).also {
       tts = it
       loadedId = voiceId
       log("voice loaded in ${System.currentTimeMillis() - t0} ms")
     }
+  }
+
+  /** Copies a voice's model and tokens to the app's files folder the first time (about 60 MB). */
+  private fun copyVoiceFiles(assets: AssetManager, voiceId: String): String {
+    val dir = File(context.filesDir, "story-voice/$voiceId")
+    dir.mkdirs()
+    for (name in listOf("model.onnx", "tokens.txt")) {
+      val target = File(dir, name)
+      if (target.exists() && target.length() > 0) continue
+      log("copying $voiceId/$name")
+      val partial = File(dir, "$name.part")
+      assets.open("voices/$voiceId/$name").use { input -> partial.outputStream().use { input.copyTo(it) } }
+      if (!partial.renameTo(target)) throw IllegalStateException("couldn't save $name")
+    }
+    log("voice files ready in $dir")
+    return dir.absolutePath
   }
 
   /** espeak-ng needs real files, so its data is copied out of the APK once. */
@@ -233,7 +252,21 @@ class MathVoiceModule : Module() {
         "(nothing yet)"
       },
     )
+    out.append("\nSYSTEM LOG (speech engine and crash lines)\n").append(systemLog())
     return out.toString()
+  }
+
+  /** The app's own system log lines (the speech library writes its error here before it aborts). */
+  private fun systemLog(): String {
+    return try {
+      val process = Runtime.getRuntime().exec(arrayOf("logcat", "-d", "-t", "400"))
+      val keep = Regex("(?i)(sherpa|onnx|espeak|abort|fatal|signal|libc|mathvoice|story)")
+      val lines = process.inputStream.bufferedReader().readLines().filter { keep.containsMatchIn(it) }
+      process.destroy()
+      if (lines.isEmpty()) "(nothing)" else lines.takeLast(25).joinToString("\n") { it.take(200) }
+    } catch (e: Throwable) {
+      "(couldn't read: ${e.message})"
+    }
   }
 
   /** Android keeps the reasons this app's recent processes ended, with a crash report for native crashes. */
