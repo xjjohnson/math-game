@@ -12,17 +12,19 @@ interface Props {
   onSelect: (choice: number) => void;
   /** How to show each choice (a word, sign, time or fraction), when it isn't the number itself. */
   label?: (choice: number) => string;
+  /** Landscape layout: the 2x2 grid stretches to the height it is given. */
+  fill?: boolean;
 }
 
 /**
  * 2x2 grid of multiple-choice answers. After answering, the right one gets a ✓
  * and a wrong pick an ✗, so the result never depends on color alone.
  */
-export function ChoiceButtons({ choices, selected, answer, onSelect, label: show = String }: Props) {
+export function ChoiceButtons({ choices, selected, answer, onSelect, label: show = String, fill = false }: Props) {
   const palette = usePalette();
   const answered = selected !== null;
   return (
-    <View style={styles.grid}>
+    <View style={[styles.grid, fill && styles.gridFill]}>
       {choices.map((choice) => {
         let color: string = colors.primary;
         let label = show(choice);
@@ -49,5 +51,6 @@ export function ChoiceButtons({ choices, selected, answer, onSelect, label: show
 
 const styles = StyleSheet.create({
   grid: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.md },
+  gridFill: { flex: 1, alignContent: 'stretch', minHeight: 0 },
   choice: { flexBasis: '45%', flexGrow: 1, minHeight: 96 },
 });

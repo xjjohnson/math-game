@@ -32,7 +32,7 @@ export function useColumnAnswer(problem: Problem, { allowNegative = false, teach
   const layout = useMemo(() => columnLayout(problem), [problem]);
   const steps = useMemo(() => (teach ? teachSteps(problem) : null), [problem, teach]);
   const fresh = useCallback(
-    (): Work => (steps ? { kind: 'teach', state: startTeach(problem, steps) } : { kind: 'free', entry: startEntry(layout.width) }),
+    (): Work => (steps ? { kind: 'teach', state: startTeach(problem, steps) } : { kind: 'free', entry: startEntry(layout.width, true) }),
     [problem, steps, layout],
   );
   const [saved, setSaved] = useState<{ problem: Problem; work: Work }>(() => ({ problem, work: fresh() }));

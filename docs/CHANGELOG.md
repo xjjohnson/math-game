@@ -5,6 +5,13 @@
 - **Two fingers at once now work everywhere you move people:** the buddy home, the Community rooms, the tree house, the blanket fort, and the car (hold GO with one finger and steer with another).
 - **Dragging a person to the edge of the screen is smooth:** the room slides along at a steady speed instead of stuttering, and only the people you are holding are redrawn while you move them. On a slowed-down test phone the average frame time at the edge dropped from about 74 ms to about 20 ms.
 - **The room's own scroller no longer grabs a drag** on Android, so a held person doesn't get dropped when the room starts to scroll.
+
+## 2026-11-24 (Normal answer box, landscape play)
+
+- **Type answers left to right.** Bigger problems now have one normal answer box (the number grows the way you say it), so 293 no longer lands as 392. No more filling the ones place first.
+- **Optional scratch boxes** on the card: a small "regroup" row above the numbers and a "scratch" row under the line. Tap one and the pad types into it; tap the answer box to go back. They are never graded and don't count as help.
+- **Show my work** is unchanged: the guided one-column-at-a-time mode still works the same.
+- **Landscape tablets don't scroll:** the question is on the left; the answer box, number pad and a pinned Check button are on the right. Phones and portrait are the same single column.
 - No new APK needed: tap Update now (or restart) to get it.
 
 ## 2026-11-24 (Lolo's question streak)
