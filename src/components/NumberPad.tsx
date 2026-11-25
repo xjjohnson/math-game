@@ -3,6 +3,7 @@ import { Platform, Pressable, StyleSheet, View } from 'react-native';
 
 import { Text } from '@/components/AppText';
 import { colors, fontSizes, radius, spacing, TAP_TARGET } from '@/constants/theme';
+import { AnswerDisplay, FillKeys } from '@/components/FillPad';
 import { useBigScreen } from '@/hooks/useBigScreen';
 
 interface Props {
@@ -10,6 +11,8 @@ interface Props {
   /** Show a minus key for answers that can be negative. */
   allowNegative?: boolean;
   disabled?: boolean;
+  /** Landscape tablets: fill the height given instead of using fixed key sizes. */
+  fill?: boolean;
 }
 
 const MAX_DIGITS = 6;
@@ -20,6 +23,7 @@ export function NumberPad({
   onSubmit,
   allowNegative = false,
   disabled = false,
+  fill = false,
 }: Props) {
   const [entry, setEntry] = useState('');
   const big = useBigScreen();
@@ -58,6 +62,21 @@ export function NumberPad({
     document.addEventListener('keydown', onKey);
     return () => document.removeEventListener('keydown', onKey);
   });
+
+  if (fill) {
+    const negative = entry.startsWith('-');
+    return (
+      <View style={styles.fillWrap}>
+        <AnswerDisplay text={entry.replace('-', '')} negative={negative} fill />
+        <FillKeys
+          onKey={press}
+          onCheck={submit}
+          canCheck={!disabled && entry !== '' && entry !== '-'}
+          allowNegative={allowNegative}
+        />
+      </View>
+    );
+  }
 
   return (
     <View style={styles.wrap}>
@@ -109,6 +128,7 @@ export function NumberPad({
 
 const styles = StyleSheet.create({
   wrap: { gap: spacing.sm },
+  fillWrap: { flex: 1, gap: spacing.sm, minHeight: 0 },
   display: {
     minHeight: TAP_TARGET,
     borderWidth: 3,
@@ -152,6 +172,12 @@ interface ColumnPadProps {
   onCheck: () => void;
   canCheck: boolean;
   disabled?: boolean;
+  /** The typed answer, shown above the keys (single-box mode). */
+  display?: { text: string; negative: boolean; active: boolean; onPress: () => void; onToggleSign?: () => void };
+  /** Landscape tablets: fill the height given, with Check pinned at the bottom. */
+  fill?: boolean;
+  /** Show the minus key (fill mode). */
+  allowNegative?: boolean;
 }
 
 const COLUMN_KEYS = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '⌫', '0', 'check'];
@@ -160,7 +186,7 @@ const COLUMN_KEYS = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '⌫', '0', 'c
  * A shorter pad for answers written in boxes, with Check in the bottom row so
  * the whole problem fits on a phone without scrolling.
  */
-export function ColumnPad({ onKey, onCheck, canCheck, disabled = false }: ColumnPadProps) {
+export function ColumnPad({ onKey, onCheck, canCheck, disabled = false, display, fill = false, allowNegative = false }: ColumnPadProps) {
   const big = useBigScreen();
   useEffect(() => {
     if (Platform.OS !== 'web' || disabled) return;
@@ -177,7 +203,17 @@ export function ColumnPad({ onKey, onCheck, canCheck, disabled = false }: Column
     return () => document.removeEventListener('keydown', onKeyDown);
   });
 
-  return (
+  const shown = display ? <AnswerDisplay {...display} fill={fill} /> : null;
+  if (fill) {
+    return (
+      <View style={styles.fillWrap}>
+        {shown}
+        <FillKeys onKey={onKey} onCheck={onCheck} canCheck={canCheck && !disabled} allowNegative={allowNegative} />
+      </View>
+    );
+  }
+
+  const grid = (
     <View style={styles.grid}>
       {COLUMN_KEYS.map((key) => {
         const check = key === 'check';
@@ -204,6 +240,14 @@ export function ColumnPad({ onKey, onCheck, canCheck, disabled = false }: Column
         );
       })}
     </View>
+  );
+  return shown ? (
+    <View style={styles.wrap}>
+      {shown}
+      {grid}
+    </View>
+  ) : (
+    grid
   );
 }
 

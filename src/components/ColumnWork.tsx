@@ -66,6 +66,8 @@ export function ColumnWork({
   const answer = String(Math.abs(problem.answer)).split('');
   const revealed = [...Array<null>(layout.width - answer.length).fill(null), ...answer];
   const typing = entry !== null && !reveal;
+  // Single-box mode: the real answer is typed in the box by the pad; the card only has optional scratch boxes.
+  const single = !!entry?.single && !reveal;
   const subtract = problem.operation === 'subtract';
   // How far a carry travels: from the answer box one column right, up past both numbers.
   const carryFrom = { x: cell, y: rowHeight * 2 + 14 + box.height / 2 + CARRY_BOX / 2 - 10 };
@@ -87,7 +89,7 @@ export function ColumnWork({
   return (
     <View style={styles.wrap}>
       {entry ? (
-        <View style={styles.row}>
+        <View style={[styles.row, single && styles.scratch]}>
           <Text style={[styles.carryHint, { width: cell }]} numberOfLines={1} adjustsFontSizeToFit>{subtract ? 'trade' : 'regroup'}</Text>
           {cols.map((i) => {
             const selected = typing && selectable && entry.cursor.row === 'carry' && entry.cursor.col === i;
@@ -122,6 +124,29 @@ export function ColumnWork({
       {digitRow(layout.b, symbol)}
       <View style={[styles.line, { backgroundColor: ink, width: cell * (layout.width + 1) }]} />
 
+      {single ? (
+        <View style={[styles.row, styles.scratch]}>
+          <Text style={[styles.carryHint, { width: cell }]} numberOfLines={1} adjustsFontSizeToFit>scratch</Text>
+          {cols.map((i) => {
+            const selected = selectable && entry.cursor.row === 'work' && entry.cursor.col === i;
+            const mark = entry.work[i];
+            return (
+              <Pressable
+                key={i}
+                onPress={() => onSelect?.('work', i)}
+                hitSlop={4}
+                accessibilityRole="button"
+                accessibilityLabel={`Scratch box under the ${placeName(layout.width - 1 - i)}${mark ? `, ${mark}` : ', empty'}. Just for you, not graded.`}
+                style={[styles.carryCell, { width: cell }]}
+              >
+                <View style={[styles.workBox, { width: cell - 6, height: box.height }, styles.carryBoxDashed, selected && styles.selected]}>
+                  {mark ? <PencilDigit key={mark} text={mark} style={pencil} /> : null}
+                </View>
+              </Pressable>
+            );
+          })}
+        </View>
+      ) : (
       <View style={styles.row}>
         {entry && allowNegative && typing ? (
           <Pressable
@@ -169,6 +194,7 @@ export function ColumnWork({
           })
         )}
       </View>
+      )}
     </View>
   );
 }
@@ -181,6 +207,8 @@ const styles = StyleSheet.create({
   row: { flexDirection: 'row', alignItems: 'center' },
   digit: { fontWeight: '900', textAlign: 'center', fontVariant: ['tabular-nums'] },
   struck: { textDecorationLine: 'line-through', opacity: 0.45 },
+  scratch: { opacity: 0.7 },
+  workBox: { borderRadius: radius.md / 2, alignItems: 'center', justifyContent: 'center' },
   carryHint: { fontSize: 14, fontWeight: '700', color: colors.textMuted, textAlign: 'center' },
   carryCell: { alignItems: 'center' },
   carryBox: {

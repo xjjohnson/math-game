@@ -133,3 +133,44 @@ describe('show my work', () => {
     expect(teachSteps(problem('multiply', 23, 45, 1035))).toBeNull();
   });
 });
+
+describe('single answer box', () => {
+  const single = () => startEntry(3, true);
+
+  it('types left to right, the way the number is said', () => {
+    const e = type(single(), '293');
+    expect(e.typed).toBe('293');
+    expect(entryValue(e)).toBe(293);
+    // The per-column boxes stay untouched.
+    expect(e.digits).toEqual([null, null, null]);
+  });
+
+  it('delete removes the last digit; no more digits than columns', () => {
+    expect(type(single(), '29⌫').typed).toBe('2');
+    expect(type(single(), '12345').typed).toBe('123');
+    expect(entryValue(single())).toBeNull();
+  });
+
+  it('a minus makes the value negative', () => {
+    const e = pressKey(type(single(), '12'), '±', true);
+    expect(entryValue(e)).toBe(-12);
+  });
+
+  it('scratch boxes never change the answer', () => {
+    let e = type(single(), '29');
+    e = selectBox(e, 'carry', 1);
+    e = pressKey(e, '1');
+    expect(e.carries).toEqual([null, '1', null]);
+    // A mark hands the typing back to the answer box.
+    expect(e.cursor.row).toBe('answer');
+    e = selectBox(e, 'work', 2);
+    e = type(e, '95');
+    expect(e.work).toEqual([null, '5', '9']);
+    expect(e.cursor).toEqual({ row: 'work', col: 0 });
+    expect(e.typed).toBe('29');
+    expect(entryValue(e)).toBe(29);
+    // Tapping the answer box goes back to it.
+    e = selectBox(e, 'answer', 0);
+    expect(type(e, '3').typed).toBe('293');
+  });
+});

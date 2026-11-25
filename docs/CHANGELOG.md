@@ -1,5 +1,13 @@
 # Change log
 
+## 2026-11-24 (Normal answer box, landscape play)
+
+- **Type answers left to right.** Bigger problems now have one normal answer box (the number grows the way you say it), so 293 no longer lands as 392. No more filling the ones place first.
+- **Optional scratch boxes** on the card: a small "regroup" row above the numbers and a "scratch" row under the line. Tap one and the pad types into it; tap the answer box to go back. They are never graded and don't count as help.
+- **Show my work** is unchanged: the guided one-column-at-a-time mode still works the same.
+- **Landscape tablets don't scroll:** the question is on the left; the answer box, number pad and a pinned Check button are on the right. Phones and portrait are the same single column.
+- No new APK needed: tap Update now (or restart) to get it.
+
 ## 2026-11-24 (Lolo's question streak)
 
 - **Lolo now keeps asking until you miss.** Questions get harder as you go: two warm-ups, two just right, three challenges, then challenges from the next grade up.
