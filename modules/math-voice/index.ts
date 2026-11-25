@@ -7,6 +7,8 @@ interface NativeVoice {
   stop(): void;
   readLog(): string;
   clearLog(): void;
+  setOptions(threads: number, debug: boolean): void;
+  selfCheck(): string;
 }
 
 // Missing on the web, on PC, and on APKs built before Story Voice was added.
@@ -58,5 +60,23 @@ export function clearStoryVoiceLog() {
     native?.clearLog();
   } catch {
     // Nothing to clear.
+  }
+}
+
+/** For tracking down the crash: threads for the speech engine, and whether it prints its own details. */
+export function setStoryOptions(threads: number, debug: boolean) {
+  try {
+    native?.setOptions(threads, debug);
+  } catch {
+    // Not built in.
+  }
+}
+
+/** Sizes of the speech files saved on the tablet. */
+export function storySelfCheck(): string {
+  try {
+    return native?.selfCheck() ?? '';
+  } catch (e) {
+    return `Couldn't check: ${String(e)}`;
   }
 }
