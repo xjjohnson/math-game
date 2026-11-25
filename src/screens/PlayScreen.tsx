@@ -1,6 +1,6 @@
 import { useLocalSearchParams } from 'expo-router';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Pressable, StyleSheet, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 
 import { Text } from '@/components/AppText';
 import { BigButton } from '@/components/BigButton';
@@ -22,6 +22,7 @@ import { colors, fontSizes, radius, spacing } from '@/constants/theme';
 import { usePalette } from '@/hooks/useAccessibility';
 import { useColumnAnswer } from '@/hooks/useColumnAnswer';
 import { useGameSession } from '@/hooks/useGameSession';
+import { useLandscapePlay } from '@/hooks/useLandscapePlay';
 import { useTimer } from '@/hooks/useTimer';
 import { useActiveProfile, useProfiles } from '@/store/profiles';
 import { useSettings } from '@/store/settings';
@@ -89,6 +90,7 @@ function Round({ config: asked, onPlayAgain }: { config: GameConfig; onPlayAgain
     : resolveInputStyle(profile?.inputStyle, state.difficulty, config.grade);
   const companion = companionFor(profile);
   const palette = usePalette();
+  const landscape = useLandscapePlay();
 
   // Read each new problem aloud when that setting is on; stop when leaving the round.
   useEffect(() => {
@@ -168,153 +170,216 @@ function Round({ config: asked, onPlayAgain }: { config: GameConfig; onPlayAgain
   const handsOn = state.problem.interact;
   const card = handsOnCard(state.problem, !!showFeedback);
 
+  const answerDisplay =
+    typingColumns && !column.teaching
+      ? {
+          text: column.entry.typed,
+          negative: column.entry.negative,
+          active: column.entry.cursor.row === 'answer',
+          onPress: () => column.select('answer', 0),
+          onToggleSign: allowNegative ? () => column.press('±') : undefined,
+        }
+      : undefined;
+
+  const statsRow = (
+    <View style={styles.statusRow}>
+      <Text style={styles.status}>
+        {state.index + 1} / {config.questionCount}
+      </Text>
+      <Text style={styles.status}>🔥 {state.streak}</Text>
+      {/* Coins so far this round; stars are handed out at the end. */}
+      <Text style={styles.status} accessibilityLabel={`${roundCoins} coins this round`}>
+        🪙 {roundCoins}
+      </Text>
+      {landscape && config.timer !== null && secondsLeft !== null ? (
+        <View style={styles.inlineTimer}>
+          <TimerBar total={config.timer} left={secondsLeft} speedy={config.dailyDate ? SPEEDY_SECONDS : undefined} />
+        </View>
+      ) : null}
+      <SpeakButton onPress={() => speakProblem(state.problem, true)} />
+    </View>
+  );
+  const levelRow = config.adaptive ? (
+    <Text style={styles.level}>Level: {difficultyConfigFor(state.difficulty, config.grade).label}</Text>
+  ) : null;
+  const timerRow =
+    !landscape && config.timer !== null && secondsLeft !== null ? (
+      <TimerBar total={config.timer} left={secondsLeft} speedy={config.dailyDate ? SPEEDY_SECONDS : undefined} />
+    ) : null;
+
+  const cardEl = (
+    <FlashCard
+      key={`card-${state.index}`}
+      problem={card}
+      reveal={!!showFeedback}
+      fill={landscape}
+      column={
+        typingColumns && !showFeedback
+          ? {
+              layout: column.layout,
+              entry: column.entry,
+              selectable: !column.teaching,
+              pending: column.hint?.typed,
+              flyCarries: column.teaching,
+              finished: column.hint?.done,
+              allowNegative,
+              onSelect: column.select,
+              onToggleSign: () => column.press('±'),
+            }
+          : undefined
+      }
+      cardStyle={cardStyleFor(profile)}
+    />
+  );
+
+  const aidEl =
+    !showFeedback && (countModel || (canHelp && config.timer === null)) ? (
+      <View style={styles.aidRow}>
+        {countModel ? (
+          <Pressable
+            onPress={() => setCounting((on) => !on)}
+            accessibilityRole="button"
+            accessibilityState={{ expanded: counting }}
+            style={styles.countToggle}
+            hitSlop={6}
+          >
+            <Text style={styles.countToggleText}>{counting ? 'Hide counting' : '🧮 Count it out'}</Text>
+          </Pressable>
+        ) : null}
+        {canHelp && config.timer === null ? (
+          <Pressable
+            onPress={() => openHelp('ask')}
+            accessibilityRole="button"
+            accessibilityLabel="Help with this question"
+            style={styles.countToggle}
+            hitSlop={6}
+          >
+            <Text style={styles.countToggleText}>💡 Help</Text>
+          </Pressable>
+        ) : null}
+      </View>
+    ) : null;
+  const countingEl =
+    countModel && counting && !showFeedback ? (
+      <CountingAid key={`count-${state.index}`} problem={state.problem} model={countModel} />
+    ) : null;
+  const companionEl = companion ? (
+    <CompanionBubble
+      companion={companion}
+      correct={showFeedback ? last.correct : null}
+      turn={state.index}
+      gift={buddyGift(profile)}
+    />
+  ) : null;
+  const feedbackEl = showFeedback ? (
+    <PopIn key={`feedback-${state.index}`} damping={10}>
+      <Text style={[styles.feedback, { color: last.correct ? palette.correct : palette.wrong }]}>
+        {last.correct
+          ? `✓ Great job! +${coinsPerAnswer(last)} 🪙`
+          : last.given === null
+            ? "✗ Time's up!"
+            : '✗ Not quite. Remember this one!'}
+      </Text>
+      {slip ? <Text style={styles.slip}>{slip}</Text> : null}
+    </PopIn>
+  ) : null;
+
+  const inputEl = handsOn ? (
+    showFeedback ? (
+      !last.correct && last.given !== null ? (
+        <Text style={styles.slip}>
+          The right answer is {answerText(state.problem, state.problem.answer)}. You {handsOn.kind === 'setClock' ? 'showed' : 'put in'} {answerText(state.problem, last.given)}.
+        </Text>
+      ) : null
+    ) : handsOn.kind === 'setClock' ? (
+      <ClockSetter key={`clock-${state.index}`} step={handsOn.step} from={handsOn.from} onCheck={answer} />
+    ) : (
+      <CoinPurse key={`purse-${state.index}`} coins={handsOn.coins} from={handsOn.from} onCheck={answer} />
+    )
+  ) : inputStyle === 'choices' && !typingColumns ? (
+    <ChoiceButtons
+      choices={state.problem.choices}
+      selected={showFeedback ? (last.given ?? Number.NaN) : null}
+      answer={state.problem.answer}
+      onSelect={answer}
+      label={(c) => answerText(state.problem, c)}
+      fill={landscape}
+    />
+  ) : showFeedback ? null : typingColumns ? (
+    <>
+      {column.hint ? <ColumnHint hint={column.hint} /> : null}
+      <ColumnPad
+        onKey={column.press}
+        canCheck={column.value !== null}
+        onCheck={() => column.value !== null && answer(column.value)}
+        display={answerDisplay}
+        fill={landscape}
+        allowNegative={allowNegative}
+      />
+    </>
+  ) : (
+    <NumberPad key={`pad-${state.index}`} onSubmit={answer} allowNegative={allowNegative} fill={landscape} />
+  );
+
+  const missEl =
+    showFeedback && !last.correct ? (
+      <View style={[styles.missRow, landscape && styles.missColumn]}>
+        {canHelp ? (
+          <BigButton label="💡 Show me how" outline onPress={() => openHelp('miss')} style={styles.missButton} />
+        ) : null}
+        <BigButton label="Next" onPress={() => dispatch({ type: 'next' })} style={styles.missButton} />
+      </View>
+    ) : null;
+
+  const helpEl = help ? (
+    <HelpPanel
+      key={`help-${state.index}-${help}`}
+      problem={state.problem}
+      progress={state.problem.skill ? profile?.skills?.[state.problem.skill] : undefined}
+      reveal={help === 'miss'}
+      given={help === 'miss' ? last?.given : undefined}
+      color={palette.operations[state.problem.operation]}
+      onClose={() => setHelp(null)}
+    />
+  ) : null;
+
+  if (landscape) {
+    // Question on the left, answer pad on the right, nothing to scroll.
+    return (
+      <Screen compact fixed>
+        <View style={styles.landscape}>
+          <View style={styles.leftCol}>
+            {statsRow}
+            {levelRow}
+            {cardEl}
+            {feedbackEl}
+            {aidEl}
+            {countingEl ? <ScrollView style={styles.countingScroll}>{countingEl}</ScrollView> : null}
+            {companionEl}
+          </View>
+          <View style={styles.rightCol}>
+            {handsOn ? <ScrollView contentContainerStyle={styles.rightScroll}>{inputEl}</ScrollView> : inputEl}
+            {missEl}
+          </View>
+        </View>
+        {helpEl}
+      </Screen>
+    );
+  }
+
   return (
     <Screen compact center>
-      <View style={styles.statusRow}>
-        <Text style={styles.status}>
-          {state.index + 1} / {config.questionCount}
-        </Text>
-        <Text style={styles.status}>🔥 {state.streak}</Text>
-        {/* Coins so far this round; stars are handed out at the end. */}
-        <Text style={styles.status} accessibilityLabel={`${roundCoins} coins this round`}>
-          🪙 {roundCoins}
-        </Text>
-        <SpeakButton onPress={() => speakProblem(state.problem, true)} />
-      </View>
-      {config.adaptive ? (
-        <Text style={styles.level}>Level: {difficultyConfigFor(state.difficulty, config.grade).label}</Text>
-      ) : null}
-      {config.timer !== null && secondsLeft !== null ? (
-        <TimerBar total={config.timer} left={secondsLeft} speedy={config.dailyDate ? SPEEDY_SECONDS : undefined} />
-      ) : null}
-
-      <FlashCard
-        key={`card-${state.index}`}
-        problem={card}
-        reveal={!!showFeedback}
-        column={
-          typingColumns && !showFeedback
-            ? {
-                layout: column.layout,
-                entry: column.entry,
-                selectable: !column.teaching,
-                pending: column.hint?.typed,
-                flyCarries: column.teaching,
-                finished: column.hint?.done,
-                allowNegative,
-                onSelect: column.select,
-                onToggleSign: () => column.press('±'),
-              }
-            : undefined
-        }
-        cardStyle={cardStyleFor(profile)}
-      />
-
-      {!showFeedback && (countModel || (canHelp && config.timer === null)) ? (
-        <View style={styles.aidRow}>
-          {countModel ? (
-            <Pressable
-              onPress={() => setCounting((on) => !on)}
-              accessibilityRole="button"
-              accessibilityState={{ expanded: counting }}
-              style={styles.countToggle}
-              hitSlop={6}
-            >
-              <Text style={styles.countToggleText}>{counting ? 'Hide counting' : '🧮 Count it out'}</Text>
-            </Pressable>
-          ) : null}
-          {canHelp && config.timer === null ? (
-            <Pressable
-              onPress={() => openHelp('ask')}
-              accessibilityRole="button"
-              accessibilityLabel="Help with this question"
-              style={styles.countToggle}
-              hitSlop={6}
-            >
-              <Text style={styles.countToggleText}>💡 Help</Text>
-            </Pressable>
-          ) : null}
-        </View>
-      ) : null}
-      {countModel && counting && !showFeedback ? (
-        <CountingAid key={`count-${state.index}`} problem={state.problem} model={countModel} />
-      ) : null}
-
-      {companion ? (
-        <CompanionBubble
-          companion={companion}
-          correct={showFeedback ? last.correct : null}
-          turn={state.index}
-          gift={buddyGift(profile)}
-        />
-      ) : null}
-
-      {showFeedback ? (
-        <PopIn key={`feedback-${state.index}`} damping={10}>
-          <Text style={[styles.feedback, { color: last.correct ? palette.correct : palette.wrong }]}>
-            {last.correct
-              ? `✓ Great job! +${coinsPerAnswer(last)} 🪙`
-              : last.given === null
-                ? "✗ Time's up!"
-                : '✗ Not quite. Remember this one!'}
-          </Text>
-          {slip ? <Text style={styles.slip}>{slip}</Text> : null}
-        </PopIn>
-      ) : null}
-
-      {handsOn ? (
-        showFeedback ? (
-          !last.correct && last.given !== null ? (
-            <Text style={styles.slip}>
-              The right answer is {answerText(state.problem, state.problem.answer)}. You {handsOn.kind === 'setClock' ? 'showed' : 'put in'} {answerText(state.problem, last.given)}.
-            </Text>
-          ) : null
-        ) : handsOn.kind === 'setClock' ? (
-          <ClockSetter key={`clock-${state.index}`} step={handsOn.step} from={handsOn.from} onCheck={answer} />
-        ) : (
-          <CoinPurse key={`purse-${state.index}`} coins={handsOn.coins} from={handsOn.from} onCheck={answer} />
-        )
-      ) : inputStyle === 'choices' && !typingColumns ? (
-        <ChoiceButtons
-          choices={state.problem.choices}
-          selected={showFeedback ? (last.given ?? Number.NaN) : null}
-          answer={state.problem.answer}
-          onSelect={answer}
-          label={(c) => answerText(state.problem, c)}
-        />
-      ) : showFeedback ? null : typingColumns ? (
-        <>
-          {column.hint ? <ColumnHint hint={column.hint} /> : null}
-          <ColumnPad
-            onKey={column.press}
-            canCheck={column.value !== null}
-            onCheck={() => column.value !== null && answer(column.value)}
-          />
-        </>
-      ) : (
-        <NumberPad key={`pad-${state.index}`} onSubmit={answer} allowNegative={allowNegative} />
-      )}
-
-      {showFeedback && !last.correct ? (
-        <View style={styles.missRow}>
-          {canHelp ? (
-            <BigButton label="💡 Show me how" outline onPress={() => openHelp('miss')} style={styles.missButton} />
-          ) : null}
-          <BigButton label="Next" onPress={() => dispatch({ type: 'next' })} style={styles.missButton} />
-        </View>
-      ) : null}
-
-      {help ? (
-        <HelpPanel
-          key={`help-${state.index}-${help}`}
-          problem={state.problem}
-          progress={state.problem.skill ? profile?.skills?.[state.problem.skill] : undefined}
-          reveal={help === 'miss'}
-          given={help === 'miss' ? last?.given : undefined}
-          color={palette.operations[state.problem.operation]}
-          onClose={() => setHelp(null)}
-        />
-      ) : null}
+      {statsRow}
+      {levelRow}
+      {timerRow}
+      {cardEl}
+      {aidEl}
+      {countingEl}
+      {companionEl}
+      {feedbackEl}
+      {inputEl}
+      {missEl}
+      {helpEl}
     </Screen>
   );
 }
@@ -337,5 +402,12 @@ const styles = StyleSheet.create({
   slip: { fontSize: 16, fontWeight: '700', color: colors.text, textAlign: 'center', marginTop: spacing.xs },
   missRow: { flexDirection: 'row', gap: spacing.sm },
   missButton: { flex: 1 },
+  missColumn: { flexDirection: 'column', flex: 1 },
+  landscape: { flex: 1, flexDirection: 'row', gap: spacing.lg },
+  leftCol: { flex: 1.15, gap: spacing.sm, minHeight: 0 },
+  rightCol: { flex: 0.85, gap: spacing.sm, minHeight: 0 },
+  rightScroll: { flexGrow: 1, justifyContent: 'center', gap: spacing.md },
+  countingScroll: { flexGrow: 0, maxHeight: '40%' },
+  inlineTimer: { flex: 1, marginHorizontal: spacing.sm },
   feedback: { fontSize: fontSizes.button, fontWeight: '800', textAlign: 'center' },
 });

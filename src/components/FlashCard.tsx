@@ -21,6 +21,8 @@ interface Props {
   column?: ColumnProps;
   /** Look bought in the shop; defaults to the classic white card. */
   cardStyle?: CardStyle;
+  /** Landscape layout: the card takes all the height it is given and centers the problem. */
+  fill?: boolean;
 }
 
 const SYMBOLS = Object.fromEntries(OPERATIONS.map((o) => [o.value, o.symbol])) as Record<
@@ -53,7 +55,7 @@ export interface ColumnProps {
   onToggleSign?: () => void;
 }
 
-export function FlashCard({ problem, reveal = false, column, cardStyle }: Props) {
+export function FlashCard({ problem, reveal = false, column, cardStyle, fill = false }: Props) {
   const palette = usePalette();
   const big = useBigScreen();
   const look = cardStyle ?? {
@@ -68,6 +70,7 @@ export function FlashCard({ problem, reveal = false, column, cardStyle }: Props)
     <PopIn
       style={[
         styles.card,
+        fill && styles.cardFill,
         {
           backgroundColor: look.background,
           borderColor: look.border ?? palette.operations[problem.operation],
@@ -201,6 +204,7 @@ function Corners({ pair }: { pair: [string, string] }) {
 
 const styles = StyleSheet.create({
   corner: { position: 'absolute', fontSize: 22 },
+  cardFill: { flex: 1, justifyContent: 'center', minHeight: 0 },
   card: {
     borderWidth: 6,
     borderRadius: radius.lg,

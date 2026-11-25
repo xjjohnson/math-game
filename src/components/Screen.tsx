@@ -24,10 +24,12 @@ interface Props {
   footer?: ReactNode;
   /** Centers the content up and down, so a game on a tablet doesn't leave the bottom half empty. */
   center?: boolean;
+  /** No page scrolling: the content gets exactly the screen (landscape play layout). */
+  fixed?: boolean;
 }
 
 /** Standard page wrapper: safe area, scrolling, centered column for tablets and PC. */
-export function Screen({ title, children, compact = false, noHeader = false, tab, wide = false, footer, center = false }: Props) {
+export function Screen({ title, children, compact = false, noHeader = false, tab, wide = false, footer, center = false, fixed = false }: Props) {
   const profile = useActiveProfile();
   const background = backgroundColor(profile);
   return (
@@ -41,10 +43,14 @@ export function Screen({ title, children, compact = false, noHeader = false, tab
       }
     >
       <BackgroundDecor id={profile?.equipped.background} color={background} decor={backgroundDecor(profile)} />
-      <ScrollView contentContainerStyle={[styles.content, compact && styles.compact, wide && styles.wide, center && styles.center]}>
-        {title ? <Text style={styles.title} accessibilityRole="header">{title}</Text> : null}
-        {children}
-      </ScrollView>
+      {fixed ? (
+        <View style={styles.fixed}>{children}</View>
+      ) : (
+        <ScrollView contentContainerStyle={[styles.content, compact && styles.compact, wide && styles.wide, center && styles.center]}>
+          {title ? <Text style={styles.title} accessibilityRole="header">{title}</Text> : null}
+          {children}
+        </ScrollView>
+      )}
       {footer ? <View style={styles.footer}>{footer}</View> : null}
       {tab ? <TabBar active={tab} /> : null}
     </SafeAreaView>
@@ -53,6 +59,7 @@ export function Screen({ title, children, compact = false, noHeader = false, tab
 
 const styles = StyleSheet.create({
   safe: { flex: 1 },
+  fixed: { flex: 1, padding: spacing.md, width: '100%', maxWidth: 1400, alignSelf: 'center' },
   content: {
     padding: spacing.lg,
     gap: spacing.md,
