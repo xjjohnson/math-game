@@ -456,28 +456,74 @@ export function DriveTown({ onDoor }: { onDoor: (id: BuildingId) => void }) {
 
   const wheel = useAnimatedStyle(() => ({ transform: [{ rotate: `${wheelTurn * 70}deg` }] }));
 
-  // The steering wheel: drag sideways to turn; it springs back when let go.
+  // The steering wheel and Go pedal share one responder, so a finger on each works at the same time:
+  // slide one sideways to turn (it springs back when let go) while the other holds Go.
   const wheelStart = useRef(0);
-  const wheelResponder = {
-    onStartShouldSetResponder: () => true,
-    onMoveShouldSetResponder: () => true,
+  const pedalsRef = useRef<HostInstance>(null);
+  const pedalsX = useRef(0);
+  const zones = useRef({ wheel: { x: 0, w: 0 }, go: { x: 0, w: 0 } });
+  const wheelTouch = useRef<number | null>(null);
+  const gasTouch = useRef<number | null>(null);
+  const [goDown, setGoDown] = useState(false);
+  const zoneOf = (pageX: number): 'wheel' | 'go' | null => {
+    const x = pageX - pedalsX.current;
+    const { wheel: wz, go: gz } = zones.current;
+    if (x >= wz.x && x <= wz.x + wz.w) return 'wheel';
+    if (x >= gz.x && x <= gz.x + gz.w) return 'go';
+    return null;
+  };
+  const pedalStart = (id: number, pageX: number) => {
+    const zone = zoneOf(pageX);
+    if (zone === 'wheel' && wheelTouch.current === null) {
+      wheelTouch.current = id;
+      wheelStart.current = pageX;
+      cancelPlan();
+    } else if (zone === 'go' && gasTouch.current === null) {
+      gasTouch.current = id;
+      gas.current = true;
+      setGoDown(true);
+      cancelPlan();
+    }
+  };
+  const pedalEnd = (id: number) => {
+    if (wheelTouch.current === id) {
+      wheelTouch.current = null;
+      steer.current = 0;
+      setWheelTurn(0);
+    }
+    if (gasTouch.current === id) {
+      gasTouch.current = null;
+      gas.current = false;
+      setGoDown(false);
+    }
+  };
+  const pedalTouches = (e: GestureResponderEvent) => (e.nativeEvent.changedTouches?.length ? e.nativeEvent.changedTouches : [e.nativeEvent]);
+  const pedalsResponder = {
+    onStartShouldSetResponder: (e: GestureResponderEvent) => {
+      pedalsRef.current?.measure((_x, _y, _w, _h, pageX) => (pedalsX.current = pageX ?? 0));
+      return zoneOf(e.nativeEvent.pageX) !== null;
+    },
     onResponderTerminationRequest: () => false,
     onResponderGrant: (e: GestureResponderEvent) => {
-      wheelStart.current = e.nativeEvent.pageX;
-      cancelPlan();
+      pedalStart(Number(e.nativeEvent.identifier), e.nativeEvent.pageX);
+      return true;
     },
+    onResponderStart: (e: GestureResponderEvent) => pedalTouches(e).forEach((t) => pedalStart(Number(t.identifier), t.pageX)),
     onResponderMove: (e: GestureResponderEvent) => {
-      const t = Math.max(-1, Math.min(1, (e.nativeEvent.pageX - wheelStart.current) / 50));
-      steer.current = t;
-      setWheelTurn(t);
+      const list = e.nativeEvent.touches?.length ? e.nativeEvent.touches : [e.nativeEvent];
+      for (const t of list) {
+        if (Number(t.identifier) !== wheelTouch.current) continue;
+        const turn = Math.max(-1, Math.min(1, (t.pageX - wheelStart.current) / 50));
+        steer.current = turn;
+        setWheelTurn(turn);
+      }
     },
+    onResponderEnd: (e: GestureResponderEvent) => pedalTouches(e).forEach((t) => pedalEnd(Number(t.identifier))),
     onResponderRelease: () => {
-      steer.current = 0;
-      setWheelTurn(0);
+      [wheelTouch.current, gasTouch.current].forEach((id) => id !== null && pedalEnd(id));
     },
     onResponderTerminate: () => {
-      steer.current = 0;
-      setWheelTurn(0);
+      [wheelTouch.current, gasTouch.current].forEach((id) => id !== null && pedalEnd(id));
     },
   };
 
@@ -563,8 +609,8 @@ export function DriveTown({ onDoor }: { onDoor: (id: BuildingId) => void }) {
 
       {/* Wheel and Go pedal. */}
       {mode === 'drive' && controls === 'wheel' && !menu ? (
-        <View style={[styles.pedals, { bottom: bottomGap }]} pointerEvents="box-none">
-          <View {...wheelResponder} style={styles.wheelHit} accessibilityRole="adjustable" accessibilityLabel="Steering wheel. Slide left or right to turn at the next crossing.">
+        <View ref={pedalsRef} style={[styles.pedals, { bottom: bottomGap }]} pointerEvents="box-none" onLayout={() => pedalsRef.current?.measure((_x, _y, _w, _h, pageX) => (pedalsX.current = pageX ?? 0))} {...pedalsResponder}>
+          <View onLayout={(e) => (zones.current.wheel = { x: e.nativeEvent.layout.x, w: e.nativeEvent.layout.width })} style={styles.wheelHit} accessibilityRole="adjustable" accessibilityLabel="Steering wheel. Slide left or right to turn at the next crossing.">
             <Animated.View style={[styles.wheel, wheel]}>
               <SteeringWheel />
             </Animated.View>
@@ -581,18 +627,14 @@ export function DriveTown({ onDoor }: { onDoor: (id: BuildingId) => void }) {
               }}
             />
           </View>
-          <Pressable
-            onPressIn={() => {
-              gas.current = true;
-              cancelPlan();
-            }}
-            onPressOut={() => (gas.current = false)}
+          <View
+            onLayout={(e) => (zones.current.go = { x: e.nativeEvent.layout.x, w: e.nativeEvent.layout.width })}
             accessibilityRole="button"
             accessibilityLabel="Go. Hold to drive."
-            style={({ pressed }) => [styles.go, pressed && styles.goPressed]}
+            style={[styles.go, goDown && styles.goPressed]}
           >
             <Text style={styles.goText}>GO</Text>
-          </Pressable>
+          </View>
         </View>
       ) : null}
       {mode === 'drive' && controls === 'tap' && !menu ? (

@@ -1,7 +1,7 @@
 import { HiddenLolo } from '@/components/AxolotlFind';
 import { hidingAt } from '@/utils/axolotl';
 import { dateKey } from '@/utils/dates';
-import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { memo, useEffect, useRef, useState, type ReactNode } from 'react';
 import {
   ScrollView,
   StyleSheet,
@@ -642,7 +642,7 @@ export function CommunityRoom({ place, onDoor, onExit }: Props) {
 const TAP_SLOP = 6;
 /** Holding something this close to the side of the screen scrolls the room that way. */
 const EDGE = 40;
-const EDGE_STEP = 10;
+const EDGE_SPEED = 0.6;
 
 interface Box {
   left: number;
@@ -702,12 +702,15 @@ function useMultiTouch(args: TouchArgs) {
   const frame = useRef({ x: 0, y: 0 });
   const scrollX = useRef(0);
   const tracks = useRef(new Map<number, Track>());
-  const edgeTimer = useRef<ReturnType<typeof setInterval> | null>(null);
+  const edgeFrame = useRef<number | null>(null);
+  const edgeLast = useRef(0);
+  const showFrame = useRef<number | null>(null);
   const [dragAt, setDragAt] = useState<Record<string, Spot>>({});
   const [holding, setHolding] = useState(false);
 
   useEffect(() => () => {
-    if (edgeTimer.current) clearInterval(edgeTimer.current);
+    if (edgeFrame.current !== null) cancelAnimationFrame(edgeFrame.current);
+    if (showFrame.current !== null) cancelAnimationFrame(showFrame.current);
   }, []);
 
   const measure = () =>
@@ -735,11 +738,20 @@ function useMultiTouch(args: TouchArgs) {
     return (t.grab as Grab).fit({ x: t.startSpot.x + dx / roomW, y: t.startSpot.y + dy / h });
   };
 
-  const show = () => {
+  const showNow = () => {
+    showFrame.current = null;
     const next: Record<string, Spot> = {};
     for (const t of tracks.current.values()) if (t.grab && t.moved) next[t.grab.key] = spotOf(t);
     setDragAt(next);
     setHolding(tracks.current.size > 0);
+  };
+  /** Redraw at most once per frame, however many touch events came in. */
+  const show = (now = false) => {
+    if (now) {
+      if (showFrame.current !== null) cancelAnimationFrame(showFrame.current);
+      return showNow();
+    }
+    if (showFrame.current === null) showFrame.current = requestAnimationFrame(showNow);
   };
 
   const scrollBy = (dx: number) => {
@@ -751,8 +763,8 @@ function useMultiTouch(args: TouchArgs) {
   };
 
   const stopEdge = () => {
-    if (edgeTimer.current) clearInterval(edgeTimer.current);
-    edgeTimer.current = null;
+    if (edgeFrame.current !== null) cancelAnimationFrame(edgeFrame.current);
+    edgeFrame.current = null;
   };
   const edgeDir = () => {
     for (const t of tracks.current.values()) {
@@ -789,7 +801,7 @@ function useMultiTouch(args: TouchArgs) {
       moved: false,
       sentAt: 0,
     });
-    show();
+    show(true);
   };
 
   const moveTouches = (touches: readonly { identifier: number | string; pageX: number; pageY: number }[]) => {
@@ -814,14 +826,21 @@ function useMultiTouch(args: TouchArgs) {
     if (!changed) return;
     for (const t of tracks.current.values()) if (t.grab && t.moved) send(t);
     show();
-    if (!edgeTimer.current && edgeDir() !== 0) {
-      edgeTimer.current = setInterval(() => {
+    if (edgeFrame.current === null && edgeDir() !== 0) {
+      edgeLast.current = Date.now();
+      const tick = () => {
         const dir = edgeDir();
         if (dir === 0 || tracks.current.size === 0) return stopEdge();
-        scrollBy(dir * EDGE_STEP);
+        const now = Date.now();
+        // Time-based, so a slow frame doesn't make the room crawl.
+        const dt = Math.min(64, now - edgeLast.current);
+        edgeLast.current = now;
+        scrollBy(dir * EDGE_SPEED * dt);
         for (const t of tracks.current.values()) if (t.grab && t.moved) send(t);
         show();
-      }, 16);
+        edgeFrame.current = requestAnimationFrame(tick);
+      };
+      edgeFrame.current = requestAnimationFrame(tick);
     }
   };
 
@@ -839,7 +858,7 @@ function useMultiTouch(args: TouchArgs) {
         latest.current.move(t.grab.key, final.x, final.y);
       }
     }
-    show();
+    show(true);
   };
 
   const touchesOf = (e: GestureResponderEvent) => (e.nativeEvent.changedTouches?.length ? e.nativeEvent.changedTouches : [e.nativeEvent]);
@@ -850,6 +869,8 @@ function useMultiTouch(args: TouchArgs) {
     onResponderGrant: (e: GestureResponderEvent) => {
       measure();
       start(Number(e.nativeEvent.identifier), e.nativeEvent.pageX, e.nativeEvent.pageY);
+      // Tell Android's scroller not to take this touch over.
+      return true;
     },
     onResponderStart: (e: GestureResponderEvent) => touchesOf(e).forEach((t) => start(Number(t.identifier), t.pageX, t.pageY)),
     onResponderMove: (e: GestureResponderEvent) => moveTouches(e.nativeEvent.touches?.length ? e.nativeEvent.touches : [e.nativeEvent]),
@@ -858,11 +879,13 @@ function useMultiTouch(args: TouchArgs) {
     onResponderTerminate: () => {
       tracks.current.clear();
       stopEdge();
-      show();
+      show(true);
     },
   };
 
   const onScroll = (e: NativeSyntheticEvent<NativeScrollEvent>) => {
+    // While fingers are down we drive the scroll ourselves; a late event would jump it back.
+    if (tracks.current.size > 0) return;
     scrollX.current = e.nativeEvent.contentOffset.x;
   };
 
@@ -901,7 +924,8 @@ function Alive({ figure, size, seed, waving, lifted, busy = false, shadow = fals
   );
 }
 
-function Person({ person, figure, isMe, waving, spot: at, lifted, ride, w, h, token }: PersonProps) {
+const Person = memo(PersonImpl);
+function PersonImpl({ person, figure, isMe, waving, spot: at, lifted, ride, w, h, token }: PersonProps) {
   const acc = person.acc && (ACCESSORIES as readonly string[]).includes(person.acc) ? person.acc : undefined;
   const sliding = ride?.kind === 'slide';
   // Where the head is: a drawn person's head is smaller and lower than a buddy's big face.
@@ -958,7 +982,8 @@ interface PalProps {
 }
 
 /** One of a player's buddies; only its owner can move it. */
-function Pal({ figure, seed, mine, spot: at, lifted, ride, hanging, job, w, h, size }: PalProps) {
+const Pal = memo(PalImpl);
+function PalImpl({ figure, seed, mine, spot: at, lifted, ride, hanging, job, w, h, size }: PalProps) {
   const bubble = job ? (
     <Text style={[styles.helper, job === 'mixing' && styles.helperBusy]}>{job === 'mixing' ? 'Mixing! 🥄' : job === 'done' ? 'All mixed! 👍' : "I'll mix!"}</Text>
   ) : null;
@@ -1152,7 +1177,8 @@ interface PropProps {
 }
 
 /** A thing in the room anyone can pick up: it drops onto the shelf or counter under it when let go. */
-function Prop({ prop, shown, badge, caption, batter, said, splash, spot: at, lifted, w, h, size }: PropProps) {
+const Prop = memo(PropImpl);
+function PropImpl({ prop, shown, badge, caption, batter, said, splash, spot: at, lifted, w, h, size }: PropProps) {
   const box = size * 1.25;
   const label = prop.says
     ? `${shown}. Tap to hear it, drag to move${splash === 'mud' ? '. It is rolling in the mud' : ''}.`

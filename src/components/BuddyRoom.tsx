@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { memo, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import Animated, { cancelAnimation, Easing, useAnimatedStyle, useSharedValue, withRepeat, withTiming } from 'react-native-reanimated';
 import {
   Pressable,
@@ -76,6 +76,8 @@ import { DrawnItem, hasDrawing } from '@/components/DrawnItem';
 import { PrintedToy, Printer3D, type PrintJob } from '@/components/Printer3D';
 import { parsePrintId, PRINTER_ITEM, type FilamentId, type PrintToyId } from '@/constants/printer';
 import { BlanketFort } from '@/components/BlanketFort';
+import { useDragOffset } from '@/hooks/useDragOffset';
+import { DragOffsets } from '@/utils/dragOffsets';
 import { FortInside, type FortEvent } from '@/components/FortInside';
 import { FORT_ITEM, parseFortId, type BlanketId, type FortExtra, type FortExtraId } from '@/constants/fort';
 
@@ -166,7 +168,8 @@ const DOOR = '#C68B5E';
 const TAP_SLOP = 6;
 /** Holding a dragged thing this close to the side scrolls the home that way. */
 const EDGE = 40;
-const EDGE_STEP = 10;
+/** How fast the home scrolls while a piece is held at the side, in points per millisecond. */
+const EDGE_SPEED = 0.6;
 /** How long a tap's little picture floats over a thing. */
 const POP_MS = 1300;
 /** How long a washing machine runs. */
@@ -274,8 +277,11 @@ export function BuddyRoom(props: Props) {
   /** Appliances switched on, and each chalkboard's drawing. */
   const [running, setRunning] = useState<ReadonlySet<string>>(new Set());
   const [steps, setSteps] = useState<Record<string, number>>({});
-  /** How far each piece being dragged (or riding along) has moved, by piece key. */
-  const [moving, setMoving] = useState<Record<string, { dx: number; dy: number }>>({});
+  /** How far each piece being dragged (or riding along) has moved, by piece key. Kept outside React: only the carried pieces redraw as a finger moves. */
+  const [offsets] = useState(() => new DragOffsets());
+  /** Which pieces are being carried (their keys, joined), so the home only redraws when that changes. */
+  const [heldSig, setHeldSig] = useState('');
+  const heldKeys = useMemo(() => new Set(heldSig ? heldSig.split('\u0001') : []), [heldSig]);
   const [pops, setPops] = useState<Pop[]>([]);
   /** Clothes just put on (a poof) or knocked off (falling to the floor). */
   const [dressFx, setDressFx] = useState<DressFx[]>([]);
@@ -299,9 +305,14 @@ export function BuddyRoom(props: Props) {
   const frame = useRef({ x: 0, y: 0 });
   const tracks = useRef(new Map<number, Track>());
   const latestPieces = useRef<Piece[]>([]);
-  const edgeTimer = useRef<ReturnType<typeof setInterval> | null>(null);
+  /** The frame callback that scrolls the home while a carried piece is held at the side. */
+  const edgeFrame = useRef<number | null>(null);
+  const edgeLast = useRef(0);
   const scrollX = useRef(0);
   const reported = useRef(area);
+  /** The room in view right now, kept here so scrolling past a room doesn't redraw the whole screen; the screen is told once a finger lets go. */
+  const [seenArea, setSeenArea] = useState(area);
+  useEffect(() => setSeenArea(area), [area]);
   const size: HomeSize | null = useMemo(
     () => (view.width > 0 && view.height > 0 ? homeSize(view.width, view.height, areas) : null),
     [view.width, view.height, areas],
@@ -328,7 +339,7 @@ export function BuddyRoom(props: Props) {
     () => () => {
       popTimers.current.forEach(clearTimeout);
       if (washTimer.current) clearTimeout(washTimer.current);
-      if (edgeTimer.current) clearInterval(edgeTimer.current);
+      if (edgeFrame.current !== null) cancelAnimationFrame(edgeFrame.current);
       slideTimers.current.forEach(clearTimeout);
     },
     [],
@@ -402,8 +413,20 @@ export function BuddyRoom(props: Props) {
   }, [area, size?.width]);
 
   const onScroll = (e: NativeSyntheticEvent<NativeScrollEvent>) => {
-    scrollX.current = e.nativeEvent.contentOffset.x;
+    // While fingers are down this code is moving the home, and the scroller reports where it was a
+    // few frames ago: taking that would pull the home back and make the edge scroll stutter.
+    if (tracks.current.size === 0) scrollX.current = e.nativeEvent.contentOffset.x;
     if (size) onView?.((scrollX.current + view.width / 2) / size.areaWidth);
+    const now = areaInView(scrollX.current);
+    setSeenArea(now);
+    // Carrying something across rooms: tell the screen where we ended up once the finger lets go.
+    if (now !== reported.current && tracks.current.size === 0) {
+      reported.current = now;
+      onAreaChange(now);
+    }
+  };
+  /** Tells the screen which room is in view, after a carry that crossed rooms. */
+  const reportArea = () => {
     const now = areaInView(scrollX.current);
     if (now !== reported.current) {
       reported.current = now;
@@ -437,19 +460,26 @@ export function BuddyRoom(props: Props) {
     onToggle?.(name, now);
   };
 
+  // The layout only changes when the room, the buddies, the size or an open door does, not as a finger moves.
+  const pieces = useMemo(
+    () =>
+      size
+        ? layoutHome(
+            room,
+            buddies.map((b) => ({ id: b.id, spot: b.spot, personHeight: b.person?.look.height })),
+            size,
+            open,
+          )
+        : [],
+    [room, buddies, size, open],
+  );
+  const byKey = useMemo(() => new Map(pieces.map((p) => [p.key, p])), [pieces]);
+  const buddyById = useMemo(() => new Map(buddies.map((b) => [b.id, b])), [buddies]);
+  latestPieces.current = pieces;
+
   if (!size) {
     return <View ref={frameRef} style={styles.frame} onLayout={onLayout} />;
   }
-
-  const pieces = layoutHome(
-    room,
-    buddies.map((b) => ({ id: b.id, spot: b.spot, personHeight: b.person?.look.height })),
-    size,
-    open,
-  );
-  latestPieces.current = pieces;
-  const byKey = new Map(pieces.map((p) => [p.key, p]));
-  const buddyById = new Map(buddies.map((b) => [b.id, b]));
 
   const tapPiece = (piece: Piece) => {
     if (piece.buddyId) {
@@ -509,7 +539,7 @@ export function BuddyRoom(props: Props) {
   /** Where light shines in a dark room: lit fires, candles and lamps, with how far it reaches. */
   const inDark = (x: number) => dark.has(areas[Math.min(count - 1, Math.max(0, Math.floor(x / size.areaWidth)))]?.id ?? '');
   /** Only the room in view and the ones beside it are drawn; the rest of the home waits until it's near. */
-  const near = (slot: number) => Math.abs(slot - area) <= 1;
+  const near = (slot: number) => Math.abs(slot - seenArea) <= 1;
   const nearX = (x: number) => near(Math.floor(x / size.areaWidth));
   const nearSpot = (f: FixtureSpot) => near(size.order.indexOf(f.area));
   const nearGadget = (g: Gadget) => near(size.order.indexOf(g.area));
@@ -692,7 +722,9 @@ export function BuddyRoom(props: Props) {
       const at = toHome(t.pageX, t.pageY);
       for (const key of t.keys) next[key] = { dx: at.x - t.startX, dy: at.y - t.startY };
     }
-    setMoving(next);
+    offsets.set(next);
+    const sig = offsets.signature();
+    setHeldSig((was) => (was === sig ? was : sig));
   };
 
   /** The piece under a finger, unless it is already being carried by another. */
@@ -723,8 +755,8 @@ export function BuddyRoom(props: Props) {
   };
 
   const stopEdge = () => {
-    if (edgeTimer.current) clearInterval(edgeTimer.current);
-    edgeTimer.current = null;
+    if (edgeFrame.current !== null) cancelAnimationFrame(edgeFrame.current);
+    edgeFrame.current = null;
   };
 
   /** Which way to scroll while a dragged piece is held at the side of the screen. */
@@ -763,13 +795,20 @@ export function BuddyRoom(props: Props) {
     }
     if (!changed) return;
     showMoving();
-    if (!edgeTimer.current && edgeDir() !== 0) {
-      edgeTimer.current = setInterval(() => {
+    if (edgeFrame.current === null && edgeDir() !== 0) {
+      edgeLast.current = Date.now();
+      const tick = () => {
         const dir = edgeDir();
         if (dir === 0 || tracks.current.size === 0) return stopEdge();
-        scrollBy(dir * EDGE_STEP);
+        // The same speed on any tablet: distance follows the time since the last frame.
+        const now = Date.now();
+        const dt = Math.min(48, now - edgeLast.current);
+        edgeLast.current = now;
+        scrollBy(dir * EDGE_SPEED * dt);
         showMoving();
-      }, 16);
+        edgeFrame.current = requestAnimationFrame(tick);
+      };
+      edgeFrame.current = requestAnimationFrame(tick);
     }
   };
 
@@ -777,7 +816,10 @@ export function BuddyRoom(props: Props) {
     const t = tracks.current.get(id);
     if (!t) return;
     tracks.current.delete(id);
-    if (tracks.current.size === 0) stopEdge();
+    if (tracks.current.size === 0) {
+      stopEdge();
+      reportArea();
+    }
     showMoving();
     if (!t.piece) return;
     if (!t.moved) return tapPiece(t.piece);
@@ -789,7 +831,7 @@ export function BuddyRoom(props: Props) {
   const touchesOf = (e: GestureResponderEvent) =>
     e.nativeEvent.changedTouches?.length ? e.nativeEvent.changedTouches : [e.nativeEvent];
 
-  const dragging = Object.keys(moving).length > 0;
+  const dragging = heldSig !== '';
 
   return (
     <View ref={frameRef} style={styles.frame} onLayout={onLayout} accessibilityLabel="The buddies' home">
@@ -918,143 +960,36 @@ export function BuddyRoom(props: Props) {
           onResponderTerminate={() => {
             tracks.current.clear();
             stopEdge();
-            setMoving({});
+            offsets.set({});
+            setHeldSig('');
+            reportArea();
           }}
         >
           {pieces.map((piece) => {
             if (props.printing && piece.key === props.printing.toyKey) return null;
-            const offset = moving[piece.key];
             // Far rooms aren't drawn, but anything being carried is, wherever it goes.
-            if (!offset && !nearX(piece.x)) return null;
-            const buddy = piece.buddyId ? buddyById.get(piece.buddyId) : undefined;
-            const parent = piece.parent ? byKey.get(piece.parent) : undefined;
+            if (!heldKeys.has(piece.key) && !nearX(piece.x)) return null;
             const seat = piece.builtIn ? findBuiltInSeat(piece.builtIn) : undefined;
-            const seatOn = seat ? running.has(seat.appliance) : false;
-            // In a bed, a buddy naps, unless someone's bouncing on it.
-            const asleep = !!parent?.item?.sleep || (!!seat?.sleep && !seatOn);
-            const tall = Math.round(piece.height);
-            const b = bumps[piece.key];
             return (
-              <PieceView
+              <PieceItem
                 key={piece.key}
-                box={{ left: piece.x - piece.width / 2, top: piece.y - piece.height, width: piece.width, height: piece.height }}
-                offset={offset ?? null}
+                piece={piece}
+                buddy={piece.buddyId ? buddyById.get(piece.buddyId) : undefined}
+                parent={piece.parent ? byKey.get(piece.parent) : undefined}
+                seat={seat}
+                seatOn={seat ? running.has(seat.appliance) : false}
+                bump={bumps[piece.key]}
+                lit={lit.has(piece.key)}
+                sliding={sliding.has(piece.key)}
+                popSkip={!drawn.current || !!seen.current?.has(piece.key)}
                 wobble={tidying && !piece.buddyId}
-                alive={!!piece.buddyId}
-                label={buddy ? buddy.name : piece.item?.name ?? 'Thing'}
-              >
-                {lit.has(piece.key) ? (
-                  <View
-                    style={[
-                      styles.glow,
-                      {
-                        width: piece.height * 2.4,
-                        height: piece.height * 2.4,
-                        left: (piece.width - piece.height * 2.4) / 2,
-                        top: -piece.height * 0.9,
-                      },
-                    ]}
-                  />
-                ) : null}
-                {buddy && !parent && !seat ? (
-                  <GroundShadow
-                    width={piece.height * 0.42}
-                    hidden={!!offset}
-                    style={{ left: piece.width / 2 - piece.height * 0.21, bottom: -piece.height * 0.035 }}
-                  />
-                ) : null}
-                <Ride piece={piece} seat={seat} on={seatOn} size={size} sliding={sliding.has(piece.key)}>
-                <Sunk piece={piece} running={seatOn}>
-                  <PopIn skip={!drawn.current || !!seen.current?.has(piece.key)} damping={9} style={styles.fill}>
-                    <Lively
-                      height={tall}
-                      seed={piece.key}
-                      breathe={!!buddy && !offset}
-                      asleep={asleep}
-                      bounce={b?.n}
-                      bounceKind={b?.kind}
-                      style={styles.fill}
-                    >
-                      {buddy ? (
-                        buddy.person ? (
-                          <PersonFigure
-                            look={buddy.person.look}
-                            size={tall}
-                            dressed={buddy.person.dressed}
-                            gift={buddy.gift}
-                            alive
-                            asleep={asleep}
-                            mood={offset ? 'happy' : buddy.mood}
-                            wave={b?.kind === 'hop' ? b.n : undefined}
-                          />
-                        ) : (
-                          <BuddyFigure
-                            value={buddy.emoji}
-                            size={tall}
-                            fur={buddy.fur}
-                            belly={buddy.belly}
-                            dressed={buddy.dressed}
-                            gift={buddy.gift}
-                            wave={b?.kind === 'hop' ? b.n : undefined}
-                            mood={offset ? 'happy' : buddy.mood}
-                          />
-                        )
-                      ) : piece.item?.id === PRINTER_ITEM ? (
-                        <Printer3D
-                          width={piece.width}
-                          height={piece.height}
-                          job={props.printing?.printerKey === piece.key ? props.printing.job : null}
-                        />
-                      ) : piece.item && (piece.item.id === FORT_ITEM || parseFortId(piece.item.id)) ? (
-                        <BlanketFort
-                          width={piece.width}
-                          height={piece.height}
-                          blanket={(parseFortId(piece.item.id)?.id as BlanketId | undefined) ?? null}
-                          flag={props.fortFlag}
-                          glowing={!!parseFortId(piece.item.id) && inDark(piece.x)}
-                        />
-                      ) : piece.item && parsePrintId(piece.item.id) ? (
-                        <PrintedToy
-                          toy={parsePrintId(piece.item.id)!.toy.id as PrintToyId}
-                          filament={parsePrintId(piece.item.id)!.filament.id as FilamentId}
-                          width={piece.width}
-                          height={piece.height}
-                          glowing={parsePrintId(piece.item.id)!.filament.id === 'glow' && inDark(piece.x)}
-                        />
-                      ) : piece.item?.id === PICTURE_ITEM ? (
-                        <FramedPicture picture={props.pictures?.[piece.key]} width={piece.width} height={piece.height} />
-                      ) : piece.item?.draw ? (
-                        <Furniture shape={piece.item.draw} width={piece.width} height={piece.height} />
-                      ) : piece.item?.lamp ? (
-                        <Lamp width={piece.width} height={piece.height} lit={lit.has(piece.key)} />
-                      ) : piece.item?.candle ? (
-                        <Candle width={piece.width} height={piece.height} wax={piece.item.candle} lit={lit.has(piece.key)} seed={piece.key} />
-                      ) : hasDrawing(piece.item?.id) && piece.item ? (
-                        <DrawnItem id={piece.item.id} width={piece.width} height={piece.height} />
-                      ) : (
-                        piece.item?.emoji.startsWith('@') ? (
-                          <Sticker value={piece.item.emoji} size={Math.round(piece.height * 0.85)} />
-                        ) : (
-                          <Text style={{ fontSize: Math.round(piece.height * 0.85), lineHeight: tall }}>
-                            {piece.item?.emoji}
-                          </Text>
-                        )
-                      )}
-                    </Lively>
-                  </PopIn>
-                </Sunk>
-                </Ride>
-                {piece.item?.ambient && !offset ? (
-                  <Drifting rise={piece.height * 0.5} style={styles.zzz}>
-                    <Text style={{ fontSize: Math.round(piece.height * 0.32) }}>{piece.item.ambient}</Text>
-                  </Drifting>
-                ) : null}
-                {buddy && asleep ? (
-                  <Drifting rise={piece.height * 0.25} style={styles.zzz}>
-                    <Text style={{ fontSize: Math.round(piece.height * 0.3) }}>💤</Text>
-                  </Drifting>
-                ) : null}
-              </PieceView>
+                printJob={props.printing?.printerKey === piece.key ? props.printing.job : null}
+                picture={props.pictures?.[piece.key]}
+                fortFlag={!!props.fortFlag}
+                dark={inDark(piece.x)}
+                size={size}
+                offsets={offsets}
+              />
             );
           })}
         </View>
@@ -1684,6 +1619,179 @@ function Sunk({ piece, running, children }: { piece: Piece; running: boolean; ch
 }
 
 const FRONT_BALLS = ['#EF5350', '#FFCA28', '#42A5F5', '#66BB6A', '#AB47BC'];
+
+interface PieceItemProps {
+  piece: Piece;
+  buddy: HomeBuddy | undefined;
+  /** What it rests on, for a buddy sitting on a seat. */
+  parent: Piece | undefined;
+  seat: BuiltInSeat | undefined;
+  /** Its built-in seat's appliance is switched on. */
+  seatOn: boolean;
+  bump: { n: number; kind: BounceKind } | undefined;
+  lit: boolean;
+  sliding: boolean;
+  /** Skip the pop-in: it was already there before this draw. */
+  popSkip: boolean;
+  wobble: boolean;
+  printJob: PrintJob | null;
+  picture: Picture | undefined;
+  fortFlag: boolean;
+  /** Its room has the lights off. */
+  dark: boolean;
+  size: HomeSize;
+  offsets: DragOffsets;
+}
+
+/**
+ * One buddy or thing in the home. It only redraws when its own details change, and when it
+ * is carried it listens for its own offset, so moving a finger doesn't redraw the whole home.
+ */
+const PieceItem = memo(function PieceItem({
+  piece,
+  buddy,
+  parent,
+  seat,
+  seatOn,
+  bump: b,
+  lit,
+  sliding,
+  popSkip,
+  wobble,
+  printJob,
+  picture,
+  fortFlag,
+  dark,
+  size,
+  offsets,
+}: PieceItemProps) {
+  const offset = useDragOffset(offsets, piece.key);
+  // In a bed, a buddy naps, unless someone's bouncing on it.
+  const asleep = !!parent?.item?.sleep || (!!seat?.sleep && !seatOn);
+  const tall = Math.round(piece.height);
+  return (
+      <PieceView
+        key={piece.key}
+        box={{ left: piece.x - piece.width / 2, top: piece.y - piece.height, width: piece.width, height: piece.height }}
+        offset={offset}
+        wobble={wobble}
+        alive={!!piece.buddyId}
+        label={buddy ? buddy.name : piece.item?.name ?? 'Thing'}
+      >
+        {lit ? (
+          <View
+            style={[
+              styles.glow,
+              {
+                width: piece.height * 2.4,
+                height: piece.height * 2.4,
+                left: (piece.width - piece.height * 2.4) / 2,
+                top: -piece.height * 0.9,
+              },
+            ]}
+          />
+        ) : null}
+        {buddy && !parent && !seat ? (
+          <GroundShadow
+            width={piece.height * 0.42}
+            hidden={!!offset}
+            style={{ left: piece.width / 2 - piece.height * 0.21, bottom: -piece.height * 0.035 }}
+          />
+        ) : null}
+        <Ride piece={piece} seat={seat} on={seatOn} size={size} sliding={sliding}>
+        <Sunk piece={piece} running={seatOn}>
+          <PopIn skip={popSkip} damping={9} style={styles.fill}>
+            <Lively
+              height={tall}
+              seed={piece.key}
+              breathe={!!buddy && !offset}
+              asleep={asleep}
+              bounce={b?.n}
+              bounceKind={b?.kind}
+              style={styles.fill}
+            >
+              {buddy ? (
+                buddy.person ? (
+                  <PersonFigure
+                    look={buddy.person.look}
+                    size={tall}
+                    dressed={buddy.person.dressed}
+                    gift={buddy.gift}
+                    alive
+                    asleep={asleep}
+                    mood={offset ? 'happy' : buddy.mood}
+                    wave={b?.kind === 'hop' ? b.n : undefined}
+                  />
+                ) : (
+                  <BuddyFigure
+                    value={buddy.emoji}
+                    size={tall}
+                    fur={buddy.fur}
+                    belly={buddy.belly}
+                    dressed={buddy.dressed}
+                    gift={buddy.gift}
+                    wave={b?.kind === 'hop' ? b.n : undefined}
+                    mood={offset ? 'happy' : buddy.mood}
+                  />
+                )
+              ) : piece.item?.id === PRINTER_ITEM ? (
+                <Printer3D
+                  width={piece.width}
+                  height={piece.height}
+                  job={printJob}
+                />
+              ) : piece.item && (piece.item.id === FORT_ITEM || parseFortId(piece.item.id)) ? (
+                <BlanketFort
+                  width={piece.width}
+                  height={piece.height}
+                  blanket={(parseFortId(piece.item.id)?.id as BlanketId | undefined) ?? null}
+                  flag={fortFlag}
+                  glowing={!!parseFortId(piece.item.id) && dark}
+                />
+              ) : piece.item && parsePrintId(piece.item.id) ? (
+                <PrintedToy
+                  toy={parsePrintId(piece.item.id)!.toy.id as PrintToyId}
+                  filament={parsePrintId(piece.item.id)!.filament.id as FilamentId}
+                  width={piece.width}
+                  height={piece.height}
+                  glowing={parsePrintId(piece.item.id)!.filament.id === 'glow' && dark}
+                />
+              ) : piece.item?.id === PICTURE_ITEM ? (
+                <FramedPicture picture={picture} width={piece.width} height={piece.height} />
+              ) : piece.item?.draw ? (
+                <Furniture shape={piece.item.draw} width={piece.width} height={piece.height} />
+              ) : piece.item?.lamp ? (
+                <Lamp width={piece.width} height={piece.height} lit={lit} />
+              ) : piece.item?.candle ? (
+                <Candle width={piece.width} height={piece.height} wax={piece.item.candle} lit={lit} seed={piece.key} />
+              ) : hasDrawing(piece.item?.id) && piece.item ? (
+                <DrawnItem id={piece.item.id} width={piece.width} height={piece.height} />
+              ) : (
+                piece.item?.emoji.startsWith('@') ? (
+                  <Sticker value={piece.item.emoji} size={Math.round(piece.height * 0.85)} />
+                ) : (
+                  <Text style={{ fontSize: Math.round(piece.height * 0.85), lineHeight: tall }}>
+                    {piece.item?.emoji}
+                  </Text>
+                )
+              )}
+            </Lively>
+          </PopIn>
+        </Sunk>
+        </Ride>
+        {piece.item?.ambient && !offset ? (
+          <Drifting rise={piece.height * 0.5} style={styles.zzz}>
+            <Text style={{ fontSize: Math.round(piece.height * 0.32) }}>{piece.item.ambient}</Text>
+          </Drifting>
+        ) : null}
+        {buddy && asleep ? (
+          <Drifting rise={piece.height * 0.25} style={styles.zzz}>
+            <Text style={{ fontSize: Math.round(piece.height * 0.3) }}>💤</Text>
+          </Drifting>
+        ) : null}
+      </PieceView>
+  );
+});
 
 interface PieceViewProps {
   /** Where it is drawn, in pixels across the home. */
